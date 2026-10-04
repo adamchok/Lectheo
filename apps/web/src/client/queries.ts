@@ -15,6 +15,7 @@ import {
   MeResponse,
   NextStepResponse,
   RedirectResponse,
+  TranscriptResponse,
   type ActivityType,
   type LectureStatus,
 } from '@lectheo/contracts'
@@ -122,6 +123,18 @@ export function useStartActivity() {
         body: { id: newId(), conceptId: input.conceptId, type: input.type },
         schema: CreateActivityResponse,
       }),
+  })
+}
+
+/** GET /lectures/{id}/transcript (watch-mode side panel). Segments don't change while watching. */
+export function useTranscript(lectureId: string | undefined) {
+  return useQuery({
+    queryKey: [...queryKeys.lecture(lectureId ?? ''), 'transcript'] as const,
+    queryFn: ({ signal }) =>
+      apiFetch(`/lectures/${lectureId}/transcript`, { schema: TranscriptResponse, signal }),
+    enabled: Boolean(lectureId),
+    select: (response) => response.segments,
+    staleTime: Infinity,
   })
 }
 
