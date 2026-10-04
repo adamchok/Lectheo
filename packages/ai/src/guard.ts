@@ -30,6 +30,23 @@ export interface LeakCheckInput extends LeakEscalationInput {
   readonly leakKeywords: readonly string[]
 }
 
+/** Transfer guiding questions: one prompt, no flawed sentence; only the answer can leak. */
+export const answerOnlyLeakInput = (args: {
+  prompt: string
+  modelSolution: string
+  rubricDescriptions: readonly string[]
+  reply: string
+  leakKeywords: readonly string[]
+}): LeakCheckInput => ({
+  scenarioSentences: [args.prompt],
+  flawSentenceIdx: 0,
+  flawSummary: args.rubricDescriptions.join(' '),
+  correction: args.modelSolution,
+  reply: args.reply,
+  leakKeywords: args.leakKeywords,
+  answerOnly: true,
+})
+
 export type GuardDecision = 'pass' | 'block'
 
 export interface LeakCheckResult {
@@ -142,9 +159,14 @@ async function tryJev(input: LeakCheckInput, ctx: GuardContext): Promise<Message
   const evaluate = ctx.evaluate ?? ((i, signal) => jevEvaluate(i, signal, ctx))
   try {
     const scores = await withTimeout(ctx.jevTimeoutMs ?? JEV_TIMEOUT_MS, (s) => evaluate(input, s))
+    // answerOnly: there is no flawed sentence, so the location score is noise (seen at 0.5–0.8
+    // on harmless transfer questions); only the correction/answer score decides.
+    const maxP = input.answerOnly
+      ? scores.revealsCorrection
+      : Math.max(scores.revealsLocation, scores.revealsCorrection)
     return {
       ...scores,
-      maxP: Math.max(scores.revealsLocation, scores.revealsCorrection),
+      maxP,
       latencyMs: Date.now() - started,
     }
   } catch {

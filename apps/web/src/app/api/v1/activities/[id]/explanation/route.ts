@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 export const POST = route(
   { auth: 'required', params: z.object({ id: z.string() }), response: ExplanationResponse },
   async ({ actor, params }) => {
-    const { explanation, sources } = await showExplanation(actor, params.id)
-    return { explanation, sources: [...sources] }
+    const { explanation, sources, rubric } = await showExplanation(actor, params.id)
+    return { explanation, sources: [...sources], ...(rubric ? { rubric: [...rubric] } : {}) }
   },
 )

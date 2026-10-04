@@ -295,7 +295,7 @@ Once `final = true`, the response adds `explanation` and the `rubric` criteria (
 
 ### `POST /activities/{id}/explanation`
 Before the final try, this reveals the explanation now ("Show me"). It sets `explanation_shown`, so later tries are `assisted`.
-`200 { explanation, sources }`
+`200 { explanation, sources, rubric? }`. `rubric` (labels and descriptions) is included only once the activity is closed, so reopening a finished activity can show how it was graded.
 
 ---
 

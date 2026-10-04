@@ -5,12 +5,36 @@ import type { DbLike } from '../db'
 import { FEATURES } from '../features'
 import { DAILY_LIMITS } from '../quota'
 import { conceptsWithUnseenItem } from './items'
-import { createActivity, getActivity, showExplanation } from './service'
+import { createActivity, getActivity, showExplanation, takeHint } from './service'
 import { submitActivity } from './submit'
 import { ALICE, BOB, IDS, newId, seedFixture } from './test-fixture'
-import { FALLBACK_QUESTION } from './transfer'
+import { FALLBACK_QUESTION, quotesAnswer } from './transfer'
 
 vi.mock('server-only', () => ({}))
+
+/** Per-test overrides of the fake judge-transfer output (other tasks run unchanged). */
+const judge = vi.hoisted(() => ({ question: null as string | null, full: false }))
+vi.mock('@lectheo/ai', async (importOriginal) => {
+  const ai = await importOriginal<typeof import('@lectheo/ai')>()
+  return {
+    ...ai,
+    runTask: (async (task, input, ctx) => {
+      const res = await ai.runTask(task, input, ctx)
+      if (task.name !== 'judge-transfer') return res
+      const out = res.output as { criteria: { score: number }[]; guidingQuestion: string }
+      const criteria = judge.full
+        ? (input as { rubric: typeof RUBRIC }).rubric.criteria.map((c, i) => ({
+            ...out.criteria[i],
+            score: c.max,
+          }))
+        : out.criteria
+      return {
+        ...res,
+        output: { ...out, criteria, guidingQuestion: judge.question ?? out.guidingQuestion },
+      }
+    }) as typeof ai.runTask,
+  }
+})
 
 const T1 = '0190b000-0000-7000-8000-0000000000f1'
 const T2 = '0190b000-0000-7000-8000-0000000000f2'
@@ -56,6 +80,8 @@ beforeEach(async () => {
 })
 afterEach(() => {
   setTransferFlag(true)
+  judge.question = null
+  judge.full = false
 })
 
 const start = () =>
@@ -186,5 +212,56 @@ describe('transfer', () => {
     expect(await conceptsWithUnseenItem(db, BOB.userId, [IDS.concept], 'transfer')).toEqual(
       new Set([IDS.concept]),
     )
+  })
+
+  it('blocks a guiding question that quotes the model solution (realistic empty keywords)', async () => {
+    judge.question = `Did you remember to allocate strlen(s) + 1 bytes so the terminator fits?`
+    const { id } = await start()
+    const try1 = await submitActivity(ALICE, id, { answer: 'malloc(strlen(s))' }, db)
+    expect(try1.feedback.guidingQuestion).toBe(FALLBACK_QUESTION)
+    expectHidden(try1)
+    expectHidden(await getActivity(ALICE, id, db))
+  })
+
+  it('a correct try 1 closes at once with the reveal', async () => {
+    judge.full = true
+    const { id } = await start()
+    const res = await submitActivity(ALICE, id, { answer: 'strlen(s) + 1, copy the NUL' }, db)
+    expect(res).toMatchObject({ tryNo: 1, final: true, outcome: 'correct', score: 4, maxScore: 4 })
+    expect(res.canRetry).toBe(false)
+    expect(res.feedback.guidingQuestion).toBeNull()
+    expect(res.explanation).toContain(MODEL_SOLUTION)
+    expect(res.rubric?.map((r) => r.id)).toEqual(['c1', 'c2'])
+  })
+
+  it('has no hint ladder (/hints → 404)', async () => {
+    const { id } = await start()
+    await expect(takeHint(ALICE, id, db)).rejects.toMatchObject({ code: 'not_found' })
+  })
+
+  it('reopening: "Show me" on a closed activity also returns the rubric (not before)', async () => {
+    const { id } = await start()
+    await submitActivity(ALICE, id, { answer: 'first' }, db)
+    expect((await showExplanation(ALICE, id, db)).rubric).toBeUndefined()
+    await submitActivity(ALICE, id, { answer: 'second' }, db)
+    const reopened = await showExplanation(ALICE, id, db)
+    expect(reopened.explanation).toContain(MODEL_SOLUTION)
+    expect(reopened.rubric?.map((r) => r.label)).toEqual(['Allocation size', 'Loop bound'])
+  })
+})
+
+describe('quotesAnswer()', () => {
+  const prompt = 'A program copies a string s into t.'
+  it('flags a 5-word run of the model solution the problem does not contain', () => {
+    expect(quotesAnswer('So allocate strlen(s) + 1 bytes, right?', MODEL_SOLUTION, prompt)).toBe(
+      true,
+    )
+    expect(quotesAnswer('What must fit after the last character?', MODEL_SOLUTION, prompt)).toBe(
+      false,
+    )
+  })
+  it('ignores runs the problem itself states', () => {
+    const echo = 'A program copies a string s into t. What could go wrong?'
+    expect(quotesAnswer(echo, `${prompt} Then fix it.`, prompt)).toBe(false)
   })
 })

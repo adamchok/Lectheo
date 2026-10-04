@@ -3,7 +3,9 @@ import { LIBRARY_COURSE_ID, signInSample } from './fixtures'
 
 /*
  * Transfer problem (F4b) with AI_FAKE=1. The fake judge gives the first criterion full marks and
- * the rest 1, so try 1 is partial → guiding question → retry → final reveal.
+ * the rest 1: (n + 1) / 2n of the points for n criteria of max 2, i.e. "partial" (50–80 %) for any
+ * n ≥ 2. Every seeded transfer rubric has 3–4 such criteria (Pointers: 4/6), so try 1 always offers
+ * a retry. A one-criterion rubric (or other maxima) would change the flow.
  */
 
 test('transfer: map → Pointers → Transfer problem → submit twice → reveal', async ({ page }) => {
@@ -23,15 +25,22 @@ test('transfer: map → Pointers → Transfer problem → submit twice → revea
 
   const result = page.getByRole('region', { name: 'Result' })
   await expect(result.getByText(/try 1 of 2/i)).toBeVisible()
+  // a11y: the outcome is announced and focus lands on the result, not <body>.
+  await expect(
+    page.getByRole('status').filter({ hasText: /try 1 of 2: partly right/i }),
+  ).toBeAttached()
+  await expect(result.getByRole('heading', { name: 'Result' })).toBeFocused()
   await expect(result.getByText('Think about this')).toBeVisible()
   // The rubric and model solution stay hidden until the final try.
   await expect(page.getByRole('heading', { name: 'Model solution' })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'How it was graded' })).toHaveCount(0)
 
   await result.getByRole('button', { name: 'Retry' }).click()
-  await page
-    .getByRole('textbox', { name: 'Your revised answer' })
-    .fill('A pointer stores an address; dereferencing it with * reads or writes that memory.')
+  const revised = page.getByRole('textbox', { name: 'Your revised answer' })
+  await expect(revised).toBeFocused()
+  await revised.fill(
+    'A pointer stores an address; dereferencing it with * reads or writes that memory.',
+  )
   await page.getByRole('button', { name: 'Submit' }).click()
 
   await expect(result.getByText(/try 2 of 2/i)).toBeVisible()

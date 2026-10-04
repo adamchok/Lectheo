@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  answerOnlyLeakInput,
   checkLeak,
   GUARD_BLOCK_ABOVE,
   GUARD_PASS_BELOW,
@@ -9,6 +10,7 @@ import {
   type LeakCheckInput,
 } from './guard'
 import { MODEL_SLUGS } from './models'
+import { buildPrompt, ANSWER_ONLY_SYSTEM } from './tasks/leak-escalation/prompt'
 import { jsonResult, scriptedModel } from './test-utils'
 import type { LlmCallEntry } from './types'
 
@@ -153,5 +155,32 @@ describe('checkLeak()', () => {
     const res = await checkLeak(INPUT, ctx({ fake: true, evaluate }))
     expect(res.decision).toBe('pass')
     expect(evaluate).not.toHaveBeenCalled()
+  })
+
+  describe('answerOnly (transfer guiding questions)', () => {
+    const transfer = answerOnlyLeakInput({
+      prompt: 'Copy a string into new memory.',
+      modelSolution: 'Allocate strlen(s) + 1 bytes for the terminator.',
+      rubricDescriptions: ['Adds one byte for NUL.'],
+      reply: 'What has to fit after the last visible character?',
+      leakKeywords: [],
+    })
+
+    it('ignores the location score (no flawed sentence) and decides on the answer score', async () => {
+      const escalate = vi.fn()
+      const pass = await checkLeak(transfer, ctx({ evaluate: scores(0.9, 0.1), escalate }))
+      expect(pass).toMatchObject({ decision: 'pass', guard: { jev: { maxP: 0.1 } } })
+      const block = await checkLeak(transfer, ctx({ evaluate: scores(0.1, 0.9), escalate }))
+      expect(block.decision).toBe('block')
+      expect(escalate).not.toHaveBeenCalled()
+    })
+
+    it('escalates with the transfer prompt: model solution, criteria, no sentence index', () => {
+      const spec = buildPrompt(transfer)
+      expect(spec.system).toBe(ANSWER_ONLY_SYSTEM)
+      expect(spec.prompt).toContain('Model solution: Allocate strlen(s) + 1 bytes')
+      expect(spec.prompt).toContain('Grading criteria: Adds one byte for NUL.')
+      expect(spec.prompt).not.toContain('Flawed sentence index')
+    })
   })
 })

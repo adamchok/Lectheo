@@ -134,4 +134,6 @@ export type SubmitResponse = z.infer<typeof SubmitResponse>
 export const ExplanationResponse = z.object({
   explanation: z.string(),
   sources: z.array(SourceRef),
+  /** Only once the activity is closed (reopening it shows how it was graded). */
+  rubric: z.array(RubricCriterion).optional(),
 })
