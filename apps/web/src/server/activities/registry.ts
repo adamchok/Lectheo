@@ -2,6 +2,7 @@ import type { ActivityType } from '@lectheo/contracts'
 import { notFound } from '../errors'
 import { FEATURES } from '../features'
 import { spotFlawHandler } from './spot-flaw'
+import { stumpHandler } from './stump'
 import { teachBackHandler } from './teach-back'
 import { transferHandler } from './transfer'
 import type { ActivityTypeHandler } from './types'
@@ -17,8 +18,7 @@ export const ACTIVITY_HANDLERS: {
   spot_flaw: spotFlawHandler,
   teach_back: teachBackHandler,
   transfer: transferHandler,
-  // TODO(feature-stump): stump.ts handler, enabled by FEATURES.stump.
-  stump: undefined,
+  stump: stumpHandler,
 }
 
 const OPTIONAL: Partial<Record<ActivityType, boolean>> = FEATURES

@@ -82,6 +82,15 @@ describe('map transferAvailable', () => {
 })
 
 describe('next step offers transfer only with an unseen item', () => {
+  // Stump comes after transfer in the practice order (Architecture §6.3); keep it out of the way
+  // so these cases isolate the transfer gate.
+  beforeEach(() => {
+    Object.assign(FEATURES, { stump: false })
+  })
+  afterEach(() => {
+    Object.assign(FEATURES, { stump: true })
+  })
+
   /** C3 tops the ranking (latest answer wrong) with spot_flaw and teach_back already passed. */
   async function practicedC3(): Promise<void> {
     for (const lectureId of [ID.L1, ID.L2]) await addMarker(f, { lectureId, userId: ID.A })

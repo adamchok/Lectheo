@@ -8,6 +8,7 @@ import { FeaturePlaceholder } from '@/components/feature-placeholder'
 import { PageHeader } from '@/components/page-header'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ACTIVITY_LABELS } from '@/lib/labels'
+import { StumpView } from './stump/stump-view'
 import { TeachBackView } from './teach-back/teach-back-view'
 import { TransferView } from './transfer/transfer-view'
 
@@ -49,8 +50,9 @@ export function ActivityView({ activityId }: { activityId: string }) {
           <TeachBackView activity={data} />
         ) : data.type === 'transfer' ? (
           <TransferView activity={data} />
+        ) : data.type === 'stump' ? (
+          <StumpView activity={data} />
         ) : (
-          // TODO(feature-stump): Should-priority activity type.
           <FeaturePlaceholder
             feature={`feature-${data.type}`}
             icon={Sparkles}

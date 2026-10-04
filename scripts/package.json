@@ -9,7 +9,8 @@
     "seed-library": "tsx seed-library.ts",
     "eval-items": "tsx eval-items.ts",
     "eval-judge": "tsx eval-judge.ts",
-    "eval-guard": "tsx eval-guard.ts"
+    "eval-guard": "tsx eval-guard.ts",
+    "eval-stump": "tsx eval-stump.ts"
   },
   "dependencies": {
     "@lectheo/ai": "workspace:*",

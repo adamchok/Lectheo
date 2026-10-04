@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { ClientId, Id, MasterySummary, SourceRef } from '../common'
 import { ActivityStatus, ActivityType, Outcome } from '../enums'
+import { StumpResult } from '../payloads'
 
 export const CreateActivityRequest = z.object({
   id: ClientId,
@@ -37,6 +38,13 @@ export const Feedback = z.object({
   hint: z.string().nullable(),
 })
 
+/**
+ * Stump try as GET returns it: the student's own question + key with the referee result.
+ * `studentKey`, not `answerKey`: responses never carry a field named like the 🔒 item key.
+ */
+export const StumpTry = StumpResult.extend({ question: z.string(), studentKey: z.string() })
+export type StumpTry = z.infer<typeof StumpTry>
+
 export const ActivityResponse = z.object({
   id: Id,
   type: ActivityType,
@@ -49,7 +57,15 @@ export const ActivityResponse = z.object({
   scenario: z.object({ sentences: z.array(z.string()) }).nullable(),
   /** transfer only: the problem (public payload). */
   prompt: z.string().optional(),
-  tries: z.array(z.object({ tryNo: z.number().int(), outcome: Outcome, feedback: Feedback })),
+  tries: z.array(
+    z.object({
+      tryNo: z.number().int(),
+      outcome: Outcome,
+      feedback: Feedback,
+      /** Stump only, so a reload can show the last verdict. */
+      stump: StumpTry.optional(),
+    }),
+  ),
   messages: z.array(
     z.object({
       role: z.enum(['student', 'persona']),
@@ -118,16 +134,7 @@ export const SubmitResponse = z.object({
   explanation: z.string().optional(),
   rubric: z.array(RubricCriterion).optional(),
   /** Stump only. */
-  stump: z
-    .object({
-      valid: z.boolean(),
-      rejectionReason: z.string().nullable(),
-      aiAnswer: z.string().nullable(),
-      aiStumped: z.boolean(),
-      refereeNotes: z.string(),
-      groundedIn: z.enum(['lecture', 'course_knowledge']),
-    })
-    .optional(),
+  stump: StumpResult.optional(),
 })
 export type SubmitResponse = z.infer<typeof SubmitResponse>
 

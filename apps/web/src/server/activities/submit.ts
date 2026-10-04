@@ -1,5 +1,5 @@
 import { SubmitBodyByType, type ActivityType, type SubmitResponse } from '@lectheo/contracts'
-import { activities, and, attempts, eq } from '@lectheo/db'
+import { activities, and, attempts, desc, eq } from '@lectheo/db'
 import type { Actor } from '../auth'
 import { appDb, type DbLike } from '../db'
 import { ApiError, invalidState } from '../errors'
@@ -13,8 +13,11 @@ import type { ActivityContext, ActivityTypeHandler, GradingResult } from './type
  * POST /activities/{id}/submit (API Spec §7, F4c.8, F5). State machine:
  *   active --try 1 (not correct)--> awaiting_retry --try 2--> closed
  *   active --try 1 correct--> closed
+ * A handler with maxTries > 2 (stump) stays awaiting_retry until try `maxTries` or a correct one.
  * UNIQUE (activity_id, try_no) is the race guard. Same body again → the stored attempt.
  */
+
+const DEFAULT_MAX_TRIES = 2
 
 type AttemptRow = typeof attempts.$inferSelect
 
@@ -51,21 +54,34 @@ async function findAttempt(db: DbLike, activityId: string, tryNo: number) {
   return row
 }
 
+async function lastAttempt(db: DbLike, activityId: string) {
+  const [row] = await db
+    .select()
+    .from(attempts)
+    .where(eq(attempts.activityId, activityId))
+    .orderBy(desc(attempts.tryNo))
+    .limit(1)
+  return row
+}
+
 /**
- * A client retry of try 1 (lost response) arrives while the activity is awaiting_retry. Treat it
- * as a duplicate when the body is identical and the student wrote nothing since try 1 (so a
- * teach-back retry, whose body is always {}, needs new explanation first). If no turns are left,
- * nothing new can be written, so the submit counts as try 2.
+ * A client retry of the previous try (lost response) arrives while the activity is
+ * awaiting_retry. Treat it as a duplicate when the body is identical and the student wrote nothing
+ * since (so a teach-back retry, whose body is always {}, needs new explanation first). If no turns
+ * are left, nothing new can be written, so the submit counts as the next try. Handlers with
+ * `retryNeedsNewBody` (stump) always replay an identical body.
  */
 async function isDuplicateOf(
   ctx: ActivityContext,
-  first: AttemptRow,
+  handler: ActivityTypeHandler,
+  prev: AttemptRow,
   body: unknown,
 ): Promise<boolean> {
-  if (canonical(first.response) !== canonical(body)) return false
+  if (canonical(prev.response) !== canonical(body)) return false
+  if (handler.retryNeedsNewBody) return true
   if (ctx.activity.turnsUsed >= ctx.activity.turnBudget) return false
   const visible = await ctx.visibleMessages()
-  return !visible.some((m) => m.role === 'student' && m.createdAt > first.createdAt)
+  return !visible.some((m) => m.role === 'student' && m.createdAt > prev.createdAt)
 }
 
 async function replayOrConflict(
@@ -110,6 +126,7 @@ async function buildSubmitResponse(
     explanationAvailable: true,
     sources: [...extra.sources],
     mastery,
+    ...(attempt.grading.stump ? { stump: attempt.grading.stump } : {}),
     ...(reveal ? { explanation: reveal.explanation, rubric: [...reveal.rubric] } : {}),
   }
 }
@@ -127,26 +144,24 @@ export async function submitActivity(
 
   if (activity.status === 'closed') {
     // A retry of the final submit gets the stored final attempt; anything else is 409.
-    const stored = (await findAttempt(db, id, 2)) ?? (await findAttempt(db, id, 1))
+    const stored = await lastAttempt(db, id)
     if (stored?.final && canonical(stored.response) === canonical(body)) {
       return replayOrConflict(ctx, handler, stored, body)
     }
     throw invalidState('This activity is closed.')
   }
-  const tryNo: 1 | 2 = activity.status === 'active' ? 1 : 2
+  const prev = activity.status === 'active' ? undefined : await lastAttempt(db, id)
+  const tryNo = prev ? prev.tryNo + 1 : 1
   const existing = await findAttempt(db, id, tryNo)
   if (existing) return replayOrConflict(ctx, handler, existing, body)
-  if (tryNo === 2) {
-    const first = await findAttempt(db, id, 1)
-    if (first && (await isDuplicateOf(ctx, first, body))) {
-      return replayOrConflict(ctx, handler, first, body)
-    }
+  if (prev && (await isDuplicateOf(ctx, handler, prev, body))) {
+    return replayOrConflict(ctx, handler, prev, body)
   }
 
   // F6: hints and "Show me" make later tries assisted; the Socratic guiding question does not.
   const assisted = activity.hintsUsed > 0 || activity.explanationShown
   const grading = await withAiErrors(db, () => handler.submit(ctx, body as never, tryNo))
-  const final = tryNo === 2 || grading.outcome === 'correct'
+  const final = tryNo >= (handler.maxTries ?? DEFAULT_MAX_TRIES) || grading.outcome === 'correct'
 
   const [inserted] = await db
     .insert(attempts)
@@ -165,6 +180,7 @@ export async function submitActivity(
         rationale: grading.rationale,
         ...(grading.misconceptions ? { misconceptions: [...grading.misconceptions] } : {}),
         guidingQuestion: grading.feedback.guidingQuestion,
+        ...(grading.stump ? { stump: grading.stump } : {}),
       },
       score: grading.score,
       maxScore: grading.maxScore,

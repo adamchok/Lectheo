@@ -137,6 +137,9 @@ export interface StumpResult {
   readonly countsForMastery: boolean
 }
 
+/** Submits per Stump activity: a rejected question can be revised until this many (F4d.2). */
+export const STUMP_MAX_TRIES = 3
+
 export const STUMP_LABELS = {
   accepted: 'Accepted',
   stumped: 'Accepted · you stumped the AI',
