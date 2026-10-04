@@ -15,8 +15,10 @@ import {
 } from '@lectheo/db'
 import type { MasteryResult } from '@lectheo/domain'
 import { computeLayout, layoutHash, type Layout } from '@lectheo/domain/layout'
+import { conceptsWithUnseenItem } from '../activities/items'
 import type { Actor } from '../auth'
 import { appDb, type DbLike } from '../db'
+import { FEATURES } from '../features'
 import { loadMasteryForUser } from '../mastery'
 import { loadCourseForRead, type Course } from '../ownership'
 import { toAttribution } from './summary'
@@ -177,6 +179,9 @@ export async function getCourseMap(
   const mastery = await loadMasteryForUser(db, actor.userId, [...grouped.keys()])
   const moments = momentsByConcept(markerRows)
   const layout = await ensureLayout(db, course, [...grouped.keys()], edges)
+  const transfer = FEATURES.transfer
+    ? await conceptsWithUnseenItem(db, actor.userId, [...grouped.keys()], 'transfer')
+    : new Set<string>()
 
   const nodes: MapNode[] = [...grouped.values()].map((c) => {
     const m = mastery.get(c.id) ?? GRAY
@@ -188,6 +193,7 @@ export async function getCourseMap(
       markers: { lost: countKind(own, 'lost'), important: countKind(own, 'important') },
       moments: own,
       position: pos ? { x: pos.x, y: pos.y } : null,
+      transferAvailable: transfer.has(c.id),
     }
   })
 

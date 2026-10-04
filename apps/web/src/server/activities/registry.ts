@@ -4,6 +4,7 @@ import { FEATURES } from '../features'
 import { spotFlawHandler } from './spot-flaw'
 import { stumpHandler } from './stump'
 import { teachBackHandler } from './teach-back'
+import { transferHandler } from './transfer'
 import type { ActivityTypeHandler } from './types'
 
 /*
@@ -16,8 +17,7 @@ export const ACTIVITY_HANDLERS: {
 } = {
   spot_flaw: spotFlawHandler,
   teach_back: teachBackHandler,
-  // TODO(feature-transfer): transfer.ts handler, enabled by FEATURES.transfer.
-  transfer: undefined,
+  transfer: transferHandler,
   stump: stumpHandler,
 }
 

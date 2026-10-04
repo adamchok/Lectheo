@@ -6,6 +6,8 @@ export const LeakEscalationInput = z.object({
   flawSummary: z.string(),
   correction: z.string(),
   reply: z.string(),
+  /** Transfer: `correction` is the model solution and there is no flawed sentence. */
+  answerOnly: z.boolean().optional(),
 })
 export type LeakEscalationInput = z.infer<typeof LeakEscalationInput>
 

@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ACTIVITY_LABELS } from '@/lib/labels'
 import { StumpView } from './stump/stump-view'
 import { TeachBackView } from './teach-back/teach-back-view'
+import { TransferView } from './transfer/transfer-view'
 
 /** /activities/[id]: Spot the flaw / Teach-back / Transfer / Stump (F4). */
 export function ActivityView({ activityId }: { activityId: string }) {
@@ -47,10 +48,11 @@ export function ActivityView({ activityId }: { activityId: string }) {
           <SpotFlawView activity={data} />
         ) : data.type === 'teach_back' ? (
           <TeachBackView activity={data} />
+        ) : data.type === 'transfer' ? (
+          <TransferView activity={data} />
         ) : data.type === 'stump' ? (
           <StumpView activity={data} />
         ) : (
-          // TODO(feature-transfer / feature-stump): Should-priority activity types.
           <FeaturePlaceholder
             feature={`feature-${data.type}`}
             icon={Sparkles}

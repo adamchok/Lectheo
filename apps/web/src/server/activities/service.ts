@@ -1,6 +1,7 @@
 import {
   SpotFlawPublicPayload,
   SubmitStump,
+  TransferPublicPayload,
   type ActivityResponse,
   type ActivityType,
   type CreateActivityResponse,
@@ -16,7 +17,14 @@ import { loadMasteryForUser } from '../mastery'
 import { consume } from '../quota'
 import { buildContext, findActivity, loadConceptForRead, loadOwnedActivity } from './load'
 import { handlerFor } from './registry'
-import type { ActivityContext, ActivityRow, ConceptRow, Explanation, ReplyResult } from './types'
+import type {
+  ActivityContext,
+  ActivityRow,
+  ConceptRow,
+  Explanation,
+  FinalReveal,
+  ReplyResult,
+} from './types'
 
 /*
  * Shared, type-agnostic /activities logic (API Spec §7, ADR-007). Type modules plug in through
@@ -67,6 +75,8 @@ export async function createActivity(
   const existing = await findActivity(db, input.id)
   if (existing) return replay(db, actor, existing, input.type)
 
+  // ponytail: consumed before start, so a 409 bank_empty still costs one unit (no refund, like
+  // every quota here); refund in a catch around start() if students hit it in practice.
   await consume(actor, 'activities', db)
   const concept = await loadConceptForRead(db, actor, input.conceptId)
   const ai = aiContext({ actor, db })
@@ -131,6 +141,9 @@ export async function getActivity(
     turnBudget: activity.turnBudget,
     hintsUsed: activity.hintsUsed,
     scenario: scenarioOf(ctx),
+    ...(ctx.item?.kind === 'transfer'
+      ? { prompt: TransferPublicPayload.parse(ctx.item.publicPayload).prompt }
+      : {}),
     tries: tries.map((t) => ({
       tryNo: t.tryNo,
       outcome: t.outcome,
@@ -219,7 +232,7 @@ export async function showExplanation(
   actor: Actor,
   id: string,
   db: DbLike = appDb(),
-): Promise<Explanation> {
+): Promise<Explanation & { rubric?: FinalReveal['rubric'] }> {
   const current = await loadOwnedActivity(db, actor, id)
   const handler = handlerFor(current.type)
   const [row] = await db
@@ -233,7 +246,11 @@ export async function showExplanation(
       ),
     )
     .returning()
-  return handler.explanation(await buildContext(db, actor, row ?? current))
+  const ctx = await buildContext(db, actor, row ?? current)
+  const explanation = await handler.explanation(ctx)
+  // Closed: this is the reopen path, so it also carries the rubric the final submit revealed.
+  if (current.status !== 'closed') return explanation
+  return { ...explanation, rubric: (await handler.finalReveal(ctx)).rubric }
 }
 
 /** Mastery for one concept, recomputed on read (ADR-008). */
