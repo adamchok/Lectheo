@@ -29,7 +29,7 @@ describe('streamPersona()', () => {
     ])
   })
 
-  it('streams from the role model with low effort, token cap and gateway fallback', async () => {
+  it('streams from the role model with the task effort override, token cap and gateway fallback', async () => {
     const model = new MockLanguageModelV4({
       modelId: MODEL_SLUGS.sonnet,
       doStream: async () => ({
@@ -65,7 +65,7 @@ describe('streamPersona()', () => {
     expect(await result.text).toBe('Why?')
     await result.consumeStream()
     const call = model.doStreamCalls[0]
-    expect(call?.reasoning).toBe('low')
+    expect(call?.reasoning).toBe('none')
     expect(call?.maxOutputTokens).toBe(600)
     expect(call?.providerOptions).toMatchObject({ gateway: { models: [MODEL_SLUGS.geminiFlash] } })
     expect(rec.entries[0]).toMatchObject({ outcome: 'ok', outputTokens: 9, costUsd: 0.0004 })
