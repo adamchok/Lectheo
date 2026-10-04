@@ -1,5 +1,12 @@
 import { computeLayout, layoutHash } from '@lectheo/domain/layout'
-import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core'
+import { getTableColumns, sql } from 'drizzle-orm'
+import type {
+  PgColumn,
+  PgDatabase,
+  PgQueryResultHKT,
+  PgTable,
+  PgUpdateSetSource,
+} from 'drizzle-orm/pg-core'
 import * as s from '../schema'
 import { buildLibraryRows } from './library'
 import { DEFAULT_SEED_BASE_DATE, buildStudentRows } from './student'
@@ -15,12 +22,29 @@ export interface SeedCounts {
   [table: string]: number
 }
 
+/** INSERT … ON CONFLICT (target) DO UPDATE SET every non-key column = excluded.column. */
+async function upsert<T extends PgTable>(
+  tx: SeedDb,
+  table: T,
+  values: T['$inferInsert'][],
+  target: PgColumn[],
+): Promise<void> {
+  if (values.length === 0) return
+  const keys = new Set(target.map((c) => c.name))
+  // ponytail: the generic PgUpdateSetSource<T> can't be built from a mapped object, hence the cast.
+  const set = Object.fromEntries(
+    Object.entries(getTableColumns(table))
+      .filter(([, col]) => !keys.has(col.name))
+      .map(([prop, col]) => [prop, sql.raw(`excluded."${col.name}"`)]),
+  ) as PgUpdateSetSource<T>
+  await tx.insert(table).values(values).onConflictDoUpdate({ target, set })
+}
+
 /**
- * Inserts the CS50x library fixture (course, lectures, segments, concepts, occurrences, edges,
- * items, item secrets) in one transaction. Idempotent: every insert is ON CONFLICT DO NOTHING
- * and every id is stable, so re-running changes nothing. Returns the fixture row counts.
- * The course's concept-map layout is computed here and upserted (refreshed on re-seed): library
- * content is never written at runtime (Data Model §6 invariant 7).
+ * Inserts or refreshes the CS50x library fixture (course, lectures, segments, concepts,
+ * occurrences, edges, items, item secrets) in one transaction. Idempotent: ids are stable and
+ * every row is upserted from the fixture, so re-running converges the DB to the fixture.
+ * Library content is never written at runtime (Data Model §6 invariant 7), only here.
  */
 export async function seedLibrary(db: SeedDb): Promise<SeedCounts> {
   const rows = buildLibraryRows()
@@ -40,13 +64,21 @@ export async function seedLibrary(db: SeedDb): Promise<SeedCounts> {
       .insert(s.courses)
       .values({ ...rows.course, layout, layoutHash: hash })
       .onConflictDoUpdate({ target: s.courses.id, set: { layout, layoutHash: hash } })
-    await tx.insert(s.lectures).values(rows.lectures).onConflictDoNothing()
-    await tx.insert(s.transcriptSegments).values(rows.segments).onConflictDoNothing()
-    await tx.insert(s.concepts).values(rows.concepts).onConflictDoNothing()
-    await tx.insert(s.conceptOccurrences).values(rows.occurrences).onConflictDoNothing()
-    await tx.insert(s.conceptEdges).values(rows.edges).onConflictDoNothing()
-    await tx.insert(s.items).values(rows.items).onConflictDoNothing()
-    await tx.insert(s.itemSecrets).values(rows.itemSecrets).onConflictDoNothing()
+    // Library rows are owned by the fixture: re-seeding overwrites them so fixture fixes (e.g. the
+    // L5 re-time) reach already-seeded databases. Ids are stable, so attempts/markers stay linked.
+    await upsert(tx, s.lectures, rows.lectures, [s.lectures.id])
+    await upsert(tx, s.transcriptSegments, rows.segments, [
+      s.transcriptSegments.lectureId,
+      s.transcriptSegments.idx,
+    ])
+    await upsert(tx, s.concepts, rows.concepts, [s.concepts.id])
+    await upsert(tx, s.conceptOccurrences, rows.occurrences, [
+      s.conceptOccurrences.conceptId,
+      s.conceptOccurrences.lectureId,
+    ])
+    await upsert(tx, s.conceptEdges, rows.edges, [s.conceptEdges.id])
+    await upsert(tx, s.items, rows.items, [s.items.id])
+    await upsert(tx, s.itemSecrets, rows.itemSecrets, [s.itemSecrets.itemId])
   })
   return {
     courses: 1,

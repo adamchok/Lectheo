@@ -9,7 +9,6 @@ import type {
 import { ArrowRight, CircleCheck, CircleX, Loader2, Target } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { isApiClientError } from '@/client/api'
 import { isBareShortcut } from '@/client/keyboard'
@@ -18,9 +17,9 @@ import {
   useDiagnosticConfidence,
   useDiagnosticResults,
   useDiagnosticSession,
-  useStartActivity,
   useStartDiagnostic,
 } from '@/client/queries'
+import { useStartPractice } from '@/client/practice'
 import { CONFIDENCE_OPTIONS, ConfidencePicker } from '@/components/confidence-picker'
 import { ErrorState, errorMessage } from '@/components/error-state'
 import { KeyHint } from '@/components/key-hint'
@@ -458,17 +457,14 @@ interface ConfidentMistakeCardProps {
 
 /** The headline finding (Spec §4.1 step 5) with a CTA into Spot the flaw on that concept. */
 function ConfidentMistakeCard({ finding, answer }: ConfidentMistakeCardProps) {
-  const router = useRouter()
-  const practice = useStartActivity()
+  const { startPractice, isPending } = useStartPractice()
   const why =
     answer?.whyYourChoiceIsWrong ??
     'You were sure of your answer here, but it was wrong. Revisit the lecture moment below.'
 
+  // A confident mistake is red by definition (F6), so the result can show red → amber/green.
   const handlePractice = () =>
-    practice.mutate(
-      { conceptId: finding.conceptId, type: 'spot_flaw' },
-      { onSuccess: (activity) => router.push(`/activities/${activity.id}` as Route) },
-    )
+    startPractice({ conceptId: finding.conceptId, type: 'spot_flaw', mastery: 'red' })
 
   return (
     <section
@@ -484,16 +480,11 @@ function ConfidentMistakeCard({ finding, answer }: ConfidentMistakeCardProps) {
       <p>{why}</p>
       {finding.source && <SourceRef source={finding.source} />}
       <div className="flex flex-wrap items-center gap-3 pt-2">
-        <Button size="lg" disabled={practice.isPending} onClick={handlePractice}>
-          {practice.isPending && <Loader2 aria-hidden className="animate-spin" />}
+        <Button size="lg" disabled={isPending} onClick={handlePractice}>
+          {isPending && <Loader2 aria-hidden className="animate-spin" />}
           Practice this
           <ArrowRight aria-hidden />
         </Button>
-        {practice.isError && (
-          <p role="alert" className="text-destructive text-sm">
-            {errorMessage(practice.error)}
-          </p>
-        )}
       </div>
     </section>
   )
