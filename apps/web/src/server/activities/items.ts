@@ -6,12 +6,27 @@ import {
   diagnosticResponses,
   diagnosticSessions,
   eq,
+  inArray,
   items,
   sql,
 } from '@lectheo/db'
 import type { DbLike } from '../db'
 import { invalidState } from '../errors'
 import type { ItemRow } from './types'
+
+/** Verified items of `kind` this user has never seen (no activity, no diagnostic answer). */
+const unseenBy = (userId: string, kind: ItemKind) =>
+  and(
+    eq(items.kind, kind),
+    eq(items.status, 'verified'),
+    sql`not exists (select 1 from ${activities} where ${activities.userId} = ${userId}
+          and ${activities.itemId} = ${items.id})`,
+    sql`not exists (select 1 from ${diagnosticResponses}
+          join ${diagnosticSessions}
+            on ${diagnosticSessions.id} = ${diagnosticResponses.sessionId}
+          where ${diagnosticSessions.userId} = ${userId}
+          and ${diagnosticResponses.itemId} = ${items.id})`,
+  )
 
 /**
  * A verified item of `kind` for the concept that this user has never seen: not used by any of
@@ -27,23 +42,25 @@ export async function pickUnseenItem(
   const [row] = await db
     .select()
     .from(items)
-    .where(
-      and(
-        eq(items.conceptId, conceptId),
-        eq(items.kind, kind),
-        eq(items.status, 'verified'),
-        sql`not exists (select 1 from ${activities} where ${activities.userId} = ${userId}
-              and ${activities.itemId} = ${items.id})`,
-        sql`not exists (select 1 from ${diagnosticResponses}
-              join ${diagnosticSessions}
-                on ${diagnosticSessions.id} = ${diagnosticResponses.sessionId}
-              where ${diagnosticSessions.userId} = ${userId}
-              and ${diagnosticResponses.itemId} = ${items.id})`,
-      ),
-    )
+    .where(and(eq(items.conceptId, conceptId), unseenBy(userId, kind)))
     .orderBy(asc(items.variant), asc(items.createdAt))
     .limit(1)
   return row ?? null
+}
+
+/** Which of `conceptIds` still have an unseen verified item of `kind` (entry-point gating). */
+export async function conceptsWithUnseenItem(
+  db: DbLike,
+  userId: string,
+  conceptIds: readonly string[],
+  kind: ItemKind,
+): Promise<Set<string>> {
+  if (conceptIds.length === 0) return new Set()
+  const rows = await db
+    .selectDistinct({ conceptId: items.conceptId })
+    .from(items)
+    .where(and(inArray(items.conceptId, [...conceptIds]), unseenBy(userId, kind)))
+  return new Set(rows.map((r) => r.conceptId))
 }
 
 /** pickUnseenItem or 409 when the bank has nothing new for this user. */

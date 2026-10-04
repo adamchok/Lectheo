@@ -47,6 +47,8 @@ export const ActivityResponse = z.object({
   hintsUsed: z.number().int(),
   /** spot_flaw only: scenario sentences (public payload). */
   scenario: z.object({ sentences: z.array(z.string()) }).nullable(),
+  /** transfer only: the problem (public payload). */
+  prompt: z.string().optional(),
   tries: z.array(z.object({ tryNo: z.number().int(), outcome: Outcome, feedback: Feedback })),
   messages: z.array(
     z.object({

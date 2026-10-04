@@ -131,7 +131,8 @@ Joins concepts, edges, layout, this user's markers and **mastery computed on rea
     "id": "c_…", "name": "Hash tables", "summary": "…", "lectureIds": ["…"],
     "mastery": { "state": "red", "confidentMistake": true, "reasons": ["Sure and wrong in Diagnostic (twice)"] },
     "markers": { "lost": 1, "important": 0 },
-    "position": { "x": 120, "y": 340 }
+    "position": { "x": 120, "y": 340 },
+    "transferAvailable": true
   }],
   "edges": [{ "id": "e_…", "from": "c_…", "to": "c_…", "relation": "depends_on" }],
   "unlinkedMarkers": [{ "id": "m_…", "lectureId": "…", "kind": "lost", "tMs": 1834000 }]
@@ -258,6 +259,7 @@ The server picks an **unseen verified item** from the bank. If none exists, it g
 ### `GET /activities/{id}`
 `{ id, type, concept, status, turnsUsed, turnBudget, hintsUsed, tries: [{ tryNo, outcome, feedback }], messages: [{ role, content, createdAt }] }`
 Only `visible` messages are returned. Blocked author drafts never are.
+`scenario` (spot_flaw) and `prompt` (transfer) carry the item's public payload. `transferAvailable` on map nodes is true when a verified transfer item this user hasn't seen exists (F4b entry point).
 
 ### `POST /activities/{id}/messages`
 `{ text(1..2000) }`. The turn is claimed with a guarded increment, otherwise `409 invalid_state`.

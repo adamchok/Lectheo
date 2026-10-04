@@ -8,6 +8,7 @@ import {
   prerequisitesOfRed,
   rankConcepts,
 } from '@lectheo/domain'
+import { pickUnseenItem } from '../activities/items'
 import type { Actor } from '../auth'
 import { appDb, type DbLike } from '../db'
 import { FEATURES } from '../features'
@@ -151,8 +152,13 @@ export async function getNextStep(
     pendingDiagnostics: [],
     rankedConcepts: ranked,
     topConceptActivity: top
-      ? nextActivityType(byConcept.get(top.conceptId) ?? [], FEATURES)
+      ? nextActivityType(byConcept.get(top.conceptId) ?? [], {
+          ...FEATURES,
+          // Transfer only when the bank still has an item for this user (F4b).
+          transfer:
+            FEATURES.transfer &&
+            (await pickUnseenItem(db, actor.userId, top.conceptId, 'transfer')) !== null,
+        })
       : undefined,
   })
 }
-

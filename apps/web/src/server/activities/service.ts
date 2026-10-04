@@ -1,5 +1,6 @@
 import {
   SpotFlawPublicPayload,
+  TransferPublicPayload,
   type ActivityResponse,
   type ActivityType,
   type CreateActivityResponse,
@@ -122,6 +123,9 @@ export async function getActivity(
     turnBudget: activity.turnBudget,
     hintsUsed: activity.hintsUsed,
     scenario: scenarioOf(ctx),
+    ...(ctx.item?.kind === 'transfer'
+      ? { prompt: TransferPublicPayload.parse(ctx.item.publicPayload).prompt }
+      : {}),
     tries: tries.map((t) => ({
       tryNo: t.tryNo,
       outcome: t.outcome,

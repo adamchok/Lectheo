@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/page-header'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ACTIVITY_LABELS } from '@/lib/labels'
 import { TeachBackView } from './teach-back/teach-back-view'
+import { TransferView } from './transfer/transfer-view'
 
 /** /activities/[id]: Spot the flaw / Teach-back / Transfer / Stump (F4). */
 export function ActivityView({ activityId }: { activityId: string }) {
@@ -46,8 +47,10 @@ export function ActivityView({ activityId }: { activityId: string }) {
           <SpotFlawView activity={data} />
         ) : data.type === 'teach_back' ? (
           <TeachBackView activity={data} />
+        ) : data.type === 'transfer' ? (
+          <TransferView activity={data} />
         ) : (
-          // TODO(feature-transfer / feature-stump): Should-priority activity types.
+          // TODO(feature-stump): Should-priority activity type.
           <FeaturePlaceholder
             feature={`feature-${data.type}`}
             icon={Sparkles}
