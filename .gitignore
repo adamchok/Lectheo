@@ -16,3 +16,6 @@ eval-out/
 
 # Claude Code local state (worktrees, local settings)
 .claude/
+
+# Offline seed/eval caches (subtitles, per-stage model outputs, call ledger)
+.cache/

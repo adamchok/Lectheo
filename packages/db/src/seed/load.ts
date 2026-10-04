@@ -1,5 +1,5 @@
 import { computeLayout, layoutHash } from '@lectheo/domain/layout'
-import { getTableColumns, sql } from 'drizzle-orm'
+import { and, eq, getTableColumns, inArray, notInArray, sql } from 'drizzle-orm'
 import type {
   PgColumn,
   PgDatabase,
@@ -8,7 +8,8 @@ import type {
   PgUpdateSetSource,
 } from 'drizzle-orm/pg-core'
 import * as s from '../schema'
-import { buildLibraryRows } from './library'
+import { LIBRARY_COURSE_ID } from './ids'
+import { buildLibraryRows, type LibraryRows } from './library'
 import { DEFAULT_SEED_BASE_DATE, buildStudentRows } from './student'
 
 /**
@@ -40,14 +41,106 @@ async function upsert<T extends PgTable>(
   await tx.insert(table).values(values).onConflictDoUpdate({ target, set })
 }
 
+/** Item ids someone has used: attempts, activities, diagnostic answers and planned sessions. */
+async function referencedItems(tx: SeedDb, itemIds: readonly string[]): Promise<Set<string>> {
+  if (itemIds.length === 0) return new Set()
+  const ids = sql.join(
+    itemIds.map((id) => sql`${id}::uuid`),
+    sql`, `,
+  )
+  const result = await tx.execute<{ id: string }>(sql`
+    select i.id from items i where i.id in (${ids}) and (
+      exists (select 1 from attempts a where a.item_id = i.id)
+      or exists (select 1 from activities a where a.item_id = i.id)
+      or exists (select 1 from diagnostic_responses r where r.item_id = i.id)
+      or exists (select 1 from diagnostic_sessions d where i.id = any(d.planned_item_ids)))`)
+  // ponytail: postgres-js returns the row array, PGlite a { rows } result.
+  const list = Array.isArray(result) ? result : (result as { rows: { id: string }[] }).rows
+  return new Set(list.map((r) => r.id))
+}
+
+/**
+ * Removes library rows the fixture no longer has, so a regenerated bank never leaves stale
+ * concepts, edges or questions behind. Items someone has used are retired instead (attempts and
+ * sessions keep pointing at them, and retired items are never served); concepts with history or
+ * retired items are kept (deleting a concept cascades to its attempts, Data Model invariant 6).
+ */
+async function pruneLibrary(tx: SeedDb, rows: LibraryRows): Promise<void> {
+  const lectureIds = rows.lectures.map((l) => l.id!)
+  await tx.delete(s.conceptEdges).where(
+    and(
+      eq(s.conceptEdges.courseId, LIBRARY_COURSE_ID),
+      notInArray(
+        s.conceptEdges.id,
+        rows.edges.map((e) => e.id!),
+      ),
+    ),
+  )
+  const keepOccurrence = new Set(rows.occurrences.map((o) => `${o.conceptId}:${o.lectureId}`))
+  const occurrences = await tx
+    .select({
+      conceptId: s.conceptOccurrences.conceptId,
+      lectureId: s.conceptOccurrences.lectureId,
+    })
+    .from(s.conceptOccurrences)
+    .where(inArray(s.conceptOccurrences.lectureId, lectureIds))
+  for (const o of occurrences.filter((o) => !keepOccurrence.has(`${o.conceptId}:${o.lectureId}`))) {
+    await tx
+      .delete(s.conceptOccurrences)
+      .where(
+        and(
+          eq(s.conceptOccurrences.conceptId, o.conceptId),
+          eq(s.conceptOccurrences.lectureId, o.lectureId),
+        ),
+      )
+  }
+  const stale = await tx
+    .select({ id: s.items.id })
+    .from(s.items)
+    .where(
+      and(
+        inArray(s.items.lectureId, lectureIds),
+        notInArray(
+          s.items.id,
+          rows.items.map((i) => i.id!),
+        ),
+      ),
+    )
+  const used = await referencedItems(
+    tx,
+    stale.map((i) => i.id),
+  )
+  const retire = stale.filter((i) => used.has(i.id)).map((i) => i.id)
+  const drop = stale.filter((i) => !used.has(i.id)).map((i) => i.id)
+  if (retire.length > 0) {
+    await tx.update(s.items).set({ status: 'retired' }).where(inArray(s.items.id, retire))
+  }
+  if (drop.length > 0) await tx.delete(s.items).where(inArray(s.items.id, drop))
+  await tx.delete(s.concepts).where(
+    and(
+      eq(s.concepts.courseId, LIBRARY_COURSE_ID),
+      notInArray(
+        s.concepts.id,
+        rows.concepts.map((c) => c.id!),
+      ),
+      sql`not exists (select 1 from attempts a where a.concept_id = "concepts"."id")`,
+      sql`not exists (select 1 from activities a where a.concept_id = "concepts"."id")`,
+      sql`not exists (select 1 from items i where i.concept_id = "concepts"."id")`,
+    ),
+  )
+}
+
 /**
  * Inserts or refreshes the CS50x library fixture (course, lectures, segments, concepts,
  * occurrences, edges, items, item secrets) in one transaction. Idempotent: ids are stable and
- * every row is upserted from the fixture, so re-running converges the DB to the fixture.
+ * every row is upserted from the fixture and rows the fixture dropped are pruned (pruneLibrary), so
+ * re-running converges the DB to the fixture. `rows` is a test seam (seeding an older bank).
  * Library content is never written at runtime (Data Model §6 invariant 7), only here.
  */
-export async function seedLibrary(db: SeedDb): Promise<SeedCounts> {
-  const rows = buildLibraryRows()
+export async function seedLibrary(
+  db: SeedDb,
+  rows: LibraryRows = buildLibraryRows(),
+): Promise<SeedCounts> {
   const graph = {
     concepts: rows.concepts.map((c) => ({ id: c.id! })),
     edges: rows.edges.map((e) => ({
@@ -79,6 +172,7 @@ export async function seedLibrary(db: SeedDb): Promise<SeedCounts> {
     await upsert(tx, s.conceptEdges, rows.edges, [s.conceptEdges.id])
     await upsert(tx, s.items, rows.items, [s.items.id])
     await upsert(tx, s.itemSecrets, rows.itemSecrets, [s.itemSecrets.itemId])
+    await pruneLibrary(tx, rows)
   })
   return {
     courses: 1,

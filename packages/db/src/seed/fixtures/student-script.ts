@@ -154,7 +154,7 @@ const diagnostics: DiagnosticPlan[] = [
         variant: 2,
         confidence: 'unsure',
         correct: false,
-        chose: 'c',
+        chose: 'a',
         followUp: true,
       },
       { concept: 'pass_by_reference', variant: 1, confidence: 'unsure', correct: true },
@@ -174,31 +174,29 @@ const activities: ActivityPlan[] = [
     messages: [
       {
         role: 'student',
-        content:
-          'Why does your function keep going where it does when 5150 is smaller than the middle ID?',
+        content: 'What would happen if each call searched all of the doors again instead of half?',
       },
       {
         role: 'persona',
         content:
-          'After comparing with the middle, my function keeps only one half and discards the other, so each step cuts the remaining IDs in half. That is how it stays at about 10 comparisons for 1,000 IDs.',
+          'My search calls itself on the left or right half, and a function that calls itself stops eventually, so I did not worry much about what gets passed along.',
       },
       {
         role: 'student',
-        content:
-          'In a list sorted from smallest to largest, where are the IDs that are smaller than the middle one?',
+        content: 'So what actually guarantees that it reaches "no doors left"?',
       },
       {
         role: 'persona',
         content:
-          'They come before the middle, at the lower indices. My code just keeps narrowing the range until it finds 5150 or runs out of IDs.',
+          'It checks whether any doors are left first, and returns false if there are none. I trusted that check to end things.',
       },
     ],
     tries: [
       {
         answer:
-          "Sentence 3 is wrong. The array is ascending, so if 5150 is smaller than the middle ID it can only be in the left half. Search the left half and only go right when it's larger.",
+          "Sentence 4 is wrong. Calling itself doesn't make a function stop. It stops because every call gets a smaller problem, half the doors, so it eventually reaches the no-doors-left base case. If it passed the same doors each time it would recurse forever.",
         rationale:
-          'Correct sentence and a precise fix: a smaller target must be in the left half of an ascending array.',
+          'Correct sentence and a precise fix: termination depends on each call shrinking the problem toward a base case.',
       },
     ],
   },
@@ -233,7 +231,7 @@ const activities: ActivityPlan[] = [
     ],
     tries: [
       {
-        answer: "Sentence 4 is wrong because selection sort's best case isn't O(n).",
+        answer: "Sentence 4 is wrong because selection sort's best case isn't Ω(n).",
         rationale:
           'Right sentence, but the correction only restates that the claim is false; it does not say what selection sort actually does on sorted input or what its best case is.',
         correctionScore: 0,
@@ -278,19 +276,19 @@ const activities: ActivityPlan[] = [
     variant: 1,
     hoursAgo: 73.5,
     messages: [
-      { role: 'student', content: 'Does each call to draw need any memory of its own?' },
+      { role: 'student', content: 'What happens if draw(n) calls draw(n) instead of draw(n - 1)?' },
       {
         role: 'persona',
         content:
-          'Each call has its own copy of its local variables, like i, as the scenario says. I expect that to work fine even for a very tall pyramid.',
+          'It still has the base case if (n <= 0) return, as the scenario says. I expect that to stop it either way.',
       },
     ],
     tries: [
       {
         answer:
-          'Sentence 5 is wrong. Every call gets its own memory for its variables, so a pyramid of height one million means a million nested calls, which can run out of memory and crash, like the huge pyramid in lecture.',
+          'Sentence 3 is wrong. The base case only helps if the calls get closer to it. draw(n) calling draw(n) never makes n smaller, so it never reaches n <= 0 and recurses forever. Each call has to pass a smaller problem, like n - 1.',
         rationale:
-          'Identifies that each call uses additional memory and that very deep recursion can exhaust it.',
+          'Identifies that a base case is not enough: each recursive call must shrink the input toward it.',
       },
     ],
   },
@@ -343,9 +341,9 @@ const activities: ActivityPlan[] = [
     tries: [
       {
         answer:
-          'Bubble sort with the early exit. Selection sort always does about n²/2 comparisons, around 50 million for 10,000 scores, because it never checks whether the list is already sorted. Here each score is only a few spots off, so bubble sort needs just a few passes of about 10,000 comparisons, and then a pass with no swaps stops it.',
+          '(a) 5 passes of 5 comparisons each, so 25. (b) With the check, the first pass makes 5 comparisons, sees no swaps and stops, so 5. (c) On a reversed list every pass swaps something, so it never quits early and still does about (n-1)² comparisons: O(n²). The check only helps on sorted or nearly sorted input.',
         rationale:
-          'Chooses bubble sort for nearly sorted input, quantifies selection sort’s n²/2 cost, and explains why only a few passes are needed.',
+          'Counts both cases correctly and explains why the early exit leaves the worst case at O(n²).',
       },
     ],
   },

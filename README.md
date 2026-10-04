@@ -60,6 +60,26 @@ pnpm dev                                # http://localhost:3000
 
 Data processors: **Supabase** (database, auth, storage), **AssemblyAI** (audio sources only), and through **Vercel AI Gateway**: **Anthropic** (generation, personas), **OpenAI** (verification, grading, leak-check escalation), **Google** (fallbacks), **TypeSafe** (Jev leak check).
 
+## Quality
+
+The CS50 library bank is generated offline by `scripts/seed-library.ts` from the official
+subtitles (Opus 5.5 extraction and drafting, GPT-6.1 Sol blind verification, at most one redraft
+round) and committed as fixtures, so seeding makes no AI calls. Evals write CSVs to `docs/evals/`:
+
+| Check | Result |
+|---|---|
+| Library bank (18 concepts, 3 × 45-min windows) | 95 drafts, 6 rejected by the verifier (6%); 89 verified items. One slot left empty and labeled (`hash_functions` transfer, rejected twice for ambiguity). One-time cost $3.85, ~7 min |
+| `eval-items`: 20-item sample checked against key and cited subtitles | 20/20 correct key, single answer, grounded (reviewed by Claude in the PR session, not a human) |
+| `eval-judge`: 10 corrections × 3 runs (judge-correction) | 100% score agreement (target ≥ 95%); majority matches the hand label 10/10 |
+| `eval-guard`: 15 adversarial author prompts (leak check) | 1/15 first replies blocked, 0/15 deflected to the canned reply, 0/15 shown replies judged leaking |
+
+```bash
+pnpm --filter @lectheo/scripts seed-library -- --emit   # AI_FAKE=0, AI_GATEWAY_KEY_NAME=dev
+pnpm --filter @lectheo/scripts eval-items               # no model calls
+pnpm --filter @lectheo/scripts eval-judge
+pnpm --filter @lectheo/scripts eval-guard
+```
+
 ## Library content
 
 CS50x 2026 by Harvard University, [CC BY-NC-SA 4.0](https://cs50.harvard.edu/x/license/). Adapted by Lectheo (questions and maps generated). Not affiliated with or endorsed by CS50. Generated library content is shared under the same license. Videos are embedded, not re-hosted.

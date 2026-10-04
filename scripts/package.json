@@ -1,0 +1,23 @@
+{
+  "name": "@lectheo/scripts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "test": "vitest run",
+    "seed-library": "tsx seed-library.ts",
+    "eval-items": "tsx eval-items.ts",
+    "eval-judge": "tsx eval-judge.ts",
+    "eval-guard": "tsx eval-guard.ts"
+  },
+  "dependencies": {
+    "@lectheo/ai": "workspace:*",
+    "@lectheo/contracts": "workspace:*",
+    "@lectheo/db": "workspace:*",
+    "@lectheo/domain": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^5.0.3"
+  }
+}

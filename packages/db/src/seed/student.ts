@@ -7,7 +7,7 @@ import {
 } from '@lectheo/contracts'
 import type * as s from '../schema'
 import { ITEMS, LECTURES } from './library'
-import type { FlawFx, ItemFx, McqFx, TransferFx } from './fixtures/types'
+import type { FlawFx, ItemFx, TransferFx } from './fixtures/types'
 import { SEED_STUDENT_ID, conceptId, itemId, lectureId, studentRowId, type LectureKey } from './ids'
 import { studentScript, type ActivityPlan, type DiagnosticPlan } from './fixtures/student-script'
 
@@ -63,20 +63,7 @@ const lectureOfConcept = (concept: string): LectureKey => {
   return lecture.key
 }
 
-const itemRubric = (item: FlawFx | TransferFx): RubricSecret =>
-  RubricSecret.parse({
-    criteria:
-      item.kind === 'spot_flaw'
-        ? [
-            {
-              id: item.flaw ? 'correction' : 'justification',
-              label: item.rubric[0],
-              description: item.rubric[1],
-              max: 2,
-            },
-          ]
-        : item.rubric.map(([id, label, description]) => ({ id, label, description, max: 2 })),
-  })
+const itemRubric = (item: FlawFx | TransferFx): RubricSecret => RubricSecret.parse(item.rubric)
 
 /** A typical author reply that passed the leak check without escalation. */
 const passedGuard = (latencyMs: number): MessageGuard =>
@@ -117,12 +104,13 @@ const buildDiagnostic = (plan: DiagnosticPlan, clock: Clock, rows: StudentRows):
     completedAt: answeredAt(plan.answers.length),
   })
   plan.answers.forEach((a, i) => {
-    const item = findItem(a.concept, 'diagnostic_mcq', a.variant) as McqFx
-    const optionId = a.correct ? item.correct : a.chose
-    if (!optionId || (!a.correct && optionId === item.correct)) {
+    const item = findItem(a.concept, 'diagnostic_mcq', a.variant)
+    const correctId = item.answerKey.correctOptionId
+    const optionId = a.correct ? correctId : a.chose
+    if (!optionId || (!a.correct && optionId === correctId)) {
       throw new Error(`seed student: ${a.concept} v${a.variant} needs a wrong option`)
     }
-    const misconception = a.correct ? undefined : item.distractors[optionId]?.[0]
+    const misconception = a.correct ? undefined : item.distractorMeta?.[optionId]?.misconception
     const id = itemId(a.concept, 'diagnostic_mcq', a.variant)
     rows.responses.push({
       sessionId,
@@ -161,13 +149,14 @@ const buildDiagnostic = (plan: DiagnosticPlan, clock: Clock, rows: StudentRows):
   })
 }
 
+/** F4c.6: verdict 2 + location 2 + correction 0–2 (the judged rubric, scaled to 0–2). */
 const flawCriteria = (item: FlawFx, correctionScore: number) => {
   const criteria = [{ id: 'verdict', label: 'Verdict', score: 2, max: 2 }]
-  if (!item.flaw) return criteria
+  if (!item.answerKey.hasFlaw) return criteria
   return [
     ...criteria,
     { id: 'location', label: 'Flawed sentence', score: 2, max: 2 },
-    { id: 'correction', label: item.rubric[0], score: correctionScore, max: 2 },
+    { id: 'correction', label: 'Correction', score: correctionScore, max: 2 },
   ]
 }
 
@@ -220,8 +209,12 @@ const buildActivity = (plan: ActivityPlan, clock: Clock, rows: StudentRows): voi
     if (plan.type === 'spot_flaw') {
       const flawItem = item as FlawFx
       criteria = flawCriteria(flawItem, t.correctionScore ?? 2)
-      response = flawItem.flaw
-        ? { verdict: 'flawed', flawSentenceIdx: flawItem.flaw.idx, correction: t.answer }
+      response = flawItem.answerKey.hasFlaw
+        ? {
+            verdict: 'flawed',
+            flawSentenceIdx: flawItem.answerKey.flawSentenceIdx,
+            correction: t.answer,
+          }
         : { verdict: 'correct' }
     } else if (plan.type === 'transfer') {
       const rubric = itemRubric(item as TransferFx)
@@ -245,7 +238,7 @@ const buildActivity = (plan: ActivityPlan, clock: Clock, rows: StudentRows): voi
     const maxScore = criteria.reduce((sum, c) => sum + c.max, 0)
     const checks =
       plan.type === 'spot_flaw'
-        ? { verdict: true, location: (item as FlawFx).flaw ? true : null }
+        ? { verdict: true, location: (item as FlawFx).answerKey.hasFlaw ? true : null }
         : null
     rows.attempts.push({
       id: studentRowId(`attempt:${plan.key}:${i + 1}`),
