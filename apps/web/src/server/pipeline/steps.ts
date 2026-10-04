@@ -43,6 +43,10 @@ function currentRunId(): string | null {
  * True when a later claim (?from= while map_ready) started another run for this lecture: the old
  * run stops writing so the two never draft, verify or finish the same lecture together.
  */
+// ponytail: a ?from claim nulls workflow_run_id and start() writes the new id a moment later; in
+// that window the old run still passes this guard. extract/validate steps aren't guarded (they run
+// before map_ready, which a new claim can't overlap). Upgrade path: pass a claim token as a
+// workflow argument and compare that instead of the run id.
 async function superseded(lectureId: string): Promise<boolean> {
   const runId = currentRunId()
   if (!runId) return false

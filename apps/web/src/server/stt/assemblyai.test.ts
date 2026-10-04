@@ -171,8 +171,16 @@ describe('AssemblyAI client', () => {
       'GET /transcript/job-1': [{ body: { status: 'error', error: 'bad audio' } }],
       'DELETE /transcript/job-1': [{ body: {} }],
     })
+    await f.exec(`INSERT INTO pipeline_steps (lecture_id, step, status, output)
+      VALUES ('${f.lectureId}', 'submitTranscription', 'done', '{"jobId":"job-1"}')`)
     await expect(pollTranscriptionStep(f.db, f.lectureId, api.client)).rejects.toThrow()
     expect(api.calls).toContain('DELETE /transcript/job-1')
+    // The deleted job is forgotten, so a resume re-submits the kept audio instead of polling it.
+    expect(await sttJobId()).toBeNull()
+    const resubmit = fakeApi({ 'POST /transcript': [{ body: { id: 'job-2' } }] })
+    await expect(submitTranscriptionStep(f.db, f.lectureId, resubmit.client)).resolves.toEqual({
+      jobId: 'job-2',
+    })
   })
 
   it('treats an already-deleted remote transcript as deleted', async () => {

@@ -75,7 +75,7 @@ export function capToTier(segments: readonly Segment[], tier: Tier): Segment[] {
 
 /**
  * Deletes the course's concepts that no lecture mentions any more, unless someone has practised
- * them (deleting a concept cascades to its items and attempts; Data Model invariant 6).
+ * them (deleting a concept cascades to its items, activities and attempts; Data Model invariant 6).
  */
 export async function dropOrphanConcepts(db: DbLike, courseId: string): Promise<void> {
   await db.delete(concepts).where(
@@ -83,6 +83,7 @@ export async function dropOrphanConcepts(db: DbLike, courseId: string): Promise<
       eq(concepts.courseId, courseId),
       sql`not exists (select 1 from concept_occurrences o where o.concept_id = "concepts"."id")`,
       sql`not exists (select 1 from attempts a where a.concept_id = "concepts"."id")`,
+      sql`not exists (select 1 from activities a where a.concept_id = "concepts"."id")`,
       sql`not exists (select 1 from items i join attempts a on a.item_id = i.id
           where i.concept_id = "concepts"."id")`,
     ),

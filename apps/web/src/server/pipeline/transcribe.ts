@@ -1,4 +1,4 @@
-import { and, eq, isNull, lectures } from '@lectheo/db'
+import { and, eq, isNull, lectures, pipelineSteps } from '@lectheo/db'
 import { RetryableError } from 'workflow'
 import { parseTranscript, segmentCues } from '@lectheo/domain'
 import type { DbLike } from '../db'
@@ -153,14 +153,33 @@ function isTransientStt(err: unknown): boolean {
   return err instanceof TypeError
 }
 
-/** Best-effort delete of the remote transcript on a failure path (never masks the failure). */
-async function removeQuietly(stt: SttClient, jobId: string): Promise<void> {
+/**
+ * Best-effort delete of the remote transcript on a failure path (never masks the failure). Once
+ * it is gone the job id is forgotten and submitTranscription un-done, so a resume re-submits the
+ * kept audio instead of polling a deleted job forever.
+ */
+async function discardJob(
+  db: DbLike,
+  lectureId: string,
+  stt: SttClient,
+  jobId: string,
+): Promise<void> {
   try {
     await stt.remove(jobId)
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err)
     console.warn(JSON.stringify({ event: 'stt_remove_failed', jobId, reason }))
+    return
   }
+  await db
+    .update(lectures)
+    .set({ sttJobId: null })
+    .where(and(eq(lectures.id, lectureId), eq(lectures.sttJobId, jobId)))
+  await db
+    .delete(pipelineSteps)
+    .where(
+      and(eq(pipelineSteps.lectureId, lectureId), eq(pipelineSteps.step, 'submitTranscription')),
+    )
 }
 
 /** After a transcription timeout: delete the remote job (the audio stays for a retry). */
@@ -170,7 +189,9 @@ export async function abandonTranscription(
   stt: SttClient,
 ): Promise<void> {
   const { sttJobId } = await loadLecture(db, lectureId)
-  if (sttJobId && !sttJobId.startsWith(RESERVATION_PREFIX)) await removeQuietly(stt, sttJobId)
+  if (sttJobId && !sttJobId.startsWith(RESERVATION_PREFIX)) {
+    await discardJob(db, lectureId, stt, sttJobId)
+  }
 }
 
 export type PollStatus = 'pending' | 'completed'
@@ -199,7 +220,7 @@ export async function pollTranscriptionStep(
         throw err
       }
       if (job.status === 'error') {
-        await removeQuietly(stt, sttJobId)
+        await discardJob(db, lectureId, stt, sttJobId)
         throw new PipelineError(
           'stt_failed',
           `Transcription failed${job.error ? ` (${job.error})` : ''}. Try uploading a transcript instead.`,

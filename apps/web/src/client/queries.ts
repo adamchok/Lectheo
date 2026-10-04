@@ -219,14 +219,15 @@ export function useDiagnosticResults(sessionId: string, enabled = true) {
 }
 
 /** POST /lectures/{id}/process[?from=step]: start or retry processing (pipeline workstream). */
-export function useProcessLecture(lectureId: string) {
+export function useProcessLecture() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (from?: ReprocessFrom) =>
+    mutationFn: ({ lectureId, from }: { lectureId: string; from?: ReprocessFrom }) =>
       apiFetch(`/lectures/${lectureId}/process${from ? `?from=${from}` : ''}`, {
         method: 'POST',
         schema: ProcessResponse,
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.lecture(lectureId) }),
+    onSuccess: (_result, { lectureId }) =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.lecture(lectureId) }),
   })
 }

@@ -162,7 +162,7 @@ function ProcessingPanel({ lecture }: { lecture: LectureResponse }) {
 }
 
 function FailedPanel({ lecture }: { lecture: LectureResponse }) {
-  const processLecture = useProcessLecture(lecture.id)
+  const processLecture = useProcessLecture()
   const step = lecture.error?.step ?? ''
   const label = STEP_LABELS[step as PipelineStep] ?? 'Processing'
   return (
@@ -181,7 +181,10 @@ function FailedPanel({ lecture }: { lecture: LectureResponse }) {
       action={
         <Button
           onClick={() =>
-            processLecture.mutate(retryFrom(step, lecture.error?.code ?? '', lecture.source))
+            processLecture.mutate({
+              lectureId: lecture.id,
+              from: retryFrom(step, lecture.error?.code ?? '', lecture.source),
+            })
           }
           disabled={processLecture.isPending}
         >
@@ -194,33 +197,33 @@ function FailedPanel({ lecture }: { lecture: LectureResponse }) {
 }
 
 function DraftPanel({ lecture }: { lecture: LectureResponse }) {
-  const processLecture = useProcessLecture(lecture.id)
-  if (lecture.status === 'uploading') {
-    return (
-      <section className="bg-card border-border space-y-3 rounded-xl border p-6">
-        <h2 className="font-medium">Upload not finished</h2>
-        <p className="text-muted-foreground text-sm">
-          The recording or transcript didn’t finish uploading. Add the lecture again to continue.
-        </p>
-        <Button asChild variant="outline">
-          <Link href={'/lectures/new' as Route}>Add lecture</Link>
-        </Button>
-      </section>
-    )
-  }
+  const processLecture = useProcessLecture()
+  const uploading = lecture.status === 'uploading'
+  const heading = uploading ? 'Upload may not have finished' : 'Not processed yet'
+  const text = uploading
+    ? 'If the upload completed, build the map now. If it didn’t, processing stops with a clear error and you can add the lecture again.'
+    : 'Once the transcript or recording is uploaded, build the concept map and questions.'
   return (
     <section className="bg-card border-border space-y-3 rounded-xl border p-6">
-      <h2 className="font-medium">Not processed yet</h2>
-      <p className="text-muted-foreground text-sm">
-        Once the transcript or recording is uploaded, build the concept map and questions.
-      </p>
+      <h2 className="font-medium">{heading}</h2>
+      <p className="text-muted-foreground text-sm">{text}</p>
       {processLecture.isError && (
         <p className="text-destructive text-sm">{errorMessage(processLecture.error)}</p>
       )}
-      <Button onClick={() => processLecture.mutate(undefined)} disabled={processLecture.isPending}>
-        <Sparkles aria-hidden />
-        Build concept map
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          onClick={() => processLecture.mutate({ lectureId: lecture.id })}
+          disabled={processLecture.isPending}
+        >
+          <Sparkles aria-hidden />
+          Build concept map
+        </Button>
+        {uploading && (
+          <Button asChild variant="outline">
+            <Link href={'/lectures/new' as Route}>Add lecture again</Link>
+          </Button>
+        )}
+      </div>
     </section>
   )
 }

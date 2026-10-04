@@ -139,6 +139,19 @@ describe('fresh run after a new upload', () => {
     expect(await reprocessUsed()).toBe(0)
   })
 
+  it('keeps an orphaned concept that has a practice activity', async () => {
+    await runFull()
+    const [concept] = await rows<{ id: string }>(
+      f,
+      `SELECT concept_id AS id FROM concept_occurrences WHERE lecture_id = '${f.lectureId}' LIMIT 1`,
+    )
+    await f.exec(`INSERT INTO activities (id, user_id, concept_id, type, status)
+      VALUES (gen_random_uuid(), '${ID.A}', '${concept?.id}', 'teach_back', 'active');
+      UPDATE lectures SET status = 'draft' WHERE id = '${f.lectureId}'`)
+    await claimLecture(ACTOR_A, f.lectureId, undefined, f.db)
+    expect(await rows(f, `SELECT 1 FROM concepts WHERE id = '${concept?.id}'`)).toHaveLength(1)
+  })
+
   it('a failed lecture claimed without ?from resumes (done steps are kept)', async () => {
     await runFull()
     const before = await extractedAt()
@@ -155,7 +168,7 @@ describe('claims', () => {
     await expect(claimLecture(ACTOR_A, f.lectureId, undefined, f.db)).rejects.toMatchObject({
       code: 'already_processing',
     })
-    await expect(claimLecture(ACTOR_A, f.lectureId, 'draftItems', f.db)).resolves.toEqual({
+    await expect(claimLecture(ACTOR_A, f.lectureId, 'draftItems', f.db)).resolves.toMatchObject({
       reprocessCharged: true,
     })
   })

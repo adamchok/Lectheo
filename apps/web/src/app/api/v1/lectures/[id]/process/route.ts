@@ -15,9 +15,11 @@ const Params = z.object({ id: z.string() })
 export const POST = route(
   { auth: 'required', params: Params, query: ProcessQuery, response: ProcessResponse, status: 202 },
   async ({ actor, params, query }) => {
-    const { reprocessCharged } = await claimLecture(actor, params.id, query.from)
+    const { reprocessCharged, claimedAt } = await claimLecture(actor, params.id, query.from)
     await startProcessing(params.id, {
-      onStartFailed: reprocessCharged ? () => refundReprocess(actor) : undefined,
+      onStartFailed: reprocessCharged
+        ? () => refundReprocess(actor, undefined, claimedAt)
+        : undefined,
     })
     return { status: 'processing' as const }
   },

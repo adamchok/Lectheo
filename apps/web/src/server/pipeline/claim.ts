@@ -136,6 +136,8 @@ const alreadyProcessing = (): ApiError =>
 export interface Claim {
   /** True when this claim used one of today's re-runs (refund it if the run can't start). */
   reprocessCharged: boolean
+  /** When the claim was made: a refund goes back to that UTC day's counter. */
+  claimedAt: Date
 }
 
 /** Claims the lecture for processing (status → processing). The caller then starts the workflow. */
@@ -145,6 +147,7 @@ export async function claimLecture(
   from: ReprocessFrom | undefined,
   db: DbLike = appDb(),
 ): Promise<Claim> {
+  const claimedAt = new Date()
   const { lecture } = await loadLectureForWrite(actor, lectureId, db)
   await assertIntakeOpen(db)
   if (from) assertFromFits(lecture, from)
@@ -168,7 +171,7 @@ export async function claimLecture(
       if (!row) return false
       if (from) {
         // Inside the transaction: a 429 rolls the claim back, a lost claim is never charged.
-        await consume(actor, 'reprocess', tx)
+        await consume(actor, 'reprocess', tx, claimedAt)
         await resetFrom(tx, lecture.id, from)
       } else if (FRESH_RUN.includes(lecture.status)) {
         await resetFresh(tx, lecture)
@@ -180,10 +183,10 @@ export async function claimLecture(
     throw err
   }
   if (!claimed) throw alreadyProcessing()
-  return { reprocessCharged: Boolean(from) }
+  return { reprocessCharged: Boolean(from), claimedAt }
 }
 
-/** Gives back today's re-run when the workflow could not be started. */
+/** Gives back the re-run charged at `now` (the claim time) when the workflow could not start. */
 export async function refundReprocess(
   actor: Actor,
   db: DbLike = appDb(),
