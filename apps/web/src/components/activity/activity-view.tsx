@@ -1,7 +1,8 @@
 'use client'
 
-import { SearchCheck, Sparkles } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import { useActivity } from '@/client/queries'
+import { SpotFlawView } from '@/components/activity/spot-flaw/spot-flaw-view'
 import { ErrorState } from '@/components/error-state'
 import { FeaturePlaceholder } from '@/components/feature-placeholder'
 import { PageHeader } from '@/components/page-header'
@@ -24,7 +25,11 @@ export function ActivityView({ activityId }: { activityId: string }) {
   }
   if (activity.isError) {
     return (
-      <ErrorState title="Couldn't load this activity" error={activity.error} onRetry={() => activity.refetch()} />
+      <ErrorState
+        title="Couldn't load this activity"
+        error={activity.error}
+        onRetry={() => activity.refetch()}
+      />
     )
   }
 
@@ -38,16 +43,7 @@ export function ActivityView({ activityId }: { activityId: string }) {
       />
       <div className="mx-auto max-w-3xl">
         {data.type === 'spot_flaw' ? (
-          // TODO(feature-spot-the-flaw): scenario sentences (selectable), author Q&A (≤ 6,
-          // POST …/messages JSON), 2-step hints, verdict + flawed sentence + correction submit,
-          // Socratic retry, final explanation + rubric with <SourceRef>s, <MasteryBadge> change.
-          <FeaturePlaceholder
-            feature="feature-spot-the-flaw"
-            icon={SearchCheck}
-            title="Spot the flaw"
-            description="Read a short explanation and decide whether it holds up."
-            className="min-h-80"
-          />
+          <SpotFlawView activity={data} />
         ) : data.type === 'teach_back' ? (
           <TeachBackView activity={data} />
         ) : (

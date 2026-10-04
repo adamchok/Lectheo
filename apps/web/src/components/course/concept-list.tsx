@@ -1,5 +1,6 @@
 import type { CourseMapResponse, MapEdge, MapNode } from '@lectheo/contracts'
 import { Network } from 'lucide-react'
+import { PracticeButton } from '@/components/activity/spot-flaw/practice-button'
 import { EmptyState } from '@/components/empty-state'
 import { MarkerCounts } from '@/components/marker-counts'
 import { MasteryBadge } from '@/components/mastery-badge'
@@ -49,6 +50,7 @@ function ConceptRow({ node, edges, byId }: { node: MapNode; edges: readonly MapE
           reasons={node.mastery.reasons}
           confidentMistake={node.mastery.confidentMistake}
         />
+        <PracticeButton conceptId={node.id} conceptName={node.name} mastery={node.mastery.state} />
       </div>
     </li>
   )
