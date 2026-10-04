@@ -23,6 +23,6 @@ export const judgeCorrectionTask = defineTask<JudgeCorrectionInput, JudgeCorrect
     })),
     misconceptions: [],
     rationale: 'The correction names the error and states the right behaviour.',
-    guidingQuestion: 'Where does memory from malloc live, and how long does it last?',
+    guidingQuestion: 'Can you give one concrete case that shows your corrected sentence holds?',
   }),
 })

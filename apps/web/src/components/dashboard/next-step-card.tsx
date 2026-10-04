@@ -5,9 +5,9 @@ import { ArrowRight, CircleCheckBig, ClipboardCheck, LoaderCircle, PlayCircle, S
 import type { Route } from 'next'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
 import { useNextStep, useStartActivity } from '@/client/queries'
-import { errorMessage, ErrorState } from '@/components/error-state'
+import { toastStartError } from '@/components/activity/spot-flaw/api'
+import { ErrorState } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ACTIVITY_LABELS } from '@/lib/labels'
@@ -50,8 +50,7 @@ function NextStepAction({ step }: { step: NextStepResponse }) {
         { conceptId, type: activityType },
         {
           onSuccess: (activity) => router.push(`/activities/${activity.id}` as Route),
-          onError: (error) =>
-            toast.error("Couldn't start the activity", { description: errorMessage(error) }),
+          onError: toastStartError,
         },
       )
     return (
