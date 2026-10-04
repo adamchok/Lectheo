@@ -153,6 +153,11 @@ export async function readTranscriptRequest(req: Request): Promise<TranscriptInp
     return { raw: await file.text(), ext }
   }
   const json: unknown = await req.json().catch(() => null)
+  const text = (json as { text?: unknown } | null)?.text
+  // An oversize paste is a 413 like an oversize file, not a schema failure.
+  if (typeof text === 'string' && text.length > MAX_TRANSCRIPT_BYTES) {
+    throw tooLarge({ sizeBytes: new TextEncoder().encode(text).length })
+  }
   const parsed = TranscriptTextRequest.safeParse(json)
   if (!parsed.success) {
     throw new ApiError('validation_failed', 'Send a transcript file or JSON `{ text }`.')

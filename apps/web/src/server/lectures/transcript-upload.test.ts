@@ -156,6 +156,15 @@ describe('readTranscriptRequest', () => {
     await expect(readTranscriptRequest(req)).rejects.toMatchObject({ code: 'payload_too_large' })
   })
 
+  it('413s an oversize paste (not validation_failed)', async () => {
+    const req = new Request('http://x', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text: 'x'.repeat(2 * 1024 * 1024 + 1) }),
+    })
+    await expect(readTranscriptRequest(req)).rejects.toMatchObject({ code: 'payload_too_large' })
+  })
+
   it('rejects other extensions (422) and files over 2 MB (413)', async () => {
     await expect(readTranscriptRequest(multipart('w.pdf', 'x'))).rejects.toMatchObject({
       code: 'unprocessable_input',

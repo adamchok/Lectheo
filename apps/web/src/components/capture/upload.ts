@@ -139,6 +139,7 @@ export async function uploadAudio(
     schema: UploadUrlResponse,
     signal,
   })
+  if (signal.aborted) throw new DOMException('Upload cancelled', 'AbortError')
   await new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     let stalled = false

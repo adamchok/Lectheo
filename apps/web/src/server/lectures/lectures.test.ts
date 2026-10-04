@@ -109,6 +109,20 @@ describe('DELETE /lectures/{id}', () => {
     warn.mockRestore()
   })
 
+  it('409s a lecture that is still processing and keeps it', async () => {
+    const remove = vi.fn<RemoveObjects>(async () => undefined)
+    for (const status of ['processing', 'map_ready']) {
+      await f.exec(`UPDATE lectures SET status = '${status}' WHERE id = '${ID.PL1}'`)
+      await expect(deleteLecture(ACTOR_A, ID.PL1, f.db, remove)).rejects.toMatchObject({
+        code: 'invalid_state',
+        status: 409,
+      })
+    }
+    expect(await f.db.select().from(lectures).where(eq(lectures.id, ID.PL1))).toHaveLength(1)
+    expect(await conceptIds()).toEqual([ID.PC1, ID.PC2])
+    expect(remove).not.toHaveBeenCalled()
+  })
+
   it('404s library lectures and other users’ lectures', async () => {
     const remove = vi.fn<RemoveObjects>(async () => undefined)
     await expect(deleteLecture(ACTOR_A, ID.L1, f.db, remove)).rejects.toMatchObject({
