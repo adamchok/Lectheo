@@ -1,5 +1,6 @@
 import { Flag, MessagesSquare, ShieldQuestion } from 'lucide-react'
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { KeyHint } from '@/components/key-hint'
 import { ProductPreview } from '@/components/sign-in/product-preview'
 import { SignInActions } from '@/components/sign-in/sign-in-actions'
@@ -96,6 +97,20 @@ export default function SignInPage() {
             Lectheo: <em>lectio</em>, a reading + <em>theōria</em>, seeing.
           </p>
           <p>No points, no streaks. Just what you understand.</p>
+          <nav aria-label="Legal" className="flex gap-4">
+            <Link
+              href="/privacy"
+              className="hover:text-foreground underline-offset-4 hover:underline"
+            >
+              Privacy
+            </Link>
+            <Link
+              href="/terms"
+              className="hover:text-foreground underline-offset-4 hover:underline"
+            >
+              Terms
+            </Link>
+          </nav>
         </div>
       </footer>
     </div>
