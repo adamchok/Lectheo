@@ -46,9 +46,15 @@ pnpm dev                                # http://localhost:3000
 |---|---|
 | `pnpm check` | typecheck + lint + unit tests for every package |
 | `pnpm test` | Vitest (domain rules, contracts, DB via in-process PGlite) |
-| `pnpm --filter @lectheo/web e2e` | Playwright judge path |
+| `pnpm e2e` | Playwright judge path (see below) |
 | `pnpm db:generate` | new Drizzle migration from `packages/db/src/schema.ts` |
 | `pnpm --filter @lectheo/ai smoke` | one live call per model role (needs `AI_GATEWAY_API_KEY`) |
+
+`pnpm e2e` needs `npx supabase start` running. It reads keys from `supabase status`, refuses a
+non-local database, migrates + re-seeds it, then builds and serves the app on port 3100 with
+`AI_FAKE=1` and Cloudflare's always-pass Turnstile test keys. Sign-in loads Turnstile and the
+watch test loads YouTube (or the MP3 fallback), so it needs internet. First run:
+`pnpm --filter @lectheo/web exec playwright install chromium`.
 
 ## Data and privacy
 

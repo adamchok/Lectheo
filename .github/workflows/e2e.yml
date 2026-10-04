@@ -1,0 +1,48 @@
+name: E2E
+
+# Judge path (Architecture §1 goal 1) against a local Supabase with AI_FAKE=1. Separate workflow so
+# it never slows down or gates the `check` job in ci.yml.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CI: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Only the services the app uses: Postgres, Auth (anonymous sign-in), REST gateway, Storage.
+      - run: pnpm exec supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,mailpit,realtime,postgres-meta
+      - id: pw
+        run: echo "version=$(pnpm --filter @lectheo/web exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      - run: pnpm --filter @lectheo/web exec playwright install --with-deps chromium
+      - run: pnpm --filter @lectheo/web e2e
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+          retention-days: 7

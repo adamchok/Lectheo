@@ -10,6 +10,7 @@
     "lint": "turbo run lint",
     "test": "turbo run test",
     "check": "turbo run typecheck lint test",
+    "e2e": "pnpm --filter @lectheo/web e2e",
     "format": "prettier --write .",
     "db:generate": "pnpm --filter @lectheo/db generate",
     "db:migrate": "pnpm --filter @lectheo/db migrate",
