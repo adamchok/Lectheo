@@ -1,1 +1,207 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
+
+/*
+ * Lectheo design tokens.
+ * - Light theme is "paper": warm neutrals, ink-blue accent.
+ * - Dark theme applies via the `.dark` class (next-themes, system default) and,
+ *   before hydration / without JS, via prefers-color-scheme.
+ * - Mastery and marker colours always ship with an icon + text label (Spec F6.1).
+ *   `-fg` on `-bg` pairs are ≥ 4.5:1 (AA text); `-solid` fills are ≥ 3:1 against
+ *   the page background (AA non-text).
+ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --radius: 0.625rem;
+
+  --background: #fbfaf7;
+  --foreground: #1c1d22;
+  --card: #ffffff;
+  --card-foreground: #1c1d22;
+  --popover: #ffffff;
+  --popover-foreground: #1c1d22;
+  --primary: #2b4acb;
+  --primary-foreground: #ffffff;
+  --secondary: #f0eee9;
+  --secondary-foreground: #1c1d22;
+  --muted: #f2f0eb;
+  --muted-foreground: #5d5f68;
+  --accent: #eceff9;
+  --accent-foreground: #1c2a6b;
+  --destructive: #b42318;
+  --border: #e4e1da;
+  --input: #d6d3cb;
+  --ring: #2b4acb;
+  --sunken: #f5f3ee;
+
+  /* Mastery states (F6) */
+  --mastery-gray-fg: #52525b;
+  --mastery-gray-bg: #efeeea;
+  --mastery-gray-solid: #8b8b94;
+  --mastery-red-fg: #b42318;
+  --mastery-red-bg: #fdecea;
+  --mastery-red-solid: #d92d20;
+  --mastery-amber-fg: #8a5300;
+  --mastery-amber-bg: #fdf1d8;
+  --mastery-amber-solid: #c07a00;
+  --mastery-green-fg: #1d6b3a;
+  --mastery-green-bg: #e4f3e8;
+  --mastery-green-solid: #2f8f4e;
+
+  /* Capture markers (F1, F2.3): lost = flagged, important = starred */
+  --marker-lost-fg: #a3226b;
+  --marker-lost-bg: #fbe9f2;
+  --marker-important-fg: #0b6b78;
+  --marker-important-bg: #e1f3f5;
+}
+
+.dark {
+  --background: #121317;
+  --foreground: #e8e8ec;
+  --card: #1a1b20;
+  --card-foreground: #e8e8ec;
+  --popover: #1d1e24;
+  --popover-foreground: #e8e8ec;
+  --primary: #8ea2ff;
+  --primary-foreground: #0d1230;
+  --secondary: #23242a;
+  --secondary-foreground: #e8e8ec;
+  --muted: #202127;
+  --muted-foreground: #a3a5ae;
+  --accent: #222a4a;
+  --accent-foreground: #d5dcff;
+  --destructive: #ff8a7d;
+  --border: #2c2d34;
+  --input: #3a3c45;
+  --ring: #8ea2ff;
+  --sunken: #16171c;
+
+  --mastery-gray-fg: #b4b4bc;
+  --mastery-gray-bg: #26272d;
+  --mastery-gray-solid: #7c7c86;
+  --mastery-red-fg: #ff9b8f;
+  --mastery-red-bg: #3a1d1b;
+  --mastery-red-solid: #f0625a;
+  --mastery-amber-fg: #f5c063;
+  --mastery-amber-bg: #33280f;
+  --mastery-amber-solid: #d99a2b;
+  --mastery-green-fg: #7fd49b;
+  --mastery-green-bg: #15301f;
+  --mastery-green-solid: #45b06a;
+
+  --marker-lost-fg: #f59ac6;
+  --marker-lost-bg: #3a1a2b;
+  --marker-important-fg: #6fd3df;
+  --marker-important-bg: #12313a;
+}
+
+/* No-JS / pre-hydration fallback: follow the OS unless a theme class is set. */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light):not(.dark) {
+    --background: #121317;
+    --foreground: #e8e8ec;
+    --card: #1a1b20;
+    --card-foreground: #e8e8ec;
+    --popover: #1d1e24;
+    --popover-foreground: #e8e8ec;
+    --primary: #8ea2ff;
+    --primary-foreground: #0d1230;
+    --secondary: #23242a;
+    --secondary-foreground: #e8e8ec;
+    --muted: #202127;
+    --muted-foreground: #a3a5ae;
+    --accent: #222a4a;
+    --accent-foreground: #d5dcff;
+    --destructive: #ff8a7d;
+    --border: #2c2d34;
+    --input: #3a3c45;
+    --ring: #8ea2ff;
+    --sunken: #16171c;
+  }
+}
+
+@theme inline {
+  --font-sans: var(--font-ui), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-display), ui-serif, Georgia, serif;
+  --font-mono: var(--font-code), ui-monospace, 'SFMono-Regular', monospace;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sunken: var(--sunken);
+
+  --color-mastery-gray: var(--mastery-gray-fg);
+  --color-mastery-gray-bg: var(--mastery-gray-bg);
+  --color-mastery-gray-solid: var(--mastery-gray-solid);
+  --color-mastery-red: var(--mastery-red-fg);
+  --color-mastery-red-bg: var(--mastery-red-bg);
+  --color-mastery-red-solid: var(--mastery-red-solid);
+  --color-mastery-amber: var(--mastery-amber-fg);
+  --color-mastery-amber-bg: var(--mastery-amber-bg);
+  --color-mastery-amber-solid: var(--mastery-amber-solid);
+  --color-mastery-green: var(--mastery-green-fg);
+  --color-mastery-green-bg: var(--mastery-green-bg);
+  --color-mastery-green-solid: var(--mastery-green-solid);
+
+  --color-marker-lost: var(--marker-lost-fg);
+  --color-marker-lost-bg: var(--marker-lost-bg);
+  --color-marker-important: var(--marker-important-fg);
+  --color-marker-important-bg: var(--marker-important-bg);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: 'kern', 'liga';
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 22%, transparent);
+  }
+  kbd {
+    @apply font-mono;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

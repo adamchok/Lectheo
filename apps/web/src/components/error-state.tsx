@@ -1,0 +1,83 @@
+'use client'
+
+import { RotateCw, TriangleAlert } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { isApiClientError } from '@/client/api'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+
+export interface ErrorStateProps {
+  title?: ReactNode
+  /** Any thrown value; ApiClientError messages are user-facing and shown as-is. */
+  error?: unknown
+  description?: ReactNode
+  onRetry?: () => void
+  action?: ReactNode
+  className?: string
+}
+
+/** Turns an unknown error into calm, user-facing copy. */
+export function errorMessage(error: unknown): string {
+  if (isApiClientError(error)) {
+    switch (error.code) {
+      case 'network_error':
+        return "We couldn't reach Lectheo. Check your connection and try again."
+      case 'unauthenticated':
+        return 'Your session has ended. Please sign in again.'
+      case 'not_found':
+        return "This page doesn't exist, or you don't have access to it."
+      case 'ai_paused':
+      case 'intake_paused':
+        return error.message || 'New AI work is paused for now. Prepared practice still works.'
+      default:
+        return error.message
+    }
+  }
+  return 'Something went wrong. Please try again.'
+}
+
+export function ErrorState({
+  title = "Something didn't load",
+  error,
+  description,
+  onRetry,
+  action,
+  className,
+}: ErrorStateProps) {
+  const requestId = isApiClientError(error) ? error.requestId : undefined
+  return (
+    <div
+      role="alert"
+      className={cn(
+        'border-border bg-card flex flex-col items-center gap-3 rounded-xl border px-6 py-10 text-center',
+        className,
+      )}
+    >
+      <span className="bg-mastery-red-bg text-mastery-red flex size-10 items-center justify-center rounded-full">
+        <TriangleAlert aria-hidden className="size-5" />
+      </span>
+      <div className="max-w-md space-y-1">
+        <p className="font-medium">{title}</p>
+        <p className="text-muted-foreground text-sm text-pretty">
+          {description ?? errorMessage(error)}
+        </p>
+        {requestId && (
+          <p className="text-muted-foreground/80 pt-1 font-mono text-[0.6875rem]">
+            Reference {requestId}
+          </p>
+        )}
+      </div>
+      {(onRetry || action) && (
+        <div className="flex gap-2 pt-1">
+          {onRetry && (
+            <Button variant="outline" size="sm" onClick={onRetry}>
+              <RotateCw aria-hidden />
+              Try again
+            </Button>
+          )}
+          {action}
+        </div>
+      )}
+    </div>
+  )
+}

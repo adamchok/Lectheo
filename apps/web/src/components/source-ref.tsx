@@ -1,0 +1,84 @@
+'use client'
+
+import type { SourceRef as SourceRefData } from '@lectheo/contracts'
+import { Play } from 'lucide-react'
+import type { Route } from 'next'
+import Link from 'next/link'
+import { formatTimestamp, formatTimestampLong } from '@/client/format'
+import { cn } from '@/lib/utils'
+import { usePlayer } from './player-context'
+
+export interface SourceRefProps {
+  source: SourceRefData
+  /** Overrides the PlayerContext seek (e.g. a local preview player). */
+  onSeek?: (ms: number) => void
+  /** Hide the excerpt and show only "▶ 12:41". */
+  compact?: boolean
+  className?: string
+}
+
+const baseClass =
+  'group inline-flex max-w-full items-baseline gap-1.5 rounded-md px-1.5 py-0.5 -mx-1.5 text-left text-sm transition-colors hover:bg-accent focus-visible:bg-accent'
+
+/**
+ * Grounding link "▶ 12:41 · excerpt" (Architecture §7). Seeks the player when one is
+ * registered; otherwise opens the transcript panel, falling back to the lecture page.
+ */
+export function SourceRef({ source, onSeek, compact = false, className }: SourceRefProps) {
+  const player = usePlayer()
+  const seek = onSeek ?? player.seek
+  const label = `${seek ? 'Play from' : 'Open transcript at'} ${formatTimestampLong(source.startMs)}`
+
+  const content = (
+    <>
+      <Play aria-hidden className="text-primary size-3 shrink-0 translate-y-px fill-current" />
+      <span className="text-primary font-mono text-[0.8125rem] font-medium tabular-nums">
+        {formatTimestamp(source.startMs)}
+      </span>
+      {!compact && source.excerpt && (
+        <>
+          <span aria-hidden className="text-muted-foreground">
+            ·
+          </span>
+          <span className="text-muted-foreground group-hover:text-foreground line-clamp-1 italic">
+            “{source.excerpt}”
+          </span>
+        </>
+      )}
+    </>
+  )
+
+  if (seek) {
+    return (
+      <button
+        type="button"
+        aria-label={`${label}: ${source.excerpt}`}
+        className={cn(baseClass, className)}
+        onClick={() => seek(source.startMs)}
+      >
+        {content}
+      </button>
+    )
+  }
+
+  if (player.openTranscript) {
+    const open = player.openTranscript
+    return (
+      <button
+        type="button"
+        aria-label={`${label}: ${source.excerpt}`}
+        className={cn(baseClass, className)}
+        onClick={() => open(source)}
+      >
+        {content}
+      </button>
+    )
+  }
+
+  const href = `/lectures/${source.lectureId}?t=${source.startMs}#transcript` as Route
+  return (
+    <Link href={href} aria-label={`${label}: ${source.excerpt}`} className={cn(baseClass, className)}>
+      {content}
+    </Link>
+  )
+}
