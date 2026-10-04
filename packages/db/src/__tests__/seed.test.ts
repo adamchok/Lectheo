@@ -116,6 +116,27 @@ describe('CS50x library + seed student fixture', () => {
     expect(await tableCounts(db)).toEqual(firstCounts)
   })
 
+  it('re-seeding restores stale library rows from the fixture (e.g. a re-timed lecture)', async () => {
+    const l5 = lectureId('l5')
+    const segment = `SELECT start_ms FROM transcript_segments WHERE lecture_id = '${l5}' AND idx = 0`
+    const [before] = await rows<{ start_ms: number }>(db, segment)
+    await db.$client.query(
+      `UPDATE transcript_segments SET start_ms = start_ms + 999 WHERE lecture_id = '${l5}'`,
+    )
+    await db.$client.query(`UPDATE lectures SET media = NULL WHERE id = '${l5}'`)
+
+    await seedAll(db)
+
+    const [after] = await rows<{ start_ms: number }>(db, segment)
+    const [lecture] = await rows<{ media: unknown }>(
+      db,
+      `SELECT media FROM lectures WHERE id = '${l5}'`,
+    )
+    expect(after!.start_ms).toBe(before!.start_ms)
+    expect(lecture!.media).not.toBeNull()
+    expect(await tableCounts(db)).toEqual(firstCounts)
+  })
+
   it('uses stable, deterministic ids', () => {
     expect(seedId('x')).toBe(seedId('x'))
     expect(seedId('x')).toMatch(

@@ -1,12 +1,11 @@
 'use client'
 
-import type { ActivityType, CourseMapResponse, MapNode } from '@lectheo/contracts'
+import type { ActivityType, CourseMapResponse, MapNode, MasteryState } from '@lectheo/contracts'
 import { Flag, Star, X } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useEffect, useRef, type ReactNode } from 'react'
-import { useStartActivity } from '@/client/queries'
+import { useStartPractice } from '@/client/practice'
 import { MasteryBadge } from '@/components/mastery-badge'
 import { SourceRef } from '@/components/source-ref'
 import { Button } from '@/components/ui/button'
@@ -28,9 +27,8 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
-function PracticeButtons({ conceptId }: { conceptId: string }) {
-  const router = useRouter()
-  const start = useStartActivity()
+function PracticeButtons({ conceptId, mastery }: { conceptId: string; mastery: MasteryState }) {
+  const { startPractice, isPending } = useStartPractice()
   const enabled = PRACTICE.filter((p) => p.enabled)
   if (enabled.length === 0) return null
   return (
@@ -40,23 +38,13 @@ function PracticeButtons({ conceptId }: { conceptId: string }) {
           <Button
             key={p.type}
             size="sm"
-            disabled={start.isPending}
-            onClick={() =>
-              start.mutate(
-                { conceptId, type: p.type },
-                { onSuccess: (activity) => router.push(`/activities/${activity.id}` as Route) },
-              )
-            }
+            disabled={isPending}
+            onClick={() => startPractice({ conceptId, type: p.type, mastery })}
           >
             {p.label}
           </Button>
         ))}
       </div>
-      {start.isError && (
-        <p role="alert" className="text-destructive text-sm">
-          Couldn&apos;t start practice. Try again.
-        </p>
-      )}
     </Section>
   )
 }
@@ -145,7 +133,7 @@ export function NodePanel({ concept, map, onClose }: NodePanelProps) {
 
       {concept.summary && <p className="text-sm text-pretty">{concept.summary}</p>}
 
-      <PracticeButtons conceptId={concept.id} />
+      <PracticeButtons conceptId={concept.id} mastery={concept.mastery.state} />
 
       {concept.lectureIds.length > 0 && (
         <Section title="Appears in">
