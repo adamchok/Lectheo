@@ -2,7 +2,19 @@
   "$schema": "https://turbo.build/schema.json",
   "globalEnv": ["AI_FAKE", "NODE_ENV"],
   "tasks": {
-    "build": { "dependsOn": ["^build"], "outputs": [".next/**", "!.next/cache/**"], "env": ["NEXT_PUBLIC_*", "POSTGRES_URL", "SUPABASE_*", "AI_GATEWAY_API_KEY", "ASSEMBLYAI_API_KEY", "TURNSTILE_SECRET_KEY", "CRON_SECRET"] },
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**", "src/app/.well-known/workflow/**"],
+      "env": [
+        "NEXT_PUBLIC_*",
+        "POSTGRES_URL",
+        "SUPABASE_*",
+        "AI_GATEWAY_API_KEY",
+        "ASSEMBLYAI_API_KEY",
+        "TURNSTILE_SECRET_KEY",
+        "CRON_SECRET"
+      ]
+    },
     "dev": { "cache": false, "persistent": true },
     "typecheck": { "dependsOn": ["^typecheck"] },
     "lint": {},

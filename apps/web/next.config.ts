@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next'
+import { withWorkflow } from 'workflow/next'
 
 const nextConfig: NextConfig = {
   // Workspace packages ship TypeScript source.
@@ -6,4 +7,5 @@ const nextConfig: NextConfig = {
   typedRoutes: true,
 }
 
-export default nextConfig
+// Vercel Workflows: compiles 'use workflow' / 'use step' (ADR-002, server/pipeline/workflow.ts).
+export default withWorkflow(nextConfig)

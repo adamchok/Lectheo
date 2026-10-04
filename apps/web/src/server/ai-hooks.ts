@@ -16,6 +16,8 @@ import { consume, evaluateSpend, markAiDegraded } from './quota'
 export interface AiContextOptions {
   /** The user the call is for (quota + ledger). Omit for system work (pipeline on behalf of a lecture). */
   actor?: Actor | null
+  /** Owner to bill in llm_calls when there is no actor (pipeline work for a user's lecture). */
+  userId?: string
   lectureId?: string
   /** true for new processing / generation: blocks on intake_paused as well as ai_paused. */
   intake?: boolean
@@ -56,7 +58,7 @@ export function aiHooks(opts: AiContextOptions = {}): TaskHooks {
 /** TaskContext for runTask / streamPersona / checkLeak. */
 export function aiContext(opts: AiContextOptions = {}): TaskContext {
   return {
-    userId: opts.actor?.userId,
+    userId: opts.actor?.userId ?? opts.userId,
     lectureId: opts.lectureId,
     hooks: aiHooks(opts),
   }

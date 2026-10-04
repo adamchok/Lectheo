@@ -12,13 +12,17 @@ export function validateExtraction(
   input: ExtractConceptsInput,
 ): string[] {
   const known = segmentSet(input.segments)
-  const min = Math.max(MIN_CONCEPTS, input.targetCount - COUNT_SLACK)
+  // F2.9: a short lecture may teach only one or two concepts; don't force the model to pad.
+  const min =
+    input.targetCount <= MIN_CONCEPTS ? 1 : Math.max(MIN_CONCEPTS, input.targetCount - COUNT_SLACK)
   const max = Math.min(MAX_CONCEPTS, input.targetCount + COUNT_SLACK)
   const keys = out.concepts.map((c) => c.canonicalKey)
   const allKeys = new Set([...keys, ...input.existingConcepts.map((c) => c.canonicalKey)])
 
+  // F2.9: a lecture with no real teaching content (an admin session) returns no concepts rather
+  // than invented ones; otherwise the count must match the lecture's length.
   const count =
-    out.concepts.length < min || out.concepts.length > max
+    out.concepts.length > 0 && (out.concepts.length < min || out.concepts.length > max)
       ? [`concepts: expected ${min}..${max}, got ${out.concepts.length}`]
       : []
   const dupes = keys.filter((k, i) => keys.indexOf(k) !== i).map((k) => `duplicate key "${k}"`)
