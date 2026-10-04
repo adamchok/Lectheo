@@ -78,6 +78,8 @@ export interface MarkerQueueApi {
  */
 export function useMarkerQueue(lectureId: string, userId: string | undefined): MarkerQueueApi {
   const queue = useRef<Promise<MarkerQueue> | null>(null)
+  /** Each marker's queue, so undo from a toast still works after the page unmounts. */
+  const owners = useRef(new Map<string, Promise<MarkerQueue>>())
   const queryClient = useQueryClient()
   // Course map and next step show marker counts / unlinked markers.
   const refreshCourses = useCallback(
@@ -117,15 +119,20 @@ export function useMarkerQueue(lectureId: string, userId: string | undefined): M
   }, [lectureId, userId, refreshCourses])
 
   const add = useCallback<MarkerQueueApi['add']>((kind, tMs) => {
+    const q = queue.current
+    if (!q) throw new Error('Markers aren’t ready yet.')
     const id = newId()
     const marker: MarkerInput = { id, kind, tMs: Math.max(0, Math.round(tMs)), capture: 'watch' }
-    void queue.current?.then((q) => q.add(marker))
+    owners.current.set(id, q)
+    void q.then((x) => x.add(marker))
     return id
   }, [])
 
   const undo = useCallback<MarkerQueueApi['undo']>(async (markerId) => {
-    const q = await queue.current
-    await q?.undo(markerId)
+    const q = owners.current.get(markerId)
+    if (!q) throw new Error('That marker can’t be undone anymore.')
+    await (await q).undo(markerId)
+    owners.current.delete(markerId)
   }, [])
 
   const flush = useCallback(() => {
