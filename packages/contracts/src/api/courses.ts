@@ -54,6 +54,8 @@ export const MapNode = z.object({
   /** This user's markers linked to the concept (node panel: "▶ 12:41" links). */
   moments: z.array(z.object({ id: Id, lectureId: Id, kind: MarkerKind, tMs: Ms })),
   position: z.object({ x: z.number(), y: z.number() }).nullable(),
+  /** A verified transfer item this user hasn't seen exists (F4b entry point). */
+  transferAvailable: z.boolean().optional(),
 })
 export type MapNode = z.infer<typeof MapNode>
 

@@ -10,6 +10,8 @@ export const FEATURES = {
   practiceSpotFlaw: true,
   /** "Teach-back" practice button in the map's node panel. */
   practiceTeachBack: true,
+  /** "Transfer problem" button, shown only when the concept has an unseen item (F4b). */
+  practiceTransfer: true,
   /** "Add lecture" entry points → /lectures/new (TODO(feature-capture-import)). */
   addLecture: true,
   /** Creating personal courses from the dashboard. */

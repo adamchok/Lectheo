@@ -16,6 +16,7 @@ import { ACTIVITY_LABELS, RELATION_LABELS } from '@/lib/labels'
 const PRACTICE: readonly { type: ActivityType; label: string; enabled: boolean }[] = [
   { type: 'spot_flaw', label: ACTIVITY_LABELS.spot_flaw, enabled: FEATURES.practiceSpotFlaw },
   { type: 'teach_back', label: ACTIVITY_LABELS.teach_back, enabled: FEATURES.practiceTeachBack },
+  { type: 'transfer', label: ACTIVITY_LABELS.transfer, enabled: FEATURES.practiceTransfer },
 ]
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -27,9 +28,16 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
-function PracticeButtons({ conceptId, mastery }: { conceptId: string; mastery: MasteryState }) {
+interface PracticeButtonsProps {
+  conceptId: string
+  mastery: MasteryState
+  transfer?: boolean
+}
+
+function PracticeButtons({ conceptId, mastery, transfer }: PracticeButtonsProps) {
   const { startPractice, isPending } = useStartPractice()
-  const enabled = PRACTICE.filter((p) => p.enabled)
+  // Transfer only while the bank has an unseen item for this concept (F4b; map payload).
+  const enabled = PRACTICE.filter((p) => p.enabled && (p.type !== 'transfer' || transfer))
   if (enabled.length === 0) return null
   return (
     <Section title="Practice">
@@ -133,7 +141,11 @@ export function NodePanel({ concept, map, onClose }: NodePanelProps) {
 
       {concept.summary && <p className="text-sm text-pretty">{concept.summary}</p>}
 
-      <PracticeButtons conceptId={concept.id} mastery={concept.mastery.state} />
+      <PracticeButtons
+        conceptId={concept.id}
+        mastery={concept.mastery.state}
+        transfer={concept.transferAvailable}
+      />
 
       {concept.lectureIds.length > 0 && (
         <Section title="Appears in">

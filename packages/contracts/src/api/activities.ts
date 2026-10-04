@@ -47,6 +47,8 @@ export const ActivityResponse = z.object({
   hintsUsed: z.number().int(),
   /** spot_flaw only: scenario sentences (public payload). */
   scenario: z.object({ sentences: z.array(z.string()) }).nullable(),
+  /** transfer only: the problem (public payload). */
+  prompt: z.string().optional(),
   tries: z.array(z.object({ tryNo: z.number().int(), outcome: Outcome, feedback: Feedback })),
   messages: z.array(
     z.object({
@@ -132,4 +134,6 @@ export type SubmitResponse = z.infer<typeof SubmitResponse>
 export const ExplanationResponse = z.object({
   explanation: z.string(),
   sources: z.array(SourceRef),
+  /** Only once the activity is closed (reopening it shows how it was graded). */
+  rubric: z.array(RubricCriterion).optional(),
 })

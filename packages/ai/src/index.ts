@@ -31,6 +31,7 @@ export {
   type PersonaStream,
 } from './stream-task'
 export {
+  answerOnlyLeakInput,
   checkLeak,
   keywordHit,
   CANNED_DEFLECTION,

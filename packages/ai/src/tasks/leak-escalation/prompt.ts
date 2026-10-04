@@ -15,7 +15,29 @@ export const SYSTEM = [
   'Answer with JSON: {"leaks": boolean, "reason": one short sentence}.',
 ].join('\n')
 
+/** Transfer problems (answerOnly): the secret is the model solution, not a flaw location. */
+export const ANSWER_ONLY_SYSTEM = [
+  'You are a strict leak checker for a transfer problem a student is solving.',
+  'You know the model solution and the grading criteria. Decide whether the REPLY (a guiding',
+  'question shown before the student retries) states or implies the model solution, one of its',
+  'key steps, or a specific fact the criteria reward. Rephrasing the answer counts as a leak.',
+  'A question that only points at what to think about, without giving the fact, is not a leak.',
+  UNTRUSTED_RULE,
+  'Answer with JSON: {"leaks": boolean, "reason": one short sentence}.',
+].join('\n')
+
 export function buildPrompt(input: LeakEscalationInput): PromptSpec {
+  if (input.answerOnly) {
+    return {
+      system: ANSWER_ONLY_SYSTEM,
+      prompt: [
+        untrusted('item', input.scenarioSentences.join('\n')),
+        `Model solution: ${input.correction}`,
+        `Grading criteria: ${input.flawSummary}`,
+        untrusted('reply', input.reply),
+      ].join('\n\n'),
+    }
+  }
   const numbered = input.scenarioSentences.map((s, i) => `${i}. ${s}`).join('\n')
   return {
     system: SYSTEM,
