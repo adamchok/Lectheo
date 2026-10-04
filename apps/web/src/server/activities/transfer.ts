@@ -135,7 +135,7 @@ export const transferHandler: ActivityTypeHandler<'transfer'> = {
     return { prompt: promptOf(ctx) }
   },
 
-  async submit(ctx, body) {
+  async submit(ctx, body, tryNo) {
     const [key, secrets] = await Promise.all([answerKeyOf(ctx), ctx.secrets()])
     const rubric = frozenRubric(ctx)
     const judge = await runTask(
@@ -153,18 +153,24 @@ export const transferHandler: ActivityTypeHandler<'transfer'> = {
       ...c,
       label: `Criterion ${i + 1}`,
     }))
-    const question = await safeQuestion(
-      ctx,
-      judge.output.guidingQuestion ?? '',
-      key,
-      rubric,
-      secrets.leakKeywords,
-    )
+    // Same 80 % / 50 % bands as teach-back (F4b.2 ≡ F4a.3, domain rubricOutcome).
+    const scored = rubricOutcome(criteria)
+    // A final try (try 2, or correct on try 1) never shows the question (submit.ts drops it), so
+    // don't pay the guard's latency/cost for it; store null.
+    const final = tryNo === 2 || scored.outcome === 'correct'
+    const question = final
+      ? null
+      : await safeQuestion(
+          ctx,
+          judge.output.guidingQuestion ?? '',
+          key,
+          rubric,
+          secrets.leakKeywords,
+        )
     return {
       checks: null,
       criteria,
-      // Same 80 % / 50 % bands as teach-back (F4b.2 ≡ F4a.3, domain rubricOutcome).
-      ...rubricOutcome(criteria),
+      ...scored,
       feedback: { guidingQuestion: question, hint: null },
       rationale: judge.output.rationale,
       misconceptions: judge.output.misconceptions,

@@ -14,10 +14,17 @@ vi.mock('server-only', () => ({}))
 
 /** Per-test overrides of the fake judge-transfer output (other tasks run unchanged). */
 const judge = vi.hoisted(() => ({ question: null as string | null, full: false }))
+/** checkLeak spy: counts calls; `block` forces a block verdict (stands in for Jev/Luna). */
+const guard = vi.hoisted(() => ({ calls: 0, block: false }))
 vi.mock('@lectheo/ai', async (importOriginal) => {
   const ai = await importOriginal<typeof import('@lectheo/ai')>()
   return {
     ...ai,
+    checkLeak: (async (input, ctx) => {
+      guard.calls += 1
+      const res = await ai.checkLeak(input, ctx)
+      return guard.block ? { ...res, decision: 'block', reason: 'stubbed jev' } : res
+    }) as typeof ai.checkLeak,
     runTask: (async (task, input, ctx) => {
       const res = await ai.runTask(task, input, ctx)
       if (task.name !== 'judge-transfer') return res
@@ -82,6 +89,8 @@ afterEach(() => {
   setTransferFlag(true)
   judge.question = null
   judge.full = false
+  guard.calls = 0
+  guard.block = false
 })
 
 const start = () =>
@@ -247,6 +256,45 @@ describe('transfer', () => {
     const reopened = await showExplanation(ALICE, id, db)
     expect(reopened.explanation).toContain(MODEL_SOLUTION)
     expect(reopened.rubric?.map((r) => r.label)).toEqual(['Allocation size', 'Loop bound'])
+  })
+})
+
+describe('transfer guiding-question guard', () => {
+  it('blocks a paraphrased leak via checkLeak (no 5-word run, no keyword)', async () => {
+    // Paraphrase of MODEL_SOLUTION: shares no 5-word run, so only the semantic guard can catch it.
+    judge.question = 'Should the buffer hold one extra byte for the NUL at the end?'
+    expect(quotesAnswer(judge.question, MODEL_SOLUTION, 'Copy a string safely.')).toBe(false)
+    guard.block = true
+    const { id } = await start()
+    const try1 = await submitActivity(ALICE, id, { answer: 'malloc(strlen(s))' }, db)
+    expect(guard.calls).toBe(1)
+    expect(try1.feedback.guidingQuestion).toBe(FALLBACK_QUESTION)
+    const [row] = await db.select().from(attempts).where(eq(attempts.activityId, id))
+    expect(row?.grading.guidingQuestion).toBe(FALLBACK_QUESTION)
+  })
+
+  it('passes a clean question through checkLeak on try 1', async () => {
+    const { id } = await start()
+    const try1 = await submitActivity(ALICE, id, { answer: 'x' }, db)
+    expect(guard.calls).toBe(1)
+    expect(try1.feedback.guidingQuestion).not.toBe(FALLBACK_QUESTION)
+  })
+
+  it('skips the guard on try 2 and stores no question', async () => {
+    const { id } = await start()
+    await submitActivity(ALICE, id, { answer: 'first' }, db)
+    guard.calls = 0
+    await submitActivity(ALICE, id, { answer: 'second' }, db)
+    expect(guard.calls).toBe(0)
+    const rows = await db.select().from(attempts).where(eq(attempts.activityId, id))
+    expect(rows.find((r) => r.tryNo === 2)?.grading.guidingQuestion).toBeNull()
+  })
+
+  it('skips the guard on a correct try 1', async () => {
+    judge.full = true
+    const { id } = await start()
+    await submitActivity(ALICE, id, { answer: 'all of it' }, db)
+    expect(guard.calls).toBe(0)
   })
 })
 
