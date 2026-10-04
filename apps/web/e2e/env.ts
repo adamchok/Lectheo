@@ -69,6 +69,10 @@ export function e2eEnv(): E2eEnv {
     AI_GATEWAY_KEY_NAME: 'dev',
     CRON_SECRET: 'e2e-cron-secret',
     PORT: String(E2E_PORT),
+    // Defence in depth: process env beats apps/web/.env.local, so real keys never load here.
+    AI_GATEWAY_API_KEY: '',
+    ASSEMBLYAI_API_KEY: '',
+    VERCEL_OIDC_TOKEN: '',
   }
   process.env[CACHE_KEY] = JSON.stringify(env)
   return env

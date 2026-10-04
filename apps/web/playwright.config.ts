@@ -16,18 +16,21 @@ export default defineConfig({
   workers: 2,
   retries: CI ? 1 : 0,
   timeout: 90_000,
+  // Abort cleanly (and write the report) well before the CI job's 15 min cap.
+  globalTimeout: CI ? 10 * 60_000 : undefined,
   expect: { timeout: 15_000 },
-  reporter: CI ? [['github'], ['html', { open: 'never' }]] : 'list',
+  reporter: CI ? [['list'], ['github'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: E2E_BASE_URL,
-    trace: 'retain-on-failure',
+    trace: CI ? 'on-first-retry' : 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
   projects: [{ name: 'chrome', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
     command: `pnpm exec next build && pnpm exec next start -p ${E2E_PORT}`,
     url: `${E2E_BASE_URL}/api/v1/health`,
-    reuseExistingServer: !CI,
+    // Never reuse a stale server: it would run an old build with whatever env it started with.
+    reuseExistingServer: false,
     env: e2eEnv(),
     timeout: 300_000,
   },

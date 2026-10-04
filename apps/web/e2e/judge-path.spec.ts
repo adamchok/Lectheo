@@ -1,5 +1,9 @@
 import { expect, test, type Page } from '@playwright/test'
-import { correctOptionId, LIBRARY_COURSE_ID, lectureId, signInSample } from './fixtures'
+import { closeDb } from '@lectheo/db'
+import { correctOptionId, LIBRARY_COURSE_ID, lectureId, signInSample, silentWav } from './fixtures'
+
+// The answer-key lookup opens a DB pool; close it so the worker can exit.
+test.afterAll(closeDb)
 
 /*
  * The judge path (Product Spec §4.1, Architecture §1 goal 1) with AI_FAKE=1. Each test signs in
@@ -27,12 +31,16 @@ test('sample sign-in lands on a dashboard pointing at Lecture 5', async ({ page 
 test('watch Lecture 5: player, transcript, markers with undo persist after reload', async ({
   page,
 }) => {
+  // No external media: block YouTube (forces the MP3 fallback) and serve the MP3 as local silence.
+  await page.route(/youtube\.com|youtube-nocookie\.com|ytimg\.com/, (route) => route.abort())
+  await page.route(/cdn\.cs50\.net\/.*\.mp3$/, (route) =>
+    route.fulfill({ contentType: 'audio/wav', body: silentWav() }),
+  )
   await signInSample(page)
   await page.getByRole('link', { name: /start watching/i }).click()
   await expect(page).toHaveURL(new RegExp(`/lectures/${L5}/watch$`))
 
-  // YouTube embed or, when it's blocked, the MP3 fallback: either way the shell is up.
-  await expect(page.locator('iframe[src*="youtube"], audio').first()).toBeAttached()
+  await expect(page.locator('audio')).toBeAttached()
   const transcript = page.getByRole('region', { name: 'Transcript' })
   await expect(transcript.getByRole('listitem').first()).toBeVisible()
 

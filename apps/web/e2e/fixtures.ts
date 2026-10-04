@@ -11,6 +11,30 @@ export async function signInSample(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 })
 }
 
+const WAV_RATE = 8_000
+const WAV_HEADER_BYTES = 44
+
+/**
+ * One second of silent 8-bit mono WAV, served in place of the lecture MP3 so the watch player
+ * becomes ready offline. (Generated rather than committed: no binary fixture to keep.)
+ */
+export function silentWav(): Buffer {
+  const header = Buffer.alloc(WAV_HEADER_BYTES)
+  header.write('RIFF', 0)
+  header.writeUInt32LE(WAV_HEADER_BYTES - 8 + WAV_RATE, 4)
+  header.write('WAVEfmt ', 8)
+  header.writeUInt32LE(16, 16) // fmt chunk size
+  header.writeUInt16LE(1, 20) // PCM
+  header.writeUInt16LE(1, 22) // mono
+  header.writeUInt32LE(WAV_RATE, 24) // sample rate
+  header.writeUInt32LE(WAV_RATE, 28) // byte rate
+  header.writeUInt16LE(1, 32) // block align
+  header.writeUInt16LE(8, 34) // bits per sample
+  header.write('data', 36)
+  header.writeUInt32LE(WAV_RATE, 40)
+  return Buffer.concat([header, Buffer.alloc(WAV_RATE, 128)])
+}
+
 /**
  * The correct option of a diagnostic item, read from the local DB. Tests use it to answer wrong
  * on purpose (a deterministic confident mistake) without depending on seed question text.
