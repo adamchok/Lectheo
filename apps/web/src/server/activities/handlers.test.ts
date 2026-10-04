@@ -51,24 +51,25 @@ describe('spot_flaw', () => {
 
   it('try 1 partial → awaiting_retry → try 2 closes → a 3rd submit is 409', async () => {
     const { id } = await startFlawed()
-    const wrongPlace = { verdict: 'flawed', flawSentenceIdx: 0, correction: 'Lookup is O(n).' }
-    const try1 = await submitActivity(ALICE, id, wrongPlace, db)
+    // Right sentence, no correction yet → 4/6 partial without a judge call.
+    const noFix = { verdict: 'flawed', flawSentenceIdx: 2 }
+    const try1 = await submitActivity(ALICE, id, noFix, db)
 
     expect(try1).toMatchObject({ tryNo: 1, final: false, outcome: 'partial', score: 4 })
-    expect(try1).toMatchObject({ canRetry: true, checks: { verdict: true, location: false } })
+    expect(try1).toMatchObject({ canRetry: true, checks: { verdict: true, location: true } })
     expect(try1.explanation).toBeUndefined()
     expect(try1.rubric).toBeUndefined()
     expect(try1.sources[0]).toMatchObject({ lectureId: IDS.lecture, idx: 1 })
     expect(try1.mastery).toMatchObject({ conceptId: IDS.concept, state: 'amber' })
     expectNoSecrets(try1)
-    expect(await judgeCalls()).toBe(1)
+    expect(await judgeCalls()).toBe(0)
     const [mid] = await db.select().from(activities).where(eq(activities.id, id))
     expect(mid?.status).toBe('awaiting_retry')
 
     // Same body again (client retry) → the stored attempt, no second judge call.
-    const replay = await submitActivity(ALICE, id, wrongPlace, db)
+    const replay = await submitActivity(ALICE, id, noFix, db)
     expect(replay.attemptId).toBe(try1.attemptId)
-    expect(await judgeCalls()).toBe(1)
+    expect(await judgeCalls()).toBe(0)
 
     const right = { verdict: 'flawed', flawSentenceIdx: 2, correction: 'Collisions can happen.' }
     const try2 = await submitActivity(ALICE, id, right, db)

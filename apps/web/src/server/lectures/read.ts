@@ -40,6 +40,7 @@ export function toLectureDto(
           endMs: media.endMs ?? null,
           localFileName: media.localFileName ?? null,
           durationMs: media.durationMs ?? lecture.durationMs ?? null,
+          fallbackAudioUrl: media.fallbackAudioUrl ?? null,
         }
       : null,
     hasTimestamps: lecture.hasTimestamps,
