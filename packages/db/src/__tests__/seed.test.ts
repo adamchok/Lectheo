@@ -138,6 +138,44 @@ describe('CS50x library + seed student fixture', () => {
     expect(await tableCounts(db)).toEqual(firstCounts)
   })
 
+  it('re-seeding replaces stale seed-student history with the current script', async () => {
+    const student = buildStudentRows()
+    // An older script: different answers, message text and an extra row the new one lacks.
+    await db.$client.query(
+      `UPDATE diagnostic_responses SET option_id = 'z' WHERE session_id IN
+         (SELECT id FROM diagnostic_sessions WHERE user_id = $1)`,
+      [SEED_STUDENT_ID],
+    )
+    await db.$client.query(
+      `UPDATE messages SET content = 'stale' WHERE activity_id IN
+         (SELECT id FROM activities WHERE user_id = $1)`,
+      [SEED_STUDENT_ID],
+    )
+    await db.$client.query(
+      `INSERT INTO markers (id, lecture_id, user_id, kind, t_ms, capture)
+       VALUES ($1, $2, $3, 'lost', 1, 'watch')`,
+      [seedId('test:stale-marker'), lectureId('l3'), SEED_STUDENT_ID],
+    )
+
+    await seedAll(db)
+
+    const options = await rows<{ option_id: string }>(
+      db,
+      `SELECT r.option_id FROM diagnostic_responses r JOIN diagnostic_sessions d
+         ON d.id = r.session_id WHERE d.user_id = $1`,
+      [SEED_STUDENT_ID],
+    )
+    expect(options.map((o) => o.option_id).sort()).toEqual(
+      student.responses.map((r) => r.optionId).sort(),
+    )
+    const [stale] = await rows<{ n: number }>(
+      db,
+      `SELECT count(*)::int AS n FROM messages WHERE content = 'stale'`,
+    )
+    expect(stale?.n).toBe(0)
+    expect(await tableCounts(db)).toEqual(firstCounts)
+  })
+
   it('re-seeding restores stale library rows from the fixture (e.g. a re-timed lecture)', async () => {
     const l5 = lectureId('l5')
     const segment = `SELECT start_ms FROM transcript_segments WHERE lecture_id = '${l5}' AND idx = 0`

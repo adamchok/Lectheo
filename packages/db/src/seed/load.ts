@@ -1,5 +1,5 @@
 import { computeLayout, layoutHash } from '@lectheo/domain/layout'
-import { and, eq, getTableColumns, inArray, notInArray, sql } from 'drizzle-orm'
+import { and, eq, getTableColumns, gte, inArray, notInArray, sql } from 'drizzle-orm'
 import type {
   PgColumn,
   PgDatabase,
@@ -126,8 +126,16 @@ async function pruneLibrary(tx: SeedDb, rows: LibraryRows): Promise<void> {
       sql`not exists (select 1 from attempts a where a.concept_id = "concepts"."id")`,
       sql`not exists (select 1 from activities a where a.concept_id = "concepts"."id")`,
       sql`not exists (select 1 from items i where i.concept_id = "concepts"."id")`,
+      sql`not exists (select 1 from marker_concepts mc where mc.concept_id = "concepts"."id")`,
     ),
   )
+  // Segments are keyed (lecture, idx): drop the tail when a regenerated transcript got shorter.
+  for (const lecture of lectureIds) {
+    const count = rows.segments.filter((seg) => seg.lectureId === lecture).length
+    await tx
+      .delete(s.transcriptSegments)
+      .where(and(eq(s.transcriptSegments.lectureId, lecture), gte(s.transcriptSegments.idx, count)))
+  }
 }
 
 /**
@@ -194,6 +202,9 @@ export interface SeedStudentOptions {
 /**
  * Inserts the seed student (profiles.kind = 'seed') and its per-user rows, which clone_sample()
  * copies for every sample account. Requires seedLibrary() first. Idempotent like seedLibrary.
+ * The seed profile's history is replaced, not merged: a regenerated bank changes item text, so
+ * stale answers, messages and rubric snapshots must not survive next to it (clone_sample copies
+ * them into every new sample account). Only the kind = 'seed' profile's rows are touched.
  */
 export async function seedStudent(
   db: SeedDb,
@@ -202,13 +213,20 @@ export async function seedStudent(
   const rows = buildStudentRows(options.baseDate ?? DEFAULT_SEED_BASE_DATE)
   await db.transaction(async (tx) => {
     await tx.insert(s.profiles).values(rows.profile).onConflictDoNothing()
-    await tx.insert(s.markers).values(rows.markers).onConflictDoNothing()
-    await tx.insert(s.markerConcepts).values(rows.markerConcepts).onConflictDoNothing()
-    await tx.insert(s.diagnosticSessions).values(rows.sessions).onConflictDoNothing()
-    await tx.insert(s.diagnosticResponses).values(rows.responses).onConflictDoNothing()
-    await tx.insert(s.activities).values(rows.activities).onConflictDoNothing()
-    await tx.insert(s.messages).values(rows.messages).onConflictDoNothing()
-    await tx.insert(s.attempts).values(rows.attempts).onConflictDoNothing()
+    const seed = rows.profile.id!
+    // Children go by cascade: messages (activities), diagnostic_responses (sessions),
+    // marker_concepts (markers).
+    await tx.delete(s.attempts).where(eq(s.attempts.userId, seed))
+    await tx.delete(s.activities).where(eq(s.activities.userId, seed))
+    await tx.delete(s.diagnosticSessions).where(eq(s.diagnosticSessions.userId, seed))
+    await tx.delete(s.markers).where(eq(s.markers.userId, seed))
+    await tx.insert(s.markers).values(rows.markers)
+    await tx.insert(s.markerConcepts).values(rows.markerConcepts)
+    await tx.insert(s.diagnosticSessions).values(rows.sessions)
+    await tx.insert(s.diagnosticResponses).values(rows.responses)
+    await tx.insert(s.activities).values(rows.activities)
+    await tx.insert(s.messages).values(rows.messages)
+    await tx.insert(s.attempts).values(rows.attempts)
   })
   return {
     profiles: 1,

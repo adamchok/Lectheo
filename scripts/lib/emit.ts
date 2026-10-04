@@ -4,6 +4,8 @@ import { join } from 'node:path'
 import type { Segment } from '@lectheo/domain'
 import type { ConceptFx, ExtraOccurrenceFx, ItemFx, LectureFx } from '@lectheo/db/seed'
 import type { BankResult, Candidate } from './bank'
+import type { RevisionResult } from './revise'
+import { EXTRA_EDGES, fixConcept, fixTranscript } from './reviewed'
 import { REPO_ROOT } from './cache'
 import type { LecturePlan } from './curriculum'
 import { SLOT_KIND } from './drafts'
@@ -22,6 +24,10 @@ export interface LectureOutput {
   segments: Segment[]
   extraction: Extraction
   bank: BankResult
+  /** Bank selection after reviewer revisions, and what is still missing. */
+  selected: Candidate[]
+  shortfall: BankResult['shortfall']
+  revisions: RevisionResult[]
 }
 
 const NAME: Readonly<Record<LecturePlan['key'], string>> = {
@@ -39,8 +45,11 @@ export function lectureFx(out: LectureOutput): LectureFx {
     return {
       key,
       name,
-      summary: c.summary,
-      keyPoints: c.keyPoints.map((k) => ({ id: k.id, text: k.text, segs: [...k.segmentIdxs] })),
+      ...fixConcept(
+        key,
+        c.summary,
+        c.keyPoints.map((k) => ({ id: k.id, text: k.text, segs: [...k.segmentIdxs] })),
+      ),
       segs: [...c.segmentIdxs],
       salience: c.salience,
     }
@@ -54,7 +63,12 @@ export function lectureFx(out: LectureOutput): LectureFx {
     end: plan.end,
     duration: plan.duration,
     fallbackAudioUrl: plan.fallbackAudioUrl,
-    segments: segments.map(({ idx, startMs, endMs, text }) => ({ idx, startMs, endMs, text })),
+    segments: segments.map(({ idx, startMs, endMs, text }) => ({
+      idx,
+      startMs,
+      endMs,
+      text: fixTranscript(plan.key, idx, text),
+    })),
     concepts,
   }
 }
@@ -99,6 +113,13 @@ export function itemsFx(selected: readonly Candidate[]): ItemFx[] {
   })
 }
 
+/** Generated edges plus the reviewed EXTRA_EDGES (deduped by from/relation/to). */
+function withExtraEdges(edges: readonly SeedEdge[]): SeedEdge[] {
+  const key = (e: SeedEdge) => `${e.from}:${e.relation}:${e.to}`
+  const seen = new Set(edges.map(key))
+  return [...edges, ...EXTRA_EDGES.filter((e) => !seen.has(key(e)))]
+}
+
 const banner = (lines: readonly string[]): string =>
   ['/**', ...lines.map((l) => ` * ${l}`.trimEnd()), ' */'].join('\n')
 
@@ -122,6 +143,7 @@ export function emitFixtures(outputs: readonly LectureOutput[], edges: readonly 
       out.plan.windowNote,
       `Segments are the official subtitles (${out.plan.srtUrl}), segmented by @lectheo/domain;`,
       'CC BY-NC-SA 4.0, CS50x 2026 by Harvard University, adapted by Lectheo.',
+      'Subtitles lightly corrected for ASR errors (scripts/lib/reviewed.ts); timestamps unchanged.',
       ...GENERATED,
     ])
     const itemsHeader = banner([
@@ -137,7 +159,7 @@ export function emitFixtures(outputs: readonly LectureOutput[], edges: readonly 
       write(
         `${out.plan.key}-items.ts`,
         `import type { ItemFx } from './types'\n\n${itemsHeader}`,
-        `export const ${name}Items: ItemFx[] = ${JSON.stringify(itemsFx(out.bank.selected), null, 2)}`,
+        `export const ${name}Items: ItemFx[] = ${JSON.stringify(itemsFx(out.selected), null, 2)}`,
       ),
     )
   }
@@ -151,7 +173,7 @@ export function emitFixtures(outputs: readonly LectureOutput[], edges: readonly 
       'edges.ts',
       `import type { EdgeFx, ExtraOccurrenceFx } from './types'\n\n${edgesHeader}`,
       [
-        `export const EDGES: EdgeFx[] = ${JSON.stringify(edges, null, 2)}`,
+        `export const EDGES: EdgeFx[] = ${JSON.stringify(withExtraEdges(edges), null, 2)}`,
         `export const EXTRA_OCCURRENCES: ExtraOccurrenceFx[] = ${JSON.stringify(outputs.flatMap(extraOccurrences), null, 2)}`,
       ].join('\n\n'),
     ),
@@ -164,7 +186,7 @@ export function emitFixtures(outputs: readonly LectureOutput[], edges: readonly 
 /** Shortfall and rejection stats, so tests and the README read the bank's real numbers. */
 function writeReport(outputs: readonly LectureOutput[]): string {
   const shortfall = outputs.flatMap((o) =>
-    o.bank.shortfall.map((s) => ({
+    o.shortfall.map((s) => ({
       concept: s.conceptKey,
       kind: SLOT_KIND[s.slot],
       missing: s.missing,
@@ -175,7 +197,10 @@ function writeReport(outputs: readonly LectureOutput[]): string {
     drafted: o.bank.candidates.length,
     rejected: o.bank.candidates.filter((c) => c.verification.verdict === 'fail').length,
     selected: o.bank.selected.length,
+    revised: o.revisions.filter((r) => r.verdict === 'pass').length,
+    final: o.selected.length,
   }))
+  const revisions = outputs.flatMap((o) => o.revisions)
   const header = banner([
     'Library bank shortfall and verification stats (Architecture §5.3: at most one redraft round;',
     'slots still failing verification are left empty and labeled here).',
@@ -187,6 +212,8 @@ function writeReport(outputs: readonly LectureOutput[]): string {
     [
       `export const BANK_SHORTFALL: { concept: string; kind: ItemKind; missing: number }[] = ${JSON.stringify(shortfall, null, 2)}`,
       `export const BANK_STATS = ${JSON.stringify(stats, null, 2)} as const`,
+      `/** Reviewer-requested redrafts (scripts/lib/reviewed.ts REVISIONS) and their verdicts. */
+export const BANK_REVISIONS = ${JSON.stringify(revisions, null, 2)} as const`,
     ].join('\n\n'),
   )
 }

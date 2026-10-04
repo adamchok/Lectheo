@@ -64,7 +64,7 @@ export function targetCounts(conceptIndex: number): Record<Slot, number> {
   return { mcq: 2, flawed: withCorrect ? 1 : 2, correct: withCorrect ? 1 : 0, transfer: 1 }
 }
 
-const slotOf = (r: ItemRecord): Slot =>
+export const slotOf = (r: ItemRecord): Slot =>
   r.kind === 'diagnostic_mcq'
     ? 'mcq'
     : r.kind === 'transfer'
@@ -92,7 +92,7 @@ function isDirectiveItem(r: ItemRecord): boolean {
 
 type Verdicts = { model: string; results: VerifyItemsOutput['results'] | null }
 
-async function verifyCandidates(
+export async function verifyCandidates(
   name: string,
   segments: Segments,
   drafts: readonly Omit<Candidate, 'verification'>[],
@@ -186,12 +186,13 @@ function select(
 
 function feedbackFor(rejected: readonly Candidate[]): string | null {
   if (rejected.length === 0) return null
-  return rejected
+  const lines = rejected
     .map((c) => {
       const reasons = c.verification.reasons.slice(0, MAX_FEEDBACK_REASONS).join('; ')
       return `- ${c.record.conceptKey} ${SLOT_KIND[c.slot]} (${c.slot}): ${reasons}`
     })
     .join('\n')
+  return `Earlier drafts were rejected by an independent checker:\n${lines}`
 }
 
 export async function buildBank(

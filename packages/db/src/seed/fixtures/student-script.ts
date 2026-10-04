@@ -148,7 +148,7 @@ const diagnostics: DiagnosticPlan[] = [
     lecture: 'l4',
     hoursAgo: 26,
     answers: [
-      { concept: 'pointers', variant: 1, confidence: 'sure', correct: false, chose: 'a' },
+      { concept: 'pointers', variant: 1, confidence: 'sure', correct: false, chose: 'c' },
       {
         concept: 'pointers',
         variant: 2,

@@ -361,58 +361,59 @@ export const lecture5Items: ItemFx[] = [
     concept: 'linked_lists',
     kind: 'diagnostic_mcq',
     variant: 2,
-    segs: [8],
+    segs: [3, 5, 6, 7, 8],
     publicPayload: {
-      stem: 'A programmer switches a singly linked list to a doubly linked list, where each node has pointers to both the next and the previous node. What is the main effect?',
+      stem: "You have a singly linked list of n integers kept in sorted order, from smallest to largest. Why can't you simply run binary search on it and get O(log n) lookups, as you could with a sorted array?",
       options: [
         {
           id: 'a',
-          text: 'Searching becomes O(log n) because you can move in both directions.',
+          text: 'The values in a linked list cannot be kept in sorted order, and binary search requires sorted data.',
         },
         {
           id: 'b',
-          text: 'The list no longer needs to allocate a node for each value.',
+          text: 'To reach the middle node, you have to follow pointers from the head of the list, which takes O(n) steps each time you need a middle.',
         },
         {
           id: 'c',
-          text: 'Some insert and delete code becomes simpler to write, but the running times stay the same.',
+          text: 'Each node uses extra memory for its pointer, and binary search only works when every value takes the same small amount of space.',
         },
         {
           id: 'd',
-          text: 'The list now stores its nodes contiguously, like an array.',
+          text: 'It only works on a singly linked list. Making the list doubly linked, with a pointer back to the previous node, would allow binary search in O(log n).',
         },
       ],
     },
     answerKey: {
-      correctOptionId: 'c',
+      correctOptionId: 'b',
       explanation:
-        'With pointers going both ways, you no longer need to look ahead to find what to free or where to insert, so the code is easier to write. However, searching, inserting and deleting are still O(n), so the speed does not fundamentally change.',
+        "Array elements sit back to back in memory, so simple arithmetic lets you jump straight to the middle index. A linked list's nodes can be scattered anywhere in memory and are connected only by pointers. To find the middle, you have to start at the head and walk node by node: once to learn the length, and again to stop halfway. You repeat that work for the middle of the middle, so finding each midpoint alone costs O(n). That cancels the advantage of binary search, and searching the list is O(n).",
     },
     distractorMeta: {
       a: {
-        misconception: 'Thinks bidirectional traversal enables binary search.',
+        misconception: 'Linked lists cannot hold sorted data.',
         whyWrong:
-          'You still cannot jump to the middle without walking node by node, so search remains O(n).',
+          'A linked list can be kept sorted by inserting each value in its proper place. The problem is not the order of the values. It is that there is no fast way to jump to the middle node.',
       },
-      b: {
-        misconception: 'Confuses adding pointers with changing the allocation strategy.',
-        whyWrong: 'Every value still gets its own node. Each node just carries one more pointer.',
+      c: {
+        misconception: 'Binary search fails because of the memory overhead of pointers.',
+        whyWrong:
+          'The extra pointer costs space, not search time. Binary search is lost because nodes are not contiguous and cannot be reached by index arithmetic, not because of how much memory each node uses.',
       },
       d: {
-        misconception: 'Believes extra pointers force contiguous layout.',
+        misconception: 'Doubly linked lists restore fast, random access.',
         whyWrong:
-          'The nodes can still be anywhere in memory. Pointers connect them, not adjacency.',
+          'A pointer to the previous node makes some insert and delete code simpler, but you still have to walk node by node to reach the middle. So the running time stays the same.',
       },
     },
     rubric: null,
     hints: [
-      'Separate two questions: is the code easier to write, and is it faster in big-O terms?',
-      'Does moving backward help you reach the middle of the list any faster?',
+      'Think about how a computer finds the middle element of an array, and whether that trick depends on where the elements are stored in memory.',
+      'In a linked list, the only way to reach a node is to follow pointers. How many steps does it take to get from the head to the node halfway down the list?',
     ],
     leakKeywords: [],
     verification: {
       verdict: 'pass',
-      solvedAnswer: 'c',
+      solvedAnswer: 'b',
       reasons: [],
       model: 'openai/gpt-6.1-sol',
     },
@@ -423,47 +424,56 @@ export const lecture5Items: ItemFx[] = [
     concept: 'linked_lists',
     kind: 'spot_flaw',
     variant: 1,
-    segs: [0, 8],
+    segs: [0, 4, 5, 6, 7, 8, 9],
     publicPayload: {
       sentences: [
-        'A linked list allocates a new node for each value and connects the nodes with pointers.',
-        'This lets the list grow and shrink without copying existing values to a new location.',
-        'Making it a doubly linked list, with pointers in both directions, lets you search a sorted list in O(log n).',
-        'Without that, searching, inserting and deleting in a singly linked list are all O(n).',
+        'A linked list allocates a new node for each value and connects the nodes with pointers, so the nodes can sit wherever free memory happens to be, even if it is fragmented.',
+        'Because of this, the list can grow and shrink without copying the existing values to a new location, unlike resizing an array with realloc.',
+        'Searching for a value, deleting a value, and inserting a value into its correct place in a sorted list are all O(n), because you must walk from the head to find the right node, although prepending a node to an unsorted list is O(1).',
+        'Converting it to a doubly linked list, with pointers in both directions, restores binary search on a sorted list and brings search down to O(log n).',
       ],
     },
     answerKey: {
       hasFlaw: true,
-      flawSentenceIdx: 2,
-      flawSummary: 'Claims that doubly linked lists enable logarithmic search.',
+      flawSentenceIdx: 3,
+      flawSummary:
+        'A doubly linked list does not enable binary search or O(log n) search. You still cannot jump to the middle without traversing from one end, so search stays O(n). The extra pointers only make some code, like insertion and deletion, easier to write.',
       correction:
-        "A doubly linked list makes some code simpler, because you don't have to look ahead to insert or free nodes. It doesn't change the speed: search is still O(n), because you still have to walk node by node to reach the middle.",
+        'Converting it to a doubly linked list, with pointers in both directions, makes some code easier to write, such as insertion and deletion, but search on a sorted list is still O(n) because finding the middle still requires traversing the nodes one by one.',
       explanation:
-        "Backward pointers don't let you jump to the middle of the list. Binary search stays unavailable, and the running times are unchanged.",
+        'Binary search needs constant-time access to the middle element. Arrays provide this through arithmetic on contiguous memory. In a linked list, whether singly or doubly linked, you reach the middle only by following pointers node by node, which takes O(n) steps. Adding a backward pointer lets you move in both directions, so you no longer need to look ahead when inserting or freeing. It does not let you skip over nodes, so the asymptotic speed is unchanged. The other sentences are correct: each value gets its own node, the list grows without copying, and search, delete and sorted insertion are O(n), while prepending is O(1).',
     },
     distractorMeta: null,
     rubric: {
       criteria: [
         {
           id: 'c1',
-          label: 'Corrects the speed claim',
-          description: 'States that search remains O(n) in a doubly linked list.',
+          label: 'Identifies the false claim',
+          description:
+            'States that a doubly linked list does not make search O(log n) or enable efficient binary search; search remains O(n).',
           max: 2,
         },
         {
           id: 'c2',
-          label: 'States the real benefit',
+          label: 'Explains why',
           description:
-            'Notes that the benefit is simpler code, or explains that finding the middle still requires traversal.',
+            'Explains that reaching the middle still requires traversing node by node. The second pointer only simplifies the code; it does not provide random access.',
           max: 2,
         },
       ],
     },
     hints: [
-      'Look closely at what extra pointers can and cannot change.',
-      'Does moving backward let you reach the middle node without walking through the list?',
+      'Ask what binary search needs to do at every step, and whether adding a pointer changes how you get there.',
+      'With pointers in both directions, how many steps does it still take to reach the middle node of the list?',
     ],
-    leakKeywords: ['doubly', 'O(log n)', 'both directions'],
+    leakKeywords: [
+      'doubly',
+      'binary search',
+      'O(log n)',
+      'middle',
+      'random access',
+      'backward pointer',
+    ],
     verification: {
       verdict: 'pass',
       solvedAnswer: 'flawed',
@@ -477,48 +487,55 @@ export const lecture5Items: ItemFx[] = [
     concept: 'linked_lists',
     kind: 'spot_flaw',
     variant: 2,
-    segs: [1, 4, 5],
+    segs: [3, 4, 5, 6, 7, 9],
     publicPayload: {
       sentences: [
-        'Arrays force us to pick a size in advance, which is why linked lists are appealing.',
-        'With a linked list, we allocate one node at a time as each new value arrives.',
-        'Because each node must be placed right after the previous node in memory, a linked list cannot make use of fragmented memory.',
-        'The price we pay is that searching, inserting and deleting are all O(n).',
+        'Arrays force us to pick a size in advance, so growing one means allocating new memory and copying every old value over.',
+        'A linked list avoids that by allocating one new node, holding a value and a pointer, each time a value arrives.',
+        'Searching a linked list is O(n), and so is inserting into a list kept in sorted order, because we must walk from the head to find the right spot.',
+        'Even if the list is sorted, we can still run binary search on it in O(log n) time, because the pointers let us jump straight to the middle node.',
       ],
     },
     answerKey: {
       hasFlaw: true,
-      flawSentenceIdx: 2,
+      flawSentenceIdx: 3,
       flawSummary:
-        "Claims that linked list nodes must be contiguous and so can't use fragmented memory.",
+        'Claims binary search works in O(log n) on a sorted linked list, but pointers only lead to the next node, so reaching the middle requires a linear traversal from the head.',
       correction:
-        'Linked list nodes can live anywhere in memory, because pointers connect them. That is exactly why linked lists can make efficient use of fragmented memory, such as a few bytes here and a few bytes there.',
+        'Even if the list is sorted, binary search loses its advantage, because finding the middle node requires traversing from the beginning, which costs O(n) steps each time.',
       explanation:
-        'Contiguity is a requirement of arrays, not linked lists. Pointers let nodes stay wherever they were allocated, so a list can use scattered free chunks of memory.',
+        "Sentences 0–2 are accurate: arrays need resizing and copying, linked lists allocate a node per value, and search and sorted insertion are linear. Sentence 3 is wrong. A singly linked list's pointers only lead from one node to the next. There is no arithmetic that jumps to the middle the way array indexing does. To find the middle you must walk the list, so the logarithmic benefit of binary search is lost.",
     },
     distractorMeta: null,
     rubric: {
       criteria: [
         {
-          id: 'c1',
-          label: 'Rejects contiguity',
-          description: 'States that nodes need not be adjacent in memory.',
+          id: 'identify',
+          label: 'Identifies the flawed claim',
+          description:
+            'Points to the claim that binary search runs in O(log n) on a sorted linked list.',
           max: 2,
         },
         {
-          id: 'c2',
-          label: 'Explains the role of pointers',
+          id: 'reason',
+          label: 'Explains why',
           description:
-            'Explains that pointers link the nodes, which allows the list to use fragmented memory.',
+            'Explains that nodes are not contiguous and pointers only lead to the next node, so finding the middle requires traversing from the head in O(n) steps.',
           max: 2,
         },
       ],
     },
     hints: [
-      'Which data structure actually requires its elements to be back to back?',
-      'What connects one node to the next?',
+      'Think about what operation binary search needs to do quickly at every step.',
+      'With an array you can compute the middle index directly. What do you have to do to reach the middle node of a linked list?',
     ],
-    leakKeywords: ['contiguous', 'right after', 'fragmented'],
+    leakKeywords: [
+      'traverse',
+      'jump to the middle',
+      'contiguous',
+      'binary search lost',
+      'walk from the head',
+    ],
     verification: {
       verdict: 'pass',
       solvedAnswer: 'flawed',
@@ -650,58 +667,62 @@ export const lecture5Items: ItemFx[] = [
     concept: 'binary_search_trees',
     kind: 'diagnostic_mcq',
     variant: 2,
-    segs: [24, 25, 26, 28, 29],
+    segs: [17, 24, 25, 26, 28, 29],
     publicPayload: {
-      stem: 'In a recursive C function bool search(node *tree, int number) on a binary search tree, what should happen when tree is not NULL and number < tree->number?',
+      stem: 'A recursive C function bool search(node *tree, int number) checks whether number is in a binary search tree. Each node is greater than its left child and less than its right child, and there are no duplicates. What should the function do when tree is not NULL and number < tree->number?',
       options: [
         {
           id: 'a',
-          text: 'Return search(tree->left, number)',
+          text: 'return search(tree->right, number);',
         },
         {
           id: 'b',
-          text: 'Return search(tree->right, number)',
+          text: 'return false; because the number is smaller than the current node, it cannot be in the tree',
         },
         {
           id: 'c',
-          text: 'Return false, because the number is smaller than the current node',
+          text: 'return search(tree->left, number);',
         },
         {
           id: 'd',
-          text: 'Search both tree->left and tree->right, and return true if either finds it',
+          text: 'return true; because any number smaller than the current node must be stored in its left subtree',
         },
       ],
     },
     answerKey: {
-      correctOptionId: 'a',
+      correctOptionId: 'c',
       explanation:
-        'By the BST property, smaller values live in the left subtree. The function can therefore cut off the right subtree and recursively search tree->left for the same number. The other cases are: a NULL tree returns false, a larger number searches right, and an equal number returns true.',
+        "In a binary search tree, every value smaller than a node is in that node's left subtree. If number < tree->number, the function can ignore the right subtree and recursively search the left child. That left child is itself a smaller tree. The recursion stops when it reaches NULL and returns false, or when it finds an equal value and returns true.",
     },
     distractorMeta: {
-      b: {
-        misconception: 'Confusing which side of the tree holds smaller values.',
-        whyWrong: 'Each node is less than its right child, so smaller values are on the left.',
-      },
-      c: {
-        misconception: 'A mismatch at the current node means the value is absent.',
+      a: {
+        misconception:
+          'Reversing the ordering of the tree, so that smaller values are thought to lie to the right.',
         whyWrong:
-          'The value may still be in the left subtree. The function returns false only when it reaches a NULL tree.',
+          'Values smaller than a node are in its left subtree. Searching only the right subtree skips the place where the number would be and can wrongly return false.',
+      },
+      b: {
+        misconception:
+          "Treating 'smaller than the current node' as proof that the value is absent.",
+        whyWrong:
+          'Being smaller only tells you which direction to go. The value may still be in the left subtree, so returning false gives a wrong result for values that are present.',
       },
       d: {
-        misconception: 'BST search must explore every branch.',
+        misconception:
+          'Confusing where a value would have to be with proof that it is actually there.',
         whyWrong:
-          'Searching both subtrees throws away the halving advantage that makes BST search O(log n).',
+          'The ordering property says where the number would be if it were present, not that it exists. Returning true reports values that are not in the tree.',
       },
     },
     rubric: null,
     hints: [
-      'Remember how a node compares to its left child and to its right child.',
-      'Which subtree can be safely snipped off when the target is smaller than the current node?',
+      'Think about which part of the tree can still contain a value that is smaller than the current node.',
+      'The left subtree is itself a binary search tree, so the same function can be applied to it.',
     ],
     leakKeywords: [],
     verification: {
       verdict: 'pass',
-      solvedAnswer: 'a',
+      solvedAnswer: 'c',
       reasons: [],
       model: 'openai/gpt-6.1-sol',
     },
@@ -767,13 +788,13 @@ export const lecture5Items: ItemFx[] = [
     concept: 'binary_search_trees',
     kind: 'spot_flaw',
     variant: 2,
-    segs: [20, 21, 22, 23, 25, 26, 28],
+    segs: [20, 21, 23, 25, 26],
     publicPayload: {
       sentences: [
-        'Compared with an array of ints, a binary search tree uses roughly three times as much memory, since each node holds an int and two pointers.',
-        'In exchange, inserting a new value only requires updating pointers, rather than copying the whole data set to a new location.',
+        'Compared with an array of the same ints, a binary search tree uses considerably more memory, because each node stores an int plus two pointers for its left and right children.',
+        'In exchange, inserting a new value only requires updating pointers, rather than copying the whole data set to a new, larger block of memory.',
         "A recursive search returns false when handed a NULL tree, searches the left subtree when the target is smaller than the node's number, and searches the right subtree when it is larger.",
-        "If none of those cases applies, the target must equal the node's number, so the function returns true.",
+        "If none of those cases applies, the target must equal the node's number, so the function can simply return true without an explicit equality check.",
       ],
     },
     answerKey: {
@@ -782,28 +803,29 @@ export const lecture5Items: ItemFx[] = [
       flawSummary: null,
       correction: null,
       explanation:
-        'Every sentence is correct. Each node stores one piece of data and two pointers, which is about three times the space of a bare int. In return, the tree grows dynamically through pointer updates instead of reallocation and copying. The recursive search has exactly four cases: NULL returns false, smaller goes left, larger goes right, and otherwise the value was found, so it returns true.',
+        'Every sentence is correct. Each BST node holds an int and two pointers, so the tree needs considerably more memory than an array of ints. That cost buys dynamism: new nodes are added by updating pointers, with no copying of the existing data. The recursive search has four cases. A NULL tree returns false, a smaller target goes left, and a larger target goes right. The only remaining case is equality, so the final branch can return true without testing for it explicitly.',
     },
     distractorMeta: null,
     rubric: {
       criteria: [
         {
-          id: 'c1',
-          label: 'Recognizes correctness',
-          description: 'Concludes that the explanation has no flaw.',
+          id: 'r1',
+          label: 'Recognizes no flaw',
+          description: 'States that the explanation is fully correct and does not invent an error.',
           max: 2,
         },
         {
-          id: 'c2',
-          label: 'Justification',
-          description: 'Briefly confirms the memory trade-off and the four search cases.',
+          id: 'r2',
+          label: 'Justifies key claims',
+          description:
+            'Briefly confirms the memory cost (int plus two pointers per node), the pointer-based insertion, and that the four search cases are exhaustive.',
           max: 2,
         },
       ],
     },
     hints: [
-      'Check each claim against what a BST node contains and how recursive search proceeds.',
-      'Count the possible cases in recursive search, and make sure each one is handled correctly.',
+      'Check each claim against what a BST node contains and how its recursive search is structured.',
+      'Ask whether the four search cases (empty, smaller, larger, equal) cover every possibility, and whether each memory and insertion claim avoids overstating anything.',
     ],
     leakKeywords: [],
     verification: {
@@ -1110,9 +1132,9 @@ export const lecture5Items: ItemFx[] = [
     concept: 'hash_tables',
     kind: 'diagnostic_mcq',
     variant: 1,
-    segs: [57, 58, 61, 62],
+    segs: [50, 55, 56, 57, 58, 61, 62],
     publicPayload: {
-      stem: 'A contacts app stores n names in a hash table with 26 buckets, one per first letter, and handles collisions by chaining. Assuming names are spread evenly across the letters, what is the asymptotic running time of searching for a name?',
+      stem: 'A contacts app stores n names in a hash table with a fixed 26 buckets, one per first letter, and handles collisions by chaining names into a linked list at each bucket. Assume names are spread evenly across the letters. What is the asymptotic running time of searching for a name?',
       options: [
         {
           id: 'a',
@@ -1120,49 +1142,50 @@ export const lecture5Items: ItemFx[] = [
         },
         {
           id: 'b',
-          text: 'O(log n), because the buckets are in alphabetical order',
+          text: 'O(n), because each chain holds about n/26 names and the constant factor drops out',
         },
         {
           id: 'c',
-          text: 'O(n), because each chain holds about n/26 names and constant factors drop out',
+          text: 'O(log n), because the buckets are in alphabetical order',
         },
         {
           id: 'd',
-          text: 'O(26n), because there are 26 buckets that might each need to be searched',
+          text: 'O(26), because there are only 26 buckets to check',
         },
       ],
     },
     answerKey: {
-      correctOptionId: 'c',
+      correctOptionId: 'b',
       explanation:
-        "Hashing finds the right bucket in one step, but you then have to walk that bucket's linked list. With k buckets and evenly spread names, each chain holds about n/k names. That is faster in practice, roughly 26 times faster than a single linked list. Asymptotically, though, O(n/k) is still O(n).",
+        "Hashing on the first letter jumps to the right bucket in one step. That bucket's chain is a linked list, and it must be searched linearly. With k = 26 buckets and evenly distributed names, each chain holds about n/26 entries, so a search takes O(n/k) steps. That is about 26 times faster than one long linked list. Asymptotically, though, the constant 1/26 drops out and the search is still O(n), because chain length grows linearly with n. Real-world hash tables grow the number of buckets as n grows, which keeps chains short and lookups O(1) on average. With a fixed 26 buckets, the chains simply keep getting longer as n grows.",
     },
     distractorMeta: {
       a: {
         misconception: 'Hash table lookup is always O(1)',
         whyWrong:
-          'Jumping to the bucket takes constant time, but collisions create chains that must be searched linearly. The chain length grows with n.',
+          'Hashing finds the bucket in constant time, but collisions mean that bucket holds a chain of about n/26 names. That chain must be traversed linearly, so the search is O(n), not O(1).',
       },
-      b: {
-        misconception: 'Alphabetically ordered buckets allow binary search.',
+      c: {
+        misconception: 'Ordered buckets enable binary search, giving logarithmic time',
         whyWrong:
-          'Each bucket is a linked list, and linked lists do not support binary search. Nothing about the structure halves the problem.',
+          'Bucket order does not matter once the hash picks the bucket. Within a bucket, the chain is a linked list, which cannot be binary searched efficiently, so the search remains linear in chain length.',
       },
       d: {
-        misconception: 'Every bucket must be scanned on each lookup.',
+        misconception:
+          'Search cost depends only on the number of buckets, not on the number of stored names',
         whyWrong:
-          'The hash function picks exactly one bucket, so only one chain of about n/26 names is searched. In any case, O(26n) is not the standard simplified form.',
+          'Only one bucket is visited, but its chain grows with n (about n/26 names). The cost therefore scales with n and is not bounded by the constant 26.',
       },
     },
     rubric: null,
     hints: [
-      'Think about what happens after the hash function picks a bucket.',
-      'How long is each chain relative to n, and what does big O do with a constant divisor?',
+      'Separate the cost of finding the bucket from the cost of searching inside it.',
+      'Each bucket holds a linked list of about n/26 names. What happens to a constant factor like 1/26 in big O notation?',
     ],
     leakKeywords: [],
     verification: {
       verdict: 'pass',
-      solvedAnswer: 'c',
+      solvedAnswer: 'b',
       reasons: [],
       model: 'openai/gpt-6.1-sol',
     },
@@ -1173,58 +1196,59 @@ export const lecture5Items: ItemFx[] = [
     concept: 'hash_tables',
     kind: 'diagnostic_mcq',
     variant: 2,
-    segs: [50, 52, 53, 54, 55],
+    segs: [6, 7, 53, 55, 57, 58, 61, 62],
     publicPayload: {
-      stem: 'A hash table maps names to 26 buckets by first letter. Mario is already stored at index 12, and a new contact, Morton, also hashes to index 12. In the design described for this hash table, what happens?',
+      stem: 'A hash table has 26 buckets, one per letter, and hashes each name by its first letter. Collisions are handled by chaining names together in a linked list at the hashed bucket. Suppose n names are stored, and every one of them starts with M. What is the worst-case running time to look up a name?',
       options: [
         {
           id: 'a',
-          text: 'Morton replaces Mario at index 12',
+          text: 'O(1), because the hash function jumps straight to the right bucket',
         },
         {
           id: 'b',
-          text: 'Morton is added to the linked list at index 12, chained together with Mario',
+          text: 'O(log n), because the chain at index 12 can be binary searched',
         },
         {
           id: 'c',
-          text: 'Morton is placed in the next empty bucket, such as index 13',
+          text: 'O(n), because all n names sit in one linked list at index 12, which must be walked node by node',
         },
         {
           id: 'd',
-          text: 'The array is reallocated with more buckets so Morton gets his own slot',
+          text: 'O(n/26), which is asymptotically better than O(n) because there are 26 buckets',
         },
       ],
     },
     answerKey: {
-      correctOptionId: 'b',
+      correctOptionId: 'c',
       explanation:
-        'Each bucket is a pointer to the head of a linked list. When two keys collide, the new node is simply stitched into the chain at the hashed location. Nothing is deleted, and the structure stays organized by bucket.',
+        'Hashing finds the bucket in one step, but every name collides at index 12, so they all end up chained in a single linked list of length n. Finding a name means traversing that list from the beginning, which is linear: O(n). Even with names spread uniformly, chains have about n/k entries. That is faster in practice, but still O(n) asymptotically.',
     },
     distractorMeta: {
       a: {
-        misconception: 'A collision overwrites the existing entry.',
-        whyWrong: 'Clobbering the existing value loses data. Chaining keeps both names.',
-      },
-      c: {
-        misconception: 'Colliding entries should spill into neighboring buckets.',
+        misconception: 'Hash table lookup is always O(1)',
         whyWrong:
-          'In this design, spilling into other buckets removes any rhyme or reason about who is where. Searches would devolve into linear scans across buckets. Chaining avoids that.',
+          'Jumping to the bucket is constant time, but collisions create chains. Here the chain holds all n names, and searching it takes linear time.',
+      },
+      b: {
+        misconception: 'A sorted linked list supports binary search in logarithmic time',
+        whyWrong:
+          'A linked list has no random access. Reaching the middle means traversing from the start, so binary search does not give O(log n) on a chain.',
       },
       d: {
-        misconception: 'Collisions require growing the array.',
+        misconception: 'Dividing by a constant number of buckets improves the big-O class',
         whyWrong:
-          'The array stays at 26 pointers. Collisions are absorbed by the linked lists, not by resizing.',
+          'Big O drops constant factors, so n/26 is still O(n). Also, here every name lands in one bucket, so the chain has n entries, not n/26.',
       },
     },
     rubric: null,
     hints: [
-      'Recall what each array element in this hash table actually points to.',
-      'The data structure combines an array with another structure you already know.',
+      'Hashing tells you which bucket to look in. Think about what is waiting in that bucket.',
+      'If every name lands at index 12, how long is that linked list, and how do you search a linked list?',
     ],
     leakKeywords: [],
     verification: {
       verdict: 'pass',
-      solvedAnswer: 'b',
+      solvedAnswer: 'c',
       reasons: [],
       model: 'openai/gpt-6.1-sol',
     },
@@ -1679,6 +1703,67 @@ export const lecture5Items: ItemFx[] = [
       verdict: 'pass',
       solvedAnswer:
         '(1) All three words share the c → a prefix path; car and cart also share the r node. (2) Set terminal booleans to true at the t ending cat, the r ending car, and the t ending cart. (3) No: the ca path exists, but its terminal boolean is false. (4) Looking up cart takes four pointer steps, one per letter. Adding a million other words does not change that count.',
+      reasons: [],
+      model: 'openai/gpt-6.1-sol',
+    },
+    model: 'anthropic/claude-opus-5.5',
+    promptVersion: 'draft-items@0.1+seed.1',
+  },
+  {
+    concept: 'hash_functions',
+    kind: 'transfer',
+    variant: 1,
+    segs: [37, 39, 43, 45, 53, 59, 60, 61],
+    publicPayload: {
+      prompt:
+        'A chat app stores usernames in a hash table. Every username contains only English letters (A-Z, upper or lower case, no digits, spaces or symbols) and is at least 2 letters long. There is no upper limit on length. The hash function looks at the first two letters only, ignoring case: hash(name) = (toupper(name[0]) - \'A\') * 26 + (toupper(name[1]) - \'A\'). (a) What is the smallest and largest value this function can return, and how many buckets must the array have? (b) Which bucket do "Bob" and "Zoe" go into? (c) Do "Bob" and "bonnie" collide? Explain why no hash function into a fixed number of buckets could avoid every collision for this set of usernames. (d) Compared with hashing on only the first letter, what is gained and what is paid?',
+    },
+    answerKey: {
+      modelSolution:
+        '(a) Each letter contributes a value from 0 to 25. The smallest result is 0 for names starting with "AA". The largest is 25*26 + 25 = 675 for names starting with "ZZ". So the array needs 676 buckets, indices 0 to 675. (b) For "Bob": B = 1 and O = 14, so 1*26 + 14 = 40. For "Zoe": Z = 25 and O = 14, so 25*26 + 14 = 664. (c) Yes. "bonnie" also starts with B, O after case is ignored, so it also hashes to 40. Collisions cannot be avoided in general because the set of possible usernames is infinite (there is no length limit), while there are only finitely many buckets. Infinitely many inputs mapped into 676 outputs means some bucket must receive more than one name. (e) Hashing on the first letter uses only 26 buckets, so there are far more collisions and the chains are longer. Using two letters spreads names over 676 buckets, which shortens chains and speeds up lookups. The price is 26 times as many buckets, and many of them (for example "QX" or "ZZ") will likely stay empty, wasting memory.',
+      explanation:
+        'Hashing maps an infinite domain to a finite range of bucket indices. Using more of the key gives more buckets and fewer collisions, but it costs more memory, and many buckets go unused. No finite range can eliminate collisions for an unbounded input set.',
+    },
+    distractorMeta: null,
+    rubric: {
+      criteria: [
+        {
+          id: 'range',
+          label: 'Correct range and bucket count',
+          description: 'States outputs run from 0 to 675, so 676 buckets are needed.',
+          max: 2,
+        },
+        {
+          id: 'compute',
+          label: 'Correct bucket values',
+          description: 'Computes Bob -> 40 and Zoe -> 664 using case-insensitive letter values.',
+          max: 2,
+        },
+        {
+          id: 'collision',
+          label: 'Collision reasoning',
+          description:
+            'Identifies that Bob and bonnie both map to 40. Explains that an infinite set of inputs mapped into finitely many buckets forces collisions.',
+          max: 2,
+        },
+        {
+          id: 'tradeoff',
+          label: 'Memory vs collisions trade-off',
+          description:
+            'Notes that two-letter hashing reduces collisions and chain length compared with 26 buckets. Also notes it costs about 26 times the buckets, many of them empty.',
+          max: 2,
+        },
+      ],
+    },
+    hints: [
+      "Work out the value each letter can contribute after converting it to uppercase and subtracting 'A', then combine the two letters.",
+      'For the collision part, compare how many different usernames could exist with how many buckets there are; for the trade-off, compare 26 buckets with your answer to part (a).',
+    ],
+    leakKeywords: [],
+    verification: {
+      verdict: 'pass',
+      solvedAnswer:
+        '(a) Minimum: 0 (AA); maximum: 675 (ZZ). The array needs 676 buckets, indexed 0–675. (b) Bob: 1 × 26 + 14 = 40. Zoe: 25 × 26 + 14 = 664. (c) Yes. Bob and bonnie both begin with BO when case is ignored, so both hash to 40. There are infinitely many allowed usernames but only finitely many buckets; therefore any hash function into a fixed number of buckets must map some distinct usernames to the same bucket. (d) Using two letters distinguishes names with the same first letter but different second letters, potentially reducing collisions and shortening chains. The cost is a larger bucket array: 676 buckets instead of 26, requiring 26 times as much bucket-array memory. Collisions are still possible.',
       reasons: [],
       model: 'openai/gpt-6.1-sol',
     },

@@ -1,7 +1,8 @@
 /**
  * Judge consistency (Architecture §5.4): ~10 student corrections on library spot-the-flaw items,
  * each graded 3 times by the production judge task (judge-correction, GPT-6.1 Sol). Writes
- * docs/evals/judge.csv and prints agreement (target ≥ 95%) and accuracy against the hand label.
+ * docs/evals/judge.csv and prints agreement (target ≥ 95%) and accuracy against the case label (labels in
+ * evals/judge-cases.ts were written by Claude; human review pending).
  *
  *   AI_FAKE=0 AI_GATEWAY_KEY_NAME=dev pnpm --filter @lectheo/scripts eval-judge
  *
@@ -91,7 +92,7 @@ async function main(): Promise<void> {
   process.stdout.write(
     `${path}: ${n} cases × ${RUNS_PER_CASE} runs. Score agreement ${agree}/${n} (${pct(agree)}), ` +
       `criterion-level ${criterionAgree}/${n} (${pct(criterionAgree)}), ` +
-      `majority = hand label ${correct}/${n} (${pct(correct)}). Cost $${cost.toFixed(2)}\n`,
+      `majority = label ${correct}/${n} (${pct(correct)}). Cost $${cost.toFixed(2)}\n`,
   )
 }
 

@@ -45,6 +45,7 @@ const SEED_MAX_OUTPUT_TOKENS = MAX_OUTPUT_TOKENS.extraction
 export const MISCONCEPTION_MCQ = /always O\(1\)/i
 export const MISCONCEPTION_FLAW = /always takes O\(1\)/i
 
+/** `feedback`: extra notes for this draft (rejection reasons, reviewer notes), with their own header. */
 function seedRules(requests: readonly SeedRequest[], feedback: string | null): string {
   const mix = requests
     .map(({ conceptKey: k, counts: c }) => {
@@ -67,7 +68,7 @@ function seedRules(requests: readonly SeedRequest[], feedback: string | null): s
     '- Hints nudge without giving the answer away.',
     `Exact mix per concept:\n${mix}`,
     ...directives,
-    feedback ? `Earlier drafts were rejected by an independent checker:\n${feedback}` : '',
+    feedback ?? '',
   ]
     .filter(Boolean)
     .join('\n')

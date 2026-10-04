@@ -74,59 +74,60 @@ export const lecture3Items: ItemFx[] = [
     concept: 'binary_search',
     kind: 'diagnostic_mcq',
     variant: 2,
-    segs: [34, 35],
+    segs: [30, 31, 32, 33],
     publicPayload: {
-      stem: "The original phone-book algorithm opened to the middle, then had lines such as 'open to the middle of the left half' followed by 'go back to line 3'. How can this be turned into a recursive algorithm?",
+      stem: 'The locker-search algorithm opens the middle door, and if the number we want is less than the number behind that door, it searches only the left half and never looks at the right half again. What must be true of the numbers behind the doors for skipping the right half to be safe?',
       options: [
         {
           id: 'a',
-          text: "Replace each pair of 'open to the middle of a half' and 'go back to line 3' with a single line such as 'search the left half' or 'search the right half', meaning run the same algorithm on that half.",
+          text: 'The total number of doors must be a power of 2, so that each half splits evenly.',
         },
         {
           id: 'b',
-          text: 'Delete the check for whether the person was found, because recursion makes that check unnecessary.',
+          text: 'The number being searched for must actually be behind one of the doors.',
         },
         {
           id: 'c',
-          text: "Replace 'go back to line 3' with 'go back to line 1' so that the whole book is searched again each time.",
+          text: 'The numbers must be in sorted order, so every number to the right of the middle is at least as large as the middle one and cannot be the smaller target.',
         },
         {
           id: 'd',
-          text: 'Add a nested loop inside each half so that every page is examined one at a time.',
+          text: 'The numbers must all be different from one another, so the middle door is unique.',
         },
       ],
     },
     answerKey: {
-      correctOptionId: 'a',
+      correctOptionId: 'c',
       explanation:
-        "Each half-and-loop pair really means 'search this half'. Condensing each pair into one 'search the left/right half' line expresses the loop implicitly: you run the same algorithm again on a problem half as large.",
+        'The algorithm compares the target with the middle door and then discards a whole half. That only works if the doors are sorted. When they are, a target smaller than the middle number cannot be anywhere to its right, because every number there is at least as large as the middle one. If the doors were unsorted, the target could sit in the discarded half and the search would wrongly report that it is not there.',
     },
     distractorMeta: {
-      b: {
-        misconception: 'Recursion removes the need for conditions that stop the search.',
+      a: {
+        misconception: 'Thinks halving requires an exact even split to be correct.',
         whyWrong:
-          "Questions that are answered immediately, such as 'is the person found?', are still needed as base cases.",
+          'Uneven halves are fine. The middle just ends up slightly off-center, and discarding a half is still safe as long as the numbers are sorted.',
       },
-      c: {
-        misconception: 'A recursive call restarts on the same full-size problem.',
+      b: {
+        misconception:
+          'Confuses a precondition for correctness with the outcome the algorithm reports.',
         whyWrong:
-          'Searching the whole book again would never make progress. The recursive call must work on a smaller half.',
+          'The algorithm handles a missing number on its own: when no doors are left, it returns false. Whether the target is present has nothing to do with why the right half can be skipped.',
       },
       d: {
-        misconception: 'Recursion means adding more iteration.',
+        misconception: 'Believes duplicate values break the left/right decision.',
         whyWrong:
-          'Examining pages one by one is linear search with loops, not a recursive divide-and-conquer formulation.',
+          'With duplicates in sorted order, everything to the right of the middle is still at least as large as the middle value, so skipping it remains safe. Sortedness, not uniqueness, is what matters.',
       },
     },
     rubric: null,
     hints: [
-      "Ask what the pair of lines 'open to the middle of the left half' and 'go back to line 3' accomplishes together.",
-      "Look for an answer that says 'run the same algorithm' on a smaller piece.",
+      'Ask yourself what the algorithm learns about the unopened doors from a single comparison with the middle door.',
+      'Picture doors whose numbers are scrambled. Could the number you want be hiding in the half you threw away?',
     ],
     leakKeywords: [],
     verification: {
       verdict: 'pass',
-      solvedAnswer: 'a',
+      solvedAnswer: 'c',
       reasons: [],
       model: 'openai/gpt-6.1-sol',
     },
@@ -192,13 +193,13 @@ export const lecture3Items: ItemFx[] = [
     concept: 'binary_search',
     kind: 'spot_flaw',
     variant: 2,
-    segs: [30, 33, 34],
+    segs: [31, 33, 35, 71, 72],
     publicPayload: {
       sentences: [
-        "In the recursive locker search, questions that can be answered immediately, such as 'are any doors left?' or 'is the number behind the middle door?', are base cases.",
-        "The lines 'search the left half' and 'search the right half' are recursive cases, because they call the same algorithm again.",
-        'Each recursive case works on only half of the remaining doors, so the problem keeps shrinking.',
-        'Eventually the search bottoms out, either by finding the number or by running out of doors, and returns an answer.',
+        'The locker search compares the target with the number behind the middle door; if the target is smaller it searches only the left half, and if it is larger it searches only the right half.',
+        'That decision only makes sense if the numbers behind the doors are in sorted order, because otherwise the target could be hiding in the half that was just discarded.',
+        'Each recursive call hands the algorithm a problem half as large as before, so 8 doors become 4, then 2, then 1.',
+        'The number of times you can halve n doors before reaching a single door is log base 2 of n, which is 3 for 8 doors, so the work grows on the order of log n rather than n.',
       ],
     },
     answerKey: {
@@ -207,29 +208,30 @@ export const lecture3Items: ItemFx[] = [
       flawSummary: null,
       correction: null,
       explanation:
-        'Every sentence is accurate. Base cases answer yes or no right away, recursive cases call the algorithm on a smaller half, and the shrinking problem guarantees that the search ends.',
+        'Every sentence is correct. The algorithm compares the target to the middle door and recurses on only the left or right half. Discarding a half is valid only when the doors are sorted, since the comparison then shows which side could hold the target. Each recursive call works on a problem half as large. Repeatedly halving n reaches 1 after about log base 2 of n steps (8 to 4 to 2 to 1 is 3 halvings, and log2 8 = 3). That is why the search takes on the order of log n steps instead of the n steps of linear search.',
     },
     distractorMeta: null,
     rubric: {
       criteria: [
         {
-          id: 'c1',
-          label: 'Recognizes correctness',
-          description: 'States that the explanation contains no conceptual error.',
+          id: 'verdict',
+          label: 'Correct verdict',
+          description:
+            'States that the explanation contains no conceptual error (2). Hedges, or calls one sentence slightly off without a real error (1). Claims a specific sentence is wrong (0).',
           max: 2,
         },
         {
-          id: 'c2',
+          id: 'justification',
           label: 'Justification',
           description:
-            'Briefly explains the roles of base cases and of the shrinking recursive calls.',
+            'Explains why both key ideas hold: sorted order is what lets a half be safely discarded, and repeated halving gives about log2 n steps (2). Explains only one of these (1). Gives no valid reasoning (0).',
           max: 2,
         },
       ],
     },
     hints: [
-      'Check each sentence against the definitions of base case and recursive case.',
-      'Consider whether the claim that the problem shrinks each time holds for searching a half.',
+      'Check each claim: what lets the algorithm ignore half the doors, and how many times can a number be cut in half?',
+      'Try it with 8 doors. Count the halvings needed to reach one door, then ask what would go wrong if the numbers were in random order.',
     ],
     leakKeywords: [],
     verification: {
@@ -938,59 +940,60 @@ export const lecture3Items: ItemFx[] = [
     concept: 'bubble_sort',
     kind: 'diagnostic_mcq',
     variant: 2,
-    segs: [13, 14, 15],
+    segs: [21, 22, 23],
     publicPayload: {
-      stem: 'In bubble sort, the inner loop is written as: for i from 0 to n-2, if numbers[i] and numbers[i+1] are out of order, swap them. The array has valid indices 0 through n-1. Why does the inner loop stop at n-2 instead of n-1?',
+      stem: "A programmer adds one change to bubble sort: after each full left-to-right pass of the inner loop, if no swaps were made during that pass, the algorithm stops immediately. How does this change affect bubble sort's running time?",
       options: [
         {
           id: 'a',
-          text: 'Because the last element was already checked on an earlier pass, so it never needs to be compared again.',
+          text: 'It improves both cases: the best case becomes Omega(n) and the worst case becomes O(n log n), because fewer passes are ever needed.',
         },
         {
           id: 'b',
-          text: "Because stopping one step early is an optimization that lowers bubble sort's worst-case running time from O(n^2) to O(n).",
+          text: 'It changes nothing in big O terms, because the outer loop still says to repeat n-1 times, so even a sorted list needs on the order of n^2 comparisons.',
         },
         {
           id: 'c',
-          text: 'Because each comparison also looks at index i+1, and if i reached n-1, then i+1 would be n, which is past the end of the array.',
+          text: 'It makes the best case O(1), because an already sorted list can be detected without looking at its elements.',
         },
         {
           id: 'd',
-          text: 'Because the largest value always starts at index n-1, so that position is already correct before sorting begins.',
+          text: 'On an already sorted list it stops after one pass of about n comparisons, so the best case becomes Omega(n). The worst case is still O(n^2).',
         },
       ],
     },
     answerKey: {
-      correctOptionId: 'c',
+      correctOptionId: 'd',
       explanation:
-        'Each step of the inner loop compares a pair: the element at i and the element at i+1. The last valid index is n-1. If i were allowed to reach n-1, then i+1 would be n, an index outside the array. Stopping i at n-2 makes the final comparison use indices n-2 and n-1. This is a bounds safety check, not a speed optimization.',
+        'With the early exit, a sorted list causes one full pass with no swaps, and then the algorithm quits. That pass is about n comparisons, so the lower bound becomes Omega(n). You cannot claim a list is sorted without checking every element once, so the best case cannot be smaller than that. In the average and worst cases, swaps keep happening on most passes, so the algorithm still runs about n-1 passes of about n-1 comparisons each. That is still O(n^2). Because the upper and lower bounds now differ, there is no single theta bound.',
     },
     distractorMeta: {
       a: {
-        misconception: 'The loop bound reflects work already done on previous passes.',
+        misconception: 'Believes the early exit improves the worst case as well as the best case.',
         whyWrong:
-          'The bound is n-2 on every pass, including the very first one, when nothing has been checked yet. Index n-1 is still compared on each pass, as the right-hand element of the last pair.',
+          'In the worst case, such as reverse-sorted input, every pass makes swaps, so the early exit never triggers. The running time stays O(n^2).',
       },
       b: {
-        misconception: 'Shaving one iteration off a loop changes its asymptotic running time.',
+        misconception:
+          'Thinks the outer loop count fixes the running time no matter what the inner loop finds.',
         whyWrong:
-          'The inner loop still runs about n times. With the outer repetition, bubble sort remains O(n^2) in the worst case. Only the early exit after a pass with no swaps improves the best case to Omega(n).',
+          'The early exit ends the algorithm before the outer loop finishes. On sorted input, only one pass is made, so the best case is Omega(n), not n^2.',
       },
-      d: {
-        misconception: 'The input is assumed to already have its largest element at the end.',
+      c: {
+        misconception: 'Assumes sortedness can be confirmed without examining the data.',
         whyWrong:
-          'The input can be in any order. The largest value only reaches the end after it bubbles up during the first pass.',
+          'To know no pair is out of order, the algorithm must compare every adjacent pair at least once. That takes about n steps, not a constant number.',
       },
     },
     rubric: null,
     hints: [
-      'Look at which two positions are accessed in a single comparison.',
-      'What index would numbers[i+1] refer to if i were n-1, and does that index exist?',
+      'Think separately about two inputs: a list that is already sorted, and a list in reverse order.',
+      'How many passes happen on a sorted list before the no-swap check fires, and does that check ever fire early on reverse-sorted input?',
     ],
     leakKeywords: [],
     verification: {
       verdict: 'pass',
-      solvedAnswer: 'c',
+      solvedAnswer: 'd',
       reasons: [],
       model: 'openai/gpt-6.1-sol',
     },
@@ -1169,61 +1172,60 @@ export const lecture3Items: ItemFx[] = [
     concept: 'recursion',
     kind: 'diagnostic_mcq',
     variant: 1,
-    segs: [50, 51, 52],
+    segs: [48, 50, 51, 52],
     publicPayload: {
-      stem: 'A programmer writes a recursive C function void draw(int n) that calls draw(n - 1) and then prints a row of n hashes, but forgets to include any base case. What happens when they try to compile it with clang?',
+      stem: 'A programmer writes this C function and compiles it with make in CS50\'s environment, where compiler warnings are treated as errors:\n\nvoid draw(int n)\n{\n    draw(n - 1);\n    for (int i = 0; i < n; i++)\n    {\n        printf("#");\n    }\n    printf("\\n");\n}\n\nWhat happens, and what is the appropriate fix?',
       options: [
         {
           id: 'a',
-          text: 'It compiles and correctly prints a pyramid of height n.',
+          text: 'It compiles fine. The recursion stops on its own once n reaches 0, because a loop that runs 0 times prints nothing.',
         },
         {
           id: 'b',
-          text: 'It compiles but prints nothing, because the recursive call comes before the printing.',
+          text: 'The build fails because the compiler sees that every path through draw calls draw again. Adding if (n <= 0) return; at the top of the function fixes it.',
         },
         {
           id: 'c',
-          text: 'Clang refuses to compile it, reporting that all paths through the function will call itself.',
+          text: 'The build fails because C does not allow a function to call itself, so the pyramid must be rewritten with nested loops.',
         },
         {
           id: 'd',
-          text: 'It compiles, and the recursion stops on its own once n reaches 0.',
+          text: 'The build fails, and the fix is to move the call draw(n - 1) after the printing loop so that each row is printed before recursing.',
         },
       ],
     },
     answerKey: {
-      correctOptionId: 'c',
+      correctOptionId: 'b',
       explanation:
-        'Without a base case, every path through draw leads to another call to draw, so the recursion could never stop. Clang detects this and reports an error that all paths through the function will call itself. Adding a check such as if (n <= 0) return; fixes it.',
+        "Without a base case, every execution path through draw calls draw again, so the recursion can never end. Clang flags this as infinite recursion. Under CS50's make, warnings are treated as errors, so the build fails. The fix is a base case placed before the recursive call, such as if (n <= 0) return;. Then the calls draw(4), draw(3), draw(2), draw(1) eventually reach draw(0), which returns immediately. Using <= rather than == also handles negative inputs safely.",
     },
     distractorMeta: {
       a: {
         misconception:
-          'Believes recursion knows when to stop without an explicit stopping condition.',
+          'Believes recursion stops by itself once the problem becomes trivially small.',
         whyWrong:
-          'Nothing in the code ever stops the calls, and clang flags this as an error, so no working program is produced.',
+          'Nothing in the code checks n, so draw(0) still calls draw(-1), then draw(-2), and so on forever. A loop that runs zero times does not prevent the recursive call above it.',
       },
-      b: {
-        misconception:
-          'Thinks the order of the recursive call and the printing is what causes the problem.',
+      c: {
+        misconception: 'Believes C forbids a function from calling itself.',
         whyWrong:
-          'Calling draw(n - 1) before printing is correct. The real problem is the missing base case, which clang treats as a compile-time error.',
+          'C allows recursion. The working recursive pyramid is the same function with a base case added. The problem here is only the missing stopping condition.',
       },
       d: {
-        misconception: 'Assumes reaching 0 or a negative n automatically ends recursion.',
+        misconception: 'Believes reordering the statements in a function can replace a base case.',
         whyWrong:
-          'Nothing special happens at 0 unless the code checks for it. Without that check, the function would keep calling itself with -1, -2, and so on.',
+          'With the call moved after the loop, every path still calls draw unconditionally, so the recursion is still infinite. Only a condition that returns without recursing can stop it.',
       },
     },
     rubric: null,
     hints: [
-      'Ask yourself what would ever make this function stop calling itself.',
-      'The compiler can sometimes notice that every path through a function leads back into the same function.',
+      'Ask what would ever make this function stop calling itself.',
+      'Trace draw(1): what does it call next, and is there any line that checks n before recursing?',
     ],
     leakKeywords: [],
     verification: {
       verdict: 'pass',
-      solvedAnswer: 'c',
+      solvedAnswer: 'b',
       reasons: [],
       model: 'openai/gpt-6.1-sol',
     },

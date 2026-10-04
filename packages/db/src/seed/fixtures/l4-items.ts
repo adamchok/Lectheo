@@ -308,58 +308,60 @@ export const lecture4Items: ItemFx[] = [
     concept: 'malloc_and_null',
     kind: 'diagnostic_mcq',
     variant: 1,
-    segs: [10, 11, 13],
+    segs: [10, 11, 13, 32],
     publicPayload: {
-      stem: 'Which statement correctly distinguishes NULL from NUL in C?',
+      stem: 'A program runs char *t = malloc(strlen(s) + 1); and on this run malloc returns NULL because not enough memory was available. What should the program do next, and why?',
       options: [
         {
           id: 'a',
-          text: 'NULL is the special memory address 0x0 where nothing is stored; NUL is the single all-zero byte (backslash zero) that ends a string.',
+          text: 'Continue and copy s into t, because NULL is just the empty string and copying into it is harmless.',
         },
         {
           id: 'b',
-          text: 'They are two spellings of the same thing: the zero byte at the end of every string.',
+          text: 'Call free(t) right away and then copy s into t, because freeing resets the pointer so the memory can be reused.',
         },
         {
           id: 'c',
-          text: 'NUL is the address 0x0 returned on error; NULL is the byte that terminates a string.',
+          text: 'Check if t == NULL and, if so, stop (for example, return 1), because t holds address 0x0, where nothing is supposed to live, so touching that memory is invalid.',
         },
         {
           id: 'd',
-          text: 'NULL is the first valid address malloc normally hands out; NUL marks the end of a string.',
+          text: 'Write a backslash-zero into t[0] to mark the failure, then continue, because NULL means the string still needs a terminator.',
         },
       ],
     },
     answerKey: {
-      correctOptionId: 'a',
+      correctOptionId: 'c',
       explanation:
-        'NUL is the string terminator, a single byte of eight zero bits written as backslash zero. NULL is a special address, 0x0, where nothing is supposed to live, used by functions like malloc and get_string to signal that something went wrong.',
+        'malloc returns NULL, the special address 0x0, when it cannot provide the memory. Nothing is ever stored at that address, so the program should not read or write through t. The right move is to check if t == NULL and return 1, which signals an error. This is the same check you would do after get_string.',
     },
     distractorMeta: {
-      b: {
-        misconception: 'Because both are pronounced "null", they mean the same thing.',
+      a: {
+        misconception: 'Thinks NULL is a valid empty buffer, or the same as an empty string.',
         whyWrong:
-          'One is a character value that ends strings; the other is a pointer value (an address) that signals an error.',
+          'NULL is not a buffer at all. It is address 0x0, where nothing lives, so copying into it touches memory the program must not touch.',
       },
-      c: {
-        misconception: 'The names are swapped.',
-        whyWrong: 'NULL (two Ls) is the address 0x0; NUL (one L) is the backslash-zero terminator.',
+      b: {
+        misconception: 'Thinks free fixes a failed allocation or gives you usable memory.',
+        whyWrong:
+          'free returns memory that was successfully allocated. No memory was allocated here, and t still points nowhere valid, so copying afterward is still invalid.',
       },
       d: {
-        misconception: 'Address 0x0 is an ordinary usable location.',
+        misconception:
+          'Confuses NULL, the error address, with NUL, the backslash-zero string terminator.',
         whyWrong:
-          'Address 0x0 is deliberately never used, so it can serve as a sentinel meaning failure.',
+          'Writing anything to t[0] means writing to address 0x0. NUL is a byte that ends a string, not a way to handle a failed allocation.',
       },
     },
     rubric: null,
     hints: [
-      'One of these is a character, the other is a pointer.',
-      'Which one would a function return when it cannot give you a valid address?',
+      'Think about what address malloc hands back when it fails, and whether anything is allowed to be stored there.',
+      'Before using a pointer returned by malloc, compare it to a special value. If it matches, end the program with an error code.',
     ],
     leakKeywords: [],
     verification: {
       verdict: 'pass',
-      solvedAnswer: 'a',
+      solvedAnswer: 'c',
       reasons: [],
       model: 'openai/gpt-6.1-sol',
     },
@@ -602,59 +604,61 @@ export const lecture4Items: ItemFx[] = [
     concept: 'memory_leaks',
     kind: 'diagnostic_mcq',
     variant: 1,
-    segs: [22, 23, 25, 26],
+    segs: [15, 16, 19, 23, 27, 28, 29, 33],
     publicPayload: {
-      stem: 'A program runs int *x = malloc(3 * sizeof(int)); and then x[1] = 72; x[2] = 73; x[3] = 33;. On a system where an int is 4 bytes, which Valgrind complaint does the line x[3] = 33; most directly cause?',
+      stem: "A program calls int *x = malloc(3 * sizeof(int)); on line 8, stores three values using indices 0, 1 and 2, and then returns from main without ever calling free(x). On a system where an int is 4 bytes, what is Valgrind's leak summary most likely to report?",
       options: [
         {
           id: 'a',
-          text: 'Definitely lost 12 bytes in 1 block',
+          text: 'Invalid write of size 4 at line 8',
         },
         {
           id: 'b',
-          text: 'Invalid read of size 12',
+          text: 'Definitely lost 12 bytes in 1 block, traced back to the allocation on line 8',
         },
         {
           id: 'c',
-          text: 'Invalid write of size 4',
+          text: 'All heap blocks were freed, no leaks are possible, because the operating system reclaims memory when the program exits',
         },
         {
           id: 'd',
-          text: 'All heap blocks were freed, no leaks are possible',
+          text: 'Definitely lost 4 bytes in 3 blocks, traced back to the last line of main',
         },
       ],
     },
     answerKey: {
-      correctOptionId: 'c',
+      correctOptionId: 'b',
       explanation:
-        'Allocating 3 ints gives valid indices 0, 1 and 2. Assigning to x[3] changes a value just past the end of the allocated chunk. Valgrind reports that as an invalid write, and its size is 4 because one int is 4 bytes.',
+        'The program asks malloc for 3 ints of 4 bytes each, which is 12 bytes in one chunk, and never frees it. That is a memory leak. Valgrind\'s leak summary reports "definitely lost 12 bytes in 1 block" and points to the line where the memory was allocated, here line 8. The fix is to call free(x) once the memory is no longer needed. The rule of thumb: if you malloc\'d it, you must free it.',
     },
     distractorMeta: {
       a: {
-        misconception: 'Confusing an out-of-bounds write with a memory leak',
+        misconception: 'Confusing a leak with an out-of-bounds access.',
         whyWrong:
-          '"Definitely lost 12 bytes" comes from never freeing the 12-byte allocation, not from writing past its end.',
+          'An invalid write comes from writing past the end of allocated memory, such as an off-by-one index. Here the indices 0, 1 and 2 are all in bounds. The only problem is the missing free, which shows up in the leak summary.',
       },
-      b: {
-        misconception: 'Mixing up reads with writes and assuming the size is the whole allocation',
+      c: {
+        misconception:
+          'Believing that memory reclaimed by the operating system at exit means nothing leaked.',
         whyWrong:
-          'Assigning a value is a write, not a read, and the size reported is that of one int (4 bytes), not the full 12-byte block.',
+          "Valgrind checks whether the program itself freed everything it malloc'd before finishing. It would say all heap blocks were freed only after free(x) is added.",
       },
       d: {
-        misconception: 'Thinking that a program which runs without crashing must be memory-safe',
+        misconception:
+          'Thinking each int is a separate block, and that Valgrind points to where the memory was last used.',
         whyWrong:
-          'The out-of-bounds write is a latent bug that Valgrind still flags even though the program appeared to run fine.',
+          'A single malloc call produces one block of 12 bytes. Valgrind traces a leak back to the line that allocated the memory, not to the end of main.',
       },
     },
     rubric: null,
     hints: [
-      'Think about which indices are valid for a chunk holding exactly 3 ints.',
-      'Is x[3] = 33 changing a value or accessing one, and how many bytes does one int take up?',
+      'Work out how many bytes one malloc call requested, and how many separate allocations were made.',
+      'A leak report gives the total bytes lost and the allocation site responsible for them.',
     ],
     leakKeywords: [],
     verification: {
       verdict: 'pass',
-      solvedAnswer: 'c',
+      solvedAnswer: 'b',
       reasons: [],
       model: 'openai/gpt-6.1-sol',
     },
@@ -1470,59 +1474,61 @@ export const lecture4Items: ItemFx[] = [
     concept: 'stack_and_heap',
     kind: 'diagnostic_mcq',
     variant: 1,
-    segs: [62, 63, 64],
+    segs: [61, 62, 63, 64, 65, 66, 67],
     publicPayload: {
-      stem: "In the conventional picture of a program's memory, which region does malloc allocate from, and which way does that region grow?",
+      stem: "Picture a program's memory drawn as a tall rectangle: machine code at the top, global variables just below it, the heap below that, and the stack at the bottom. Then main calls a function swap(int a, int b) that declares a local variable temp. Which statement best describes where a, b, and temp live and what happens to that memory when swap returns?",
       options: [
         {
           id: 'a',
-          text: 'The stack, which grows upward.',
+          text: 'They are placed in the heap region, because any memory a function needs while running comes from the same area malloc uses.',
         },
         {
           id: 'b',
-          text: 'The heap, which grows downward, just below the globals.',
+          text: "They are stored inside main's existing frame, overwriting x and y, which is why swap can change main's variables.",
         },
         {
           id: 'c',
-          text: 'The machine-code region at the top of memory.',
+          text: "They get a new frame on the stack, drawn just above main's frame; when swap returns that frame is conceptually freed, but its old bits remain and can later show up as garbage values.",
         },
         {
           id: 'd',
-          text: 'The heap, which grows upward from the bottom of memory.',
+          text: 'They get a new frame on the stack, and when swap returns the computer resets every byte of that frame to zero, so no leftover values remain.',
         },
       ],
     },
     answerKey: {
-      correctOptionId: 'b',
+      correctOptionId: 'c',
       explanation:
-        'Machine code sits at the top of memory, with global variables just below it. Below those is the heap, which malloc uses and which grows downward. The stack, used for function frames and local variables, grows upward from the bottom.',
+        "In this picture, local variables and function parameters live on the stack, which builds up from the bottom like stacked trays. When main calls swap, swap gets its own frame just above main's. Its parameters a and b, which are copies of x and y, and its local temp all live in that frame. When swap returns, the frame conceptually goes away and can be reused. The zeros and ones are not cleared, though, so remnants of earlier values can later appear as garbage values. The heap, below the globals, is where malloc allocates from.",
     },
     distractorMeta: {
       a: {
-        misconception: 'Mixes up the heap and the stack.',
+        misconception:
+          'Confusing the heap with the stack: thinking all runtime memory comes from where malloc allocates.',
         whyWrong:
-          'The stack holds local variables and function frames. malloc allocates from the heap.',
+          'The heap is the region malloc uses. Function parameters and local variables live in stack frames instead.',
       },
-      c: {
-        misconception: "Thinks dynamic memory comes from the area holding the program's code.",
+      b: {
+        misconception:
+          "Thinking a called function shares or reuses the caller's frame, so its parameters are the caller's variables.",
         whyWrong:
-          "That region holds the program's compiled zeros and ones. malloc does not allocate from it.",
+          'swap gets its own separate frame, and a and b are copies of x and y. That is exactly why swapping a and b leaves x and y unchanged.',
       },
       d: {
-        misconception: 'Gets the region right but the direction wrong.',
+        misconception: "Believing a returning function's frame is wiped clean.",
         whyWrong:
-          'In this model it is the stack that grows upward from the bottom; the heap grows downward.',
+          'The memory is only made available for reuse. Its old bits stay in place, which is where garbage values come from.',
       },
     },
     rubric: null,
     hints: [
-      'The two big regions grow toward each other.',
-      "malloc's region sits just below the global variables.",
+      'Separate the region malloc uses from the region used for function calls and local variables.',
+      'Think about the trays-in-a-cafeteria image, and about whether returning from a function actually erases anything.',
     ],
     leakKeywords: [],
     verification: {
       verdict: 'pass',
-      solvedAnswer: 'b',
+      solvedAnswer: 'c',
       reasons: [],
       model: 'openai/gpt-6.1-sol',
     },
@@ -1651,50 +1657,50 @@ export const lecture4Items: ItemFx[] = [
     concept: 'stack_and_heap',
     kind: 'spot_flaw',
     variant: 2,
-    segs: [61, 62, 63, 64, 65, 66],
+    segs: [15, 16, 19, 61, 62, 63, 64, 65, 66],
     publicPayload: {
       sentences: [
-        'When a program starts, its machine code is copied from persistent storage into RAM, and in the usual picture it sits at the top of memory.',
-        'Any global variables, meaning variables defined outside of main and other functions, are placed just below that machine code.',
+        'When a program runs, its machine code is copied into RAM and, in the usual picture, sits at the top of memory, with any global variables placed just below it.',
         'Below the globals is the heap, the region malloc allocates from, and it grows downward as more memory is requested.',
         'At the other end is the stack, which holds local variables and function calls, and it grows upward like trays stacked in a cafeteria.',
-        'When a function returns, the computer wipes its frame back to all zeros so that the next function call starts with clean memory.',
+        "When main calls another function, that function gets its own frame just above main's, and its parameters and local variables live there.",
+        "If that function calls malloc, the memory it gets back is part of the function's frame, so it is automatically reclaimed when the function returns and never needs to be freed.",
       ],
     },
     answerKey: {
       hasFlaw: true,
       flawSentenceIdx: 4,
       flawSummary:
-        "A returning function's frame is not cleared. It is only conceptually freed for reuse, and its old bits stay behind.",
+        "It claims malloc'd memory lives in the calling function's stack frame and vanishes when the function returns. In fact malloc allocates from the heap, and that memory stays allocated until the program explicitly frees it.",
       correction:
-        'When a function returns, its frame is conceptually freed and can be reused by later calls, but the zeros and ones are left in place. Those leftovers are why uninitialized variables show garbage values.',
+        "Memory from malloc comes from the heap, not the function's stack frame. It stays allocated after the function returns until free is called on its address, and forgetting to free it causes a memory leak.",
       explanation:
-        'Sentences 0–3 correctly describe the layout: machine code at the top, globals just below it, the heap that malloc uses growing downward, and the stack of locals and function calls growing upward. Sentence 4 is wrong. Memory from a finished frame is not zeroed. It is simply made available again with its old contents still there. That is exactly why later function calls can see garbage values, which are remnants of earlier use.',
+        "Only a function's frame on the stack, which holds its parameters and local variables, goes away conceptually when the function returns. Memory obtained with malloc comes from the separate heap region and is not tied to any frame. It remains allocated until the programmer passes its address to free. That is why the rule is 'if you malloc it, you must free it,' and why tools like Valgrind report bytes 'definitely lost' when a malloc is never matched by a free. The other sentences correctly describe the layout: machine code at the top, globals below it, a heap that grows downward, and a stack that grows upward, with one frame per function call.",
     },
     distractorMeta: null,
     rubric: {
       criteria: [
         {
           id: 'c1',
-          label: 'Identifies the flawed claim',
+          label: 'Heap, not frame',
           description:
-            "Points to the claim that a returned function's frame is wiped to zeros as the error.",
+            "States that malloc'd memory comes from the heap rather than from the function's stack frame.",
           max: 2,
         },
         {
           id: 'c2',
-          label: 'Correct behavior',
+          label: 'Lifetime and free',
           description:
-            'Explains that the frame is only conceptually freed for reuse and the old values remain, which produces garbage values in later frames.',
+            'Explains that heap memory persists after the function returns until free is called, and that omitting free causes a memory leak.',
           max: 2,
         },
       ],
     },
     hints: [
-      'Check each claim about what physically happens to memory, not just where each region sits.',
-      'If memory were always cleaned up after a function returned, where would garbage values come from?',
+      'Ask which region of memory malloc draws from, and whether that region is tied to individual function calls.',
+      "Compare what happens to a function's local variables when it returns with what happens to memory you got from malloc. Which one needs an explicit step to give it back?",
     ],
-    leakKeywords: ['garbage values', 'remnants', 'wiped', 'zeros', 'reuse'],
+    leakKeywords: ['free', 'memory leak', 'persists', 'heap not stack', 'not part of the frame'],
     verification: {
       verdict: 'pass',
       solvedAnswer: 'flawed',

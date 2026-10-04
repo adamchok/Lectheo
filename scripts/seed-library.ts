@@ -24,6 +24,9 @@ import {
   type PriorConcept,
   type SeedEdge,
 } from './lib/extract'
+import { SLOT_KIND } from './lib/drafts'
+import { fixConcept, REVISIONS } from './lib/reviewed'
+import { reviseBank } from './lib/revise'
 import { windowSegments } from './lib/segments'
 
 const RUN = 'seed'
@@ -55,20 +58,43 @@ async function runLecture(
     return {
       canonicalKey: key,
       name,
-      summary: c.summary,
-      keyPoints: c.keyPoints.map(({ id, text }) => ({ id, text })),
+      ...fixConcept(
+        key,
+        c.summary,
+        c.keyPoints.map(({ id, text }) => ({ id, text })),
+      ),
     }
   })
   const promptSegments = segments.map(({ idx, text }) => ({ idx, text }))
   const bank = await cached<BankResult>(`bank-${plan.key}.json`, () =>
     buildBank(plan.key, promptSegments, concepts, ctx),
   )
+  const mine = REVISIONS.filter((r) =>
+    concepts.some((c) => r.item.startsWith(`${c.canonicalKey}/`)),
+  )
+  const revised = await reviseBank(bank.selected, mine, concepts, promptSegments, ctx)
+  const filled = (s: BankResult['shortfall'][number]) =>
+    revised.results.some(
+      (r) => r.verdict === 'pass' && r.item.startsWith(`${s.conceptKey}/${SLOT_KIND[s.slot]}/`),
+    )
+  const shortfall = bank.shortfall.filter((s) => !filled(s))
   out(
     `${plan.key}: ${segments.length} segments, ${concepts.length} concepts, ` +
       `${extraction.edges.length} edges, ${bank.candidates.length} drafts → ` +
-      `${bank.selected.length} selected, shortfall ${JSON.stringify(bank.shortfall)}`,
+      `${bank.selected.length} selected, ${revised.results.length} revisions ` +
+      `(${revised.results.filter((r) => r.verdict === 'fail').length} failed), ` +
+      `${revised.selected.length} final, shortfall ${JSON.stringify(shortfall)}`,
   )
-  return { output: { plan, segments, extraction, bank }, bank }
+  const output = {
+    plan,
+    segments,
+    extraction,
+    bank,
+    selected: revised.selected,
+    shortfall,
+    revisions: revised.results,
+  }
+  return { output, bank }
 }
 
 function report(stages: readonly Stage[]): void {

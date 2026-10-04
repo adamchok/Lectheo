@@ -203,6 +203,20 @@ export const EDGES: EdgeFx[] = [
     lecture: 'l5',
     segs: [35, 41],
   },
+  {
+    from: 'strings_as_char_pointers',
+    relation: 'depends_on',
+    to: 'pointers',
+    lecture: 'l4',
+    segs: [7],
+  },
+  {
+    from: 'binary_search_trees',
+    relation: 'depends_on',
+    to: 'pointers',
+    lecture: 'l5',
+    segs: [14, 23],
+  },
 ]
 
 export const EXTRA_OCCURRENCES: ExtraOccurrenceFx[] = [
