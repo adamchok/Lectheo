@@ -14,14 +14,19 @@ import {
   ListCoursesResponse,
   MeResponse,
   NextStepResponse,
+  ProcessResponse,
+  type ReprocessFromStep,
   RedirectResponse,
   TranscriptResponse,
   type ActivityType,
   type LectureStatus,
 } from '@lectheo/contracts'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { z } from 'zod'
 import { apiFetch } from './api'
 import { newId } from './ids'
+
+type ReprocessFrom = z.infer<typeof ReprocessFromStep>
 
 /** Query-key factory. Feature teams: add keys here so invalidation stays consistent. */
 export const queryKeys = {
@@ -210,5 +215,18 @@ export function useDiagnosticResults(sessionId: string, enabled = true) {
     queryFn: ({ signal }) =>
       apiFetch(`/diagnostic/${sessionId}/results`, { schema: DiagnosticResultsResponse, signal }),
     enabled,
+  })
+}
+
+/** POST /lectures/{id}/process[?from=step]: start or retry processing (pipeline workstream). */
+export function useProcessLecture(lectureId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (from?: ReprocessFrom) =>
+      apiFetch(`/lectures/${lectureId}/process${from ? `?from=${from}` : ''}`, {
+        method: 'POST',
+        schema: ProcessResponse,
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.lecture(lectureId) }),
   })
 }
