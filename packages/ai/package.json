@@ -1,0 +1,19 @@
+{
+  "name": "@lectheo/ai",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts", "./tasks/*": "./src/tasks/*/task.ts" },
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "test": "vitest run",
+    "smoke": "tsx src/smoke.ts"
+  },
+  "dependencies": {
+    "@lectheo/contracts": "workspace:*",
+    "@ai-sdk/gateway": "^4.0.103",
+    "ai": "^7.0.127",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": { "vitest": "^5.0.3" }
+}

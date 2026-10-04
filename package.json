@@ -1,0 +1,27 @@
+{
+  "name": "lectheo",
+  "private": true,
+  "packageManager": "pnpm@12.6.0",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "dev": "turbo run dev --filter=@lectheo/web",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "check": "turbo run typecheck lint test",
+    "format": "prettier --write .",
+    "db:generate": "pnpm --filter @lectheo/db generate",
+    "db:migrate": "pnpm --filter @lectheo/db migrate",
+    "db:seed": "pnpm --filter @lectheo/db seed",
+    "supabase": "supabase"
+  },
+  "devDependencies": {
+    "prettier": "^3",
+    "supabase": "^2",
+    "tsx": "^4",
+    "turbo": "^2.11.7",
+    "typescript": "~6.0.0",
+    "@types/node": "^24"
+  }
+}

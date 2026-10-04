@@ -1,0 +1,383 @@
+---
+title: Lectheo Data Model
+updated: 2026-10-04
+version: v2 (post-review)
+tags: [lectheo, architecture, database]
+related: ["[[Lectheo Architecture]]", "[[Lectheo API Spec]]", "[[Lectheo Tech Stack]]", "[[Lectheo Product Spec]]"]
+---
+
+# Lectheo Data Model
+
+Part of the architecture set: [[Lectheo Architecture]] · [[Lectheo API Spec]] · **Data Model** · [[Lectheo Tech Stack]]
+
+Postgres (Supabase, provisioned through Vercel), managed with Drizzle migrations.
+
+**Conventions**
+- **Primary keys:** `uuid` **v7 generated in the app** (Drizzle `$defaultFn`; Postgres 17 has no built-in v7). The client generates IDs for markers and created resources, and inserts use `ON CONFLICT DO NOTHING`, so retries are safe without an idempotency table.
+- **Times:** timestamps are `timestamptz` (UTC). Times inside a lecture are integer **ms of media time** (position in the recording or video).
+- **JSON:** every `jsonb` column is validated by the same Zod schema the app uses.
+- **Access:** **RLS is enabled on every table with no policies (deny-all)**, and the Supabase Data API is turned off for the `public` schema. Only the Next.js server reads or writes data, using the privileged connection. Authorization happens **in app code**. The browser uses Supabase only for Auth (Google + anonymous) and signed Storage uploads.
+- **Server-only data:** answer keys, rubrics, hints and leak keywords live in **separate secret tables or columns** (🔒) that no client response schema includes. A contract test enforces this.
+- **Indexes:** every foreign-key column used for lookups has an index (Postgres doesn't create them automatically).
+
+**Changed from v1:** removed `evidence`, `concept_mastery` (mastery is now computed on read), `idempotency_keys`, `conversations` (now `activities`), `app_flags.require_stump_for_green`, and photo assets. Added `item_secrets`, `diagnostic_responses`, `pipeline_steps`, `attempts.try_no`, and sample-account support.
+
+---
+
+## 1. Entity-relationship diagram
+
+```mermaid
+erDiagram
+    PROFILES ||--o{ COURSES : owns
+    COURSES ||--o{ LECTURES : contains
+    LECTURES ||--o{ TRANSCRIPT_SEGMENTS : has
+    LECTURES ||--o{ LECTURE_ASSETS : has
+    LECTURES ||--o{ PIPELINE_STEPS : "processed by"
+    LECTURES ||--o{ MARKERS : "marked in"
+    PROFILES ||--o{ MARKERS : taps
+    COURSES ||--o{ CONCEPTS : defines
+    CONCEPTS ||--o{ CONCEPT_OCCURRENCES : "appears in"
+    LECTURES ||--o{ CONCEPT_OCCURRENCES : mentions
+    CONCEPTS ||--o{ CONCEPT_EDGES : "source of"
+    MARKERS ||--o{ MARKER_CONCEPTS : "linked to"
+    CONCEPTS ||--o{ ITEMS : "assessed by"
+    ITEMS ||--|| ITEM_SECRETS : "hides"
+    PROFILES ||--o{ DIAGNOSTIC_SESSIONS : takes
+    DIAGNOSTIC_SESSIONS ||--o{ DIAGNOSTIC_RESPONSES : records
+    PROFILES ||--o{ ACTIVITIES : does
+    ACTIVITIES ||--o{ MESSAGES : contains
+    ACTIVITIES ||--o{ ATTEMPTS : "graded as"
+    DIAGNOSTIC_RESPONSES ||--o| ATTEMPTS : "graded as"
+    PROFILES ||--o{ LLM_CALLS : incurs
+```
+
+---
+
+## 2. Tables
+
+### Identity
+
+**`profiles`**: 1:1 with `auth.users`. Created lazily by the server auth helper on the first request (no database trigger).
+
+| Column         | Type                                     | Notes                                                            |
+| -------------- | ---------------------------------------- | ---------------------------------------------------------------- |
+| `id`           | uuid PK                                  | = `auth.users.id`                                                |
+| `kind`         | enum `google`, `sample`, `seed`, `owner` | `seed` = the template student for sample accounts. `owner` = you |
+| `display_name` | text null                                | from Google, or "Sample student"                                 |
+| `seeded_from`  | uuid null                                | for `sample`: the seed profile it was copied from                |
+| `timezone`     | text default `'UTC'`                     |                                                                  |
+| `created_at`   | timestamptz                              | used by the 24 h purge of `sample` accounts                      |
+
+### Courses and lectures
+
+**`courses`**
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `owner_id` | uuid FK → profiles, **null for library courses** | |
+| `kind` | enum `library`, `personal` | library = readable by everyone, writable by no one at runtime |
+| `title` | text | e.g. "CS50x 2026" |
+| `attribution` | jsonb null | library license notice: `{source, license, url, adaptedBy}` |
+| `layout` | jsonb null | ELK node positions `{conceptId: {x, y}}` |
+| `layout_hash` | text null | hash of concept + edge IDs; recompute layout when it changes |
+| `created_at` | timestamptz | |
+
+Index: `(owner_id)`.
+
+**`lectures`**
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | client-generated |
+| `course_id` | uuid FK → courses ON DELETE CASCADE | |
+| `title` | text | |
+| `seq` | int | order within course |
+| `source` | enum | `library`, `import`, `live`, `audio`, `transcript` |
+| `status` | enum | `draft` → `uploading` → `processing` → `map_ready` → `ready`, or `failed` |
+| `progress` | jsonb | `{step, done, total}` for the polling UI |
+| `media` | jsonb null | library: `{youtubeId, startMs, endMs}`. Import: `{localFileName, durationMs}` (metadata only; the file stays on the device) |
+| `has_timestamps` | bool | false for plain-text transcripts, which disables markers |
+| `audio_path` | text null | Storage path for uploaded or recorded audio. **Cleared, and the object deleted, after transcription** |
+| `duration_ms` | int null | measured: from the transcription result or the last transcript cue |
+| `stt_job_id` | text null | written **before** the transcription job is submitted, so retries don't create duplicate jobs |
+| `stt_confidence` | real null | |
+| `workflow_run_id` | text null | |
+| `needs_reprocess` | bool default false | set after a transcript edit |
+| `error` | jsonb null | `{step, code, message}` |
+| `created_at`, `updated_at` | timestamptz | |
+
+Index: `(course_id, seq)`. The **"one processing lecture per course"** rule is a partial unique index: `UNIQUE (course_id) WHERE status = 'processing'`.
+
+**`transcript_segments`**
+
+| Column | Type | Notes |
+|---|---|---|
+| `lecture_id` | uuid FK ON DELETE CASCADE | **PK part** |
+| `idx` | int | **PK part**. Prompts cite segments as `[s42]`; the server maps them back to `(lecture_id, 42)` |
+| `start_ms`, `end_ms` | int | `0, 0` when there are no timestamps |
+| `text` | text | speaker names stripped |
+| `edited_text` | text null | student correction (Should) |
+
+Edits never re-segment, so citations stay stable.
+
+**`lecture_assets`** (Should: slides PDF and typed notes)
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `lecture_id` | uuid FK ON DELETE CASCADE | |
+| `kind` | enum `slides_pdf`, `notes_text` | max 1 slides PDF per lecture |
+| `storage_path` | text null | |
+| `extracted_text` | text null | |
+| `status` | enum `pending`, `extracted`, `failed` | |
+
+**`pipeline_steps`**: per-step state for the ingestion workflow, which makes the steps idempotent.
+
+| Column | Type | Notes |
+|---|---|---|
+| `lecture_id` | uuid FK ON DELETE CASCADE | PK part |
+| `step` | text | PK part. One shared enum (see [[Lectheo Architecture#4.3 Ingestion pipeline]]) |
+| `status` | enum `pending`, `running`, `done`, `failed` | |
+| `attempts` | int | |
+| `output` | jsonb null | small results and IDs only, never transcripts |
+| `updated_at` | timestamptz | |
+
+**`markers`**: per user, so different users can mark the same library lecture.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | **client-generated**. A batch upsert with `ON CONFLICT DO NOTHING` is idempotent |
+| `lecture_id` | uuid FK ON DELETE CASCADE | |
+| `user_id` | uuid FK → profiles ON DELETE CASCADE | |
+| `kind` | enum `lost`, `important` | |
+| `t_ms` | int | media time |
+| `capture` | enum `watch`, `live` | |
+| `deleted_at` | timestamptz null | undo within 5 s (soft delete) |
+| `created_at` | timestamptz | |
+
+Index: `(lecture_id, user_id)`.
+
+**`marker_concepts`**
+
+| Column | Type | Notes |
+|---|---|---|
+| `marker_id` | uuid FK ON DELETE CASCADE | PK part |
+| `concept_id` | uuid FK ON DELETE CASCADE | PK part |
+| `overlap_score` | real | computed by the alignment rule |
+
+Index: `(concept_id)`.
+
+### Concept graph (per course)
+
+**`concepts`**
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `course_id` | uuid FK ON DELETE CASCADE | |
+| `name` | text | |
+| `canonical_key` | text | normalized name. `UNIQUE (course_id, canonical_key)` |
+| `summary` | text | one grounded sentence |
+| `key_points` 🔒 | jsonb | 2–5 points with segment citations. The source for teach-back rubrics; never serialized to clients |
+| `first_lecture_id` | uuid FK ON DELETE SET NULL | |
+
+Index: `(course_id)`.
+
+**`concept_occurrences`**
+
+| Column | Type | Notes |
+|---|---|---|
+| `concept_id` | uuid FK ON DELETE CASCADE | PK part |
+| `lecture_id` | uuid FK ON DELETE CASCADE | PK part |
+| `segment_idxs` | int[] | grounding (validated in code; arrays can't carry FKs) |
+| `salience` | real | 0–1 |
+
+Index: `(lecture_id)`.
+
+**`concept_edges`**
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `course_id` | uuid FK ON DELETE CASCADE | |
+| `from_concept_id`, `to_concept_id` | uuid FK ON DELETE CASCADE | `CHECK (from_concept_id <> to_concept_id)` |
+| `relation` | enum | `depends_on`, `is_a`, `part_of`, `contrasts_with`, `causes`, `example_of` |
+| `lecture_id` | uuid FK ON DELETE SET NULL | where the edge was first stated |
+| `segment_idxs` | int[] | grounding |
+
+`UNIQUE (from_concept_id, to_concept_id, relation)`. `depends_on` edges must form a DAG (checked in the pipeline's validateGraph step).
+
+After a lecture is deleted, concepts left with **no occurrences** are deleted in code (a foreign key can't express this).
+
+### Assessment content
+
+**`items`**
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `concept_id` | uuid FK ON DELETE CASCADE | |
+| `lecture_id` | uuid FK ON DELETE CASCADE | |
+| `kind` | enum | `diagnostic_mcq`, `spot_flaw`, `transfer` |
+| `variant` | int | 1, 2, … for the "never serve the same item twice" rule |
+| `status` | enum | `draft`, `verified`, `rejected`, **`retired`** (replaced by a re-process, but kept because attempts reference it) |
+| `public_payload` | jsonb | the only part clients see: stem + options (MCQ), sentences (flaw), prompt (transfer) |
+| `segment_idxs` | int[] | grounding |
+| `verification` | jsonb | verifier verdict and reasons |
+| `prompt_version`, `model` | text | provenance |
+| `created_at` | timestamptz | |
+
+Index: `(concept_id, kind, status)`, `(lecture_id)`.
+
+**`item_secrets`** 🔒: separate table for defense in depth.
+
+| Column | Type | Notes |
+|---|---|---|
+| `item_id` | uuid PK FK → items ON DELETE CASCADE | |
+| `answer_key` | jsonb | MCQ: `{correctOptionId, explanation}`. Flaw: `{hasFlaw, flawSentenceIdx, flawSummary, correction, explanation}`. Transfer: `{modelSolution}` |
+| `distractor_meta` | jsonb null | per option: `{misconception, whyWrong}` |
+| `rubric` | jsonb | criteria fixed at generation |
+| `hints` | jsonb | 2-step ladder |
+| `leak_keywords` | text[] | for the author leak check |
+
+### Learner activity
+
+**`diagnostic_sessions`**
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `user_id` | uuid FK ON DELETE CASCADE | |
+| `lecture_id` | uuid FK ON DELETE CASCADE | |
+| `planned_item_ids` | uuid[] | the core questions, in order |
+| `follow_ups_used` | int default 0 | max 2 |
+| `status` | enum `active`, `completed` | partial unique: one `active` per `(user_id, lecture_id)` |
+| `created_at`, `completed_at` | timestamptz | |
+
+**`diagnostic_responses`**: one row per question. Fixes the lost-update and double-answer races.
+
+| Column | Type | Notes |
+|---|---|---|
+| `session_id` | uuid FK ON DELETE CASCADE | **PK part** |
+| `item_id` | uuid FK | **PK part** |
+| `is_follow_up` | bool | |
+| `confidence` | enum `sure`, `unsure`, `guess`, `no_idea` | set exactly once |
+| `options_revealed_at` | timestamptz | set when confidence is recorded |
+| `option_id` | text null | set exactly once (`WHERE option_id IS NULL`) |
+| `correct` | bool null | |
+| `answered_at` | timestamptz null | |
+
+**`activities`**: replaces v1 `conversations`. One row per practice activity of any type.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | client-generated |
+| `user_id` | uuid FK ON DELETE CASCADE | |
+| `concept_id` | uuid FK ON DELETE CASCADE | |
+| `type` | enum | `spot_flaw`, `teach_back`, `transfer`, `stump` |
+| `item_id` | uuid FK null | flaw / transfer item |
+| `persona` | text null | teach-back persona key |
+| `status` | enum | `active` → `awaiting_retry` → `closed` |
+| `turns_used`, `turn_budget` | int | guarded increment: `… SET turns_used = turns_used + 1 WHERE turns_used < turn_budget RETURNING` |
+| `hints_used` | int | |
+| `explanation_shown` | bool | marks later attempts as assisted |
+| `rubric_snapshot` 🔒 | jsonb | teach-back: concept key points at start. Flaw/transfer: copied from `item_secrets.rubric` |
+| `created_at` | timestamptz | |
+
+Index: `(user_id, concept_id)`.
+
+**`messages`**
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `activity_id` | uuid FK ON DELETE CASCADE | |
+| `role` | enum `student`, `persona` | |
+| `content` | text | |
+| `visible` | bool | false for blocked author drafts (never returned to clients) |
+| `guard` | jsonb null | author replies: `{regexHit, jev: {revealsLocation, revealsCorrection, maxP, latencyMs}, escalated, escalationVerdict, regenerated}` |
+| `created_at` | timestamptz | |
+
+Index: `(activity_id, created_at)`.
+
+**`attempts`**: every graded answer. Mastery is computed from this table.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `user_id`, `concept_id` | uuid FK ON DELETE CASCADE | |
+| `activity_type` | enum | `diagnostic`, `spot_flaw`, `teach_back`, `transfer`, `stump` |
+| `activity_id` | uuid FK null | |
+| `diagnostic_session_id` | uuid FK null | |
+| `item_id` | uuid FK null | |
+| `try_no` | int | 1 or 2 (Socratic retry) |
+| `final` | bool | the attempt that closed the activity |
+| `confidence` | enum null | diagnostic only |
+| `response` | jsonb | the student's answer |
+| `grading` | jsonb | code checks + judge criteria + rationale |
+| `score`, `max_score` | numeric | |
+| `outcome` | enum | `correct`, `partial`, `incorrect`, `invalid` (rejected Stump) |
+| `assisted` | bool | hints used or explanation shown before this attempt |
+| `judge_model` | text null | recorded for consistency analysis |
+| `created_at` | timestamptz | |
+
+Constraints: `UNIQUE (activity_id, try_no)`, `UNIQUE (diagnostic_session_id, item_id)`. Index: `(user_id, concept_id, created_at)`.
+
+### Platform
+
+**`llm_calls`**: cost ledger and the source for the global spend governor.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `user_id` | uuid null | |
+| `lecture_id` | uuid null | |
+| `task`, `role`, `model`, `prompt_version` | text | |
+| `input_tokens`, `cached_tokens`, `output_tokens` | int | output includes reasoning tokens |
+| `cost_usd` | numeric(10,6) | from gateway response metadata |
+| `latency_ms` | int | |
+| `outcome` | enum | `ok`, `repaired`, `failed`, `quota_blocked`, `budget_blocked` |
+| `created_at` | timestamptz | Index: `(created_at)` |
+
+**`usage_counters`**: per-user daily quotas.
+
+| Column | Type | Notes |
+|---|---|---|
+| `user_id`, `day`, `metric` | PK | metrics: `lectures`, `reprocess`, `llm_tasks`, `activities` |
+| `count` | int | `INSERT … ON CONFLICT (user_id, day, metric) DO UPDATE SET count = usage_counters.count + 1 RETURNING count` |
+
+**`app_flags`**: single row, `{ai_degraded: bool, intake_paused: bool}`, set by the spend governor (see [[Lectheo Architecture#9.2 Abuse and cost]]).
+
+---
+
+## 3. Sample accounts (copy on start)
+
+- **Shared and read-only:** the library course, its lectures, segments, concepts, edges and items.
+- **Seed student** (`profiles.kind = 'seed'`): owns the "lived-in" per-user rows. That means markers on L3–L4, a completed diagnostic on L4 with a confident mistake, and activities and attempts on L3 (mostly green/amber).
+- **Copy:** "Explore with a sample account" → create an anonymous auth user → `clone_sample(seed_id, new_user_id)`, a SQL function that copies the seed's `markers`, `marker_concepts`, `diagnostic_sessions`, `diagnostic_responses`, `activities`, `messages` and `attempts` with new IDs, in **one transaction** (~0.5 s).
+- **Reset** = delete the user's per-user rows and copy again. **Purge:** a daily cron deletes `sample` profiles older than 24 h (cascades remove their rows and auth users).
+
+## 4. Storage layout (Supabase Storage, private buckets)
+
+| Bucket | Path | Limits |
+|---|---|---|
+| `audio` | `{userId}/{lectureId}` | Types `audio/webm`, `audio/ogg`, `audio/mpeg`, `audio/mp4` (m4a), `audio/wav`. Per-tier size enforced at **signed-URL creation**: sample ≤ 20 MB, Google ≤ 50 MB (bucket max 50 MB). Deleted after transcription |
+| `transcripts` | `{userId}/{lectureId}.{vtt,srt,txt,docx}` | ≤ 2 MB. Kept until the lecture is deleted |
+| `assets` | `{userId}/{lectureId}/slides.pdf` | ≤ 20 MB, ≤ 60 pages (Should) |
+
+Video files are **never** uploaded: imported video plays from the local file.
+
+## 5. Mastery (computed on read)
+
+`computeMastery(attempts for (user, concept), excluding outcome = 'invalid')` is a pure function in `domain/`. The map endpoint runs it for every concept in the course: ≤ 60 concepts × a few attempts each, one query. Rules are in [[Lectheo Architecture#6.2 Mastery]]. There is no cache to keep consistent.
+
+## 6. Key invariants (tested)
+
+1. Clients only ever receive `items.public_payload` for items with `status = 'verified'`. No response schema includes 🔒 fields (contract test).
+2. Every `concepts`, `concept_edges`, `items` row and grading output cites ≥ 1 existing segment of its lecture. The exception is Stump referee notes, which may cite `course_knowledge`.
+3. Each diagnostic question has its confidence recorded before its options are revealed (the confidence endpoint is the only one that returns options), and is answered at most once.
+4. Each activity has at most one attempt per `try_no`. Turns never exceed the budget (guarded update).
+5. `depends_on` edges in a course form a DAG.
+6. Re-processing never deletes items that attempts reference: it marks them `retired`. Deleting a lecture cascades to everything derived from it (including attempts on its items), then removes orphaned concepts and Storage objects.
+7. Library content is never modified at runtime (only the seed script writes it).
