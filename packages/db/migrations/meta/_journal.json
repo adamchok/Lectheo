@@ -15,6 +15,20 @@
       "when": 1791111387684,
       "tag": "0001_security",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791111584852,
+      "tag": "0002_clone_sample",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791112295999,
+      "tag": "0003_llm_calls_gateway_key",
+      "breakpoints": true
     }
   ]
 }

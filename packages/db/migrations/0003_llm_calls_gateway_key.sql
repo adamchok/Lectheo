@@ -1,0 +1,1 @@
+ALTER TABLE "llm_calls" ADD COLUMN "gateway_key" text DEFAULT 'prod' NOT NULL;

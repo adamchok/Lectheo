@@ -497,6 +497,8 @@ export const llmCalls = pgTable(
     role: text('role').notNull(),
     model: text('model').notNull(),
     promptVersion: text('prompt_version').notNull(),
+    /** Which AI Gateway key paid for the call: 'dev' | 'prod'. The governor sums 'prod' only. */
+    gatewayKey: text('gateway_key').notNull().default('prod'),
     inputTokens: integer('input_tokens').notNull().default(0),
     cachedTokens: integer('cached_tokens').notNull().default(0),
     outputTokens: integer('output_tokens').notNull().default(0),
