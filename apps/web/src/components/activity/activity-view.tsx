@@ -25,7 +25,11 @@ export function ActivityView({ activityId }: { activityId: string }) {
   }
   if (activity.isError) {
     return (
-      <ErrorState title="Couldn't load this activity" error={activity.error} onRetry={() => activity.refetch()} />
+      <ErrorState
+        title="Couldn't load this activity"
+        error={activity.error}
+        onRetry={() => activity.refetch()}
+      />
     )
   }
 
