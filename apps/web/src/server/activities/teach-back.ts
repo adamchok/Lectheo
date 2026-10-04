@@ -21,7 +21,7 @@ import type { ActivityContext, ActivityTypeHandler, MessageRow } from './types'
 
 export const TEACH_BACK_TURN_BUDGET = 6
 
-// TODO(feature-teach-back): persona picker (F4a.2 Should) — more entries + prompt variants.
+// ponytail: one persona (F4a.2 Must); the picker (Should) adds entries + prompt variants.
 export const PERSONAS = {
   first_year: { key: 'first_year', name: 'Sam, a curious first-year' },
 } as const
@@ -31,8 +31,20 @@ const DEFAULT_PERSONA: PersonaKey = 'first_year'
 const personaOf = (key: string | null) =>
   key && key in PERSONAS ? PERSONAS[key as PersonaKey] : PERSONAS[DEFAULT_PERSONA]
 
-// TODO(feature-teach-back): opener copy per persona.
-export const openerFor = (conceptName: string): string => `Wait, so what *is* ${conceptName}?`
+export const openerFor = (conceptName: string): string =>
+  `Hey! I missed the lecture on ${conceptName}. Can you explain it to me? Like, what is it ` +
+  'and why would anyone need it?'
+
+/** F5.1 hint after the guiding question: how much is missing, never what (F5.3). */
+export function retryHintFor(criteria: readonly { score: number; max: number }[]): string | null {
+  const open = criteria.filter((c) => c.score < c.max).length
+  if (open === 0) return null
+  const points = open === 1 ? '1 key point' : `${open} key points`
+  return (
+    `Sam is still fuzzy on ${points} out of ${criteria.length}. Try walking through one concrete ` +
+    'example step by step, and say why each step happens.'
+  )
+}
 
 function keyPointsOf(ctx: ActivityContext): KeyPoints {
   const snapshot = RubricSnapshot.parse(ctx.activity.rubricSnapshot)
@@ -43,12 +55,18 @@ function keyPointsOf(ctx: ActivityContext): KeyPoints {
 const toTurns = (rows: readonly MessageRow[]): ChatTurn[] =>
   rows.map((m) => ({ role: m.role, text: m.content }))
 
+/** Persona style stripped (Architecture §4.6): only the question sentences, else the whole text. */
+export function questionOf(text: string): string {
+  const questions = text.match(/[^.!?\n]*\?/g)?.map((q) => q.trim()).filter(Boolean) ?? []
+  return questions.length > 0 ? questions.join(' ') : text.trim()
+}
+
 /** Friend question (the persona message before it) + the student's answer, in order. */
 export function exchangesOf(turns: readonly ChatTurn[]): { question: string; answer: string }[] {
   return turns.flatMap((t, i) => {
     if (t.role !== 'student') return []
     const prev = turns[i - 1]
-    return [{ question: prev?.role === 'persona' ? prev.text : '', answer: t.text }]
+    return [{ question: prev?.role === 'persona' ? questionOf(prev.text) : '', answer: t.text }]
   })
 }
 
@@ -86,6 +104,7 @@ export const teachBackHandler: ActivityTypeHandler<'teach_back'> = {
       friendReplyTask,
       {
         conceptName: ctx.concept.name,
+        conceptSummary: ctx.concept.summary,
         history,
         turn: ctx.activity.turnsUsed,
         maxTurns: ctx.activity.turnBudget,
@@ -125,8 +144,7 @@ export const teachBackHandler: ActivityTypeHandler<'teach_back'> = {
       checks: null,
       criteria,
       ...teachBackOutcome(criteria),
-      // TODO(feature-teach-back): hint copy for the retry (F5.1 order: question → hint).
-      feedback: { guidingQuestion: judge.output.guidingQuestion, hint: null },
+      feedback: { guidingQuestion: judge.output.guidingQuestion, hint: retryHintFor(criteria) },
       rationale: judge.output.rationale,
       misconceptions: judge.output.misconceptions,
       judgeModel: judge.model,

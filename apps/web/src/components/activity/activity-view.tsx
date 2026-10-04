@@ -1,12 +1,13 @@
 'use client'
 
-import { MessagesSquare, SearchCheck, Sparkles } from 'lucide-react'
+import { SearchCheck, Sparkles } from 'lucide-react'
 import { useActivity } from '@/client/queries'
 import { ErrorState } from '@/components/error-state'
 import { FeaturePlaceholder } from '@/components/feature-placeholder'
 import { PageHeader } from '@/components/page-header'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ACTIVITY_LABELS } from '@/lib/labels'
+import { TeachBackView } from './teach-back/teach-back-view'
 
 /** /activities/[id]: Spot the flaw / Teach-back / Transfer / Stump (F4). */
 export function ActivityView({ activityId }: { activityId: string }) {
@@ -48,15 +49,7 @@ export function ActivityView({ activityId }: { activityId: string }) {
             className="min-h-80"
           />
         ) : data.type === 'teach_back' ? (
-          // TODO(feature-teach-back): useChat stream with the confused friend (≤ 6 turns),
-          // submit {} → criteria + guiding question, one retry, <MasteryBadge> change.
-          <FeaturePlaceholder
-            feature="feature-teach-back"
-            icon={MessagesSquare}
-            title="Teach-back"
-            description="Explain the idea to a curious first-year."
-            className="min-h-80"
-          />
+          <TeachBackView activity={data} />
         ) : (
           // TODO(feature-transfer / feature-stump): Should-priority activity types.
           <FeaturePlaceholder
