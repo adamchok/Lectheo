@@ -15,6 +15,7 @@ const ServerEnv = z.object({
   SUPABASE_SECRET_KEY: optional,
   TURNSTILE_SECRET_KEY: optional,
   AI_GATEWAY_API_KEY: optional,
+  AI_GATEWAY_KEY_NAME: z.enum(['dev', 'prod']).default('dev'),
   AI_FAKE: z
     .enum(['0', '1', 'true', 'false'])
     .optional()
