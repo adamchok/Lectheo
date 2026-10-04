@@ -2,6 +2,12 @@
 
 import {
   ActivityResponse,
+  AnswerResponse,
+  ConfidenceResponse,
+  DiagnosticResultsResponse,
+  DiagnosticSessionResponse,
+  StartDiagnosticResponse,
+  type ConfidenceLevel,
   CourseMapResponse,
   CreateActivityResponse,
   LectureResponse,
@@ -25,6 +31,10 @@ export const queryKeys = {
   nextStep: (courseId: string) => ['courses', courseId, 'next'] as const,
   lecture: (lectureId: string) => ['lectures', lectureId] as const,
   activity: (activityId: string) => ['activities', activityId] as const,
+  // Not under ['lectures', id]: a prefix invalidation of the lecture must never re-POST a start.
+  diagnosticStart: (lectureId: string) => ['diagnostic-start', lectureId] as const,
+  diagnostic: (sessionId: string) => ['diagnostic', sessionId] as const,
+  diagnosticResults: (sessionId: string) => ['diagnostic', sessionId, 'results'] as const,
 }
 
 /** Lecture statuses that change on their own; polled every 2 s (API Spec §5). */
@@ -125,5 +135,80 @@ export function useTranscript(lectureId: string | undefined) {
     enabled: Boolean(lectureId),
     select: (response) => response.segments,
     staleTime: Infinity,
+  })
+}
+
+/** POST /lectures/{id}/diagnostic: the active session or a new plan (idempotent per lecture). */
+export function useStartDiagnostic(lectureId: string) {
+  return useQuery({
+    queryKey: queryKeys.diagnosticStart(lectureId),
+    queryFn: ({ signal }) =>
+      apiFetch(`/lectures/${lectureId}/diagnostic`, {
+        method: 'POST',
+        body: {},
+        schema: StartDiagnosticResponse,
+        signal,
+      }),
+    // Re-POSTing mid-run is harmless (it returns the active session), but after the last answer
+    // it would plan a new session and swap the results away, so only refetch on remount.
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: false,
+  })
+}
+
+export function useDiagnosticSession(sessionId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.diagnostic(sessionId ?? ''),
+    queryFn: ({ signal }) =>
+      apiFetch(`/diagnostic/${sessionId}`, { schema: DiagnosticSessionResponse, signal }),
+    enabled: Boolean(sessionId),
+    staleTime: Infinity,
+  })
+}
+
+/** Records confidence; the only call that returns answer options (F3.3). */
+export function useDiagnosticConfidence(sessionId: string) {
+  return useMutation({
+    mutationFn: (input: { itemId: string; level: ConfidenceLevel }) =>
+      apiFetch(`/diagnostic/${sessionId}/items/${input.itemId}/confidence`, {
+        method: 'POST',
+        body: { level: input.level },
+        schema: ConfidenceResponse,
+      }),
+  })
+}
+
+export function useDiagnosticAnswer(sessionId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { itemId: string; optionId: string }) =>
+      apiFetch(`/diagnostic/${sessionId}/items/${input.itemId}/answer`, {
+        method: 'POST',
+        body: { optionId: input.optionId },
+        schema: AnswerResponse,
+      }),
+    onSuccess: async () => {
+      // Resume state and the start plan are now stale; refetch them on the next visit only, so
+      // the running flow (and its results screen) isn't swapped out under the student.
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.diagnostic(sessionId),
+          refetchType: 'none',
+        }),
+        queryClient.invalidateQueries({ queryKey: ['diagnostic-start'], refetchType: 'none' }),
+        // Mastery changed: maps and next-step cards recompute on read.
+        queryClient.invalidateQueries({ queryKey: queryKeys.courses }),
+      ])
+    },
+  })
+}
+
+export function useDiagnosticResults(sessionId: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.diagnosticResults(sessionId),
+    queryFn: ({ signal }) =>
+      apiFetch(`/diagnostic/${sessionId}/results`, { schema: DiagnosticResultsResponse, signal }),
+    enabled,
   })
 }
