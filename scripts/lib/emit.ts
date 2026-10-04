@@ -5,7 +5,7 @@ import type { Segment } from '@lectheo/domain'
 import type { ConceptFx, ExtraOccurrenceFx, ItemFx, LectureFx } from '@lectheo/db/seed'
 import type { BankResult, Candidate } from './bank'
 import type { RevisionResult } from './revise'
-import { EXTRA_EDGES, fixConcept, fixTranscript } from './reviewed'
+import { EXTRA_EDGES, fixConcept, fixTranscript, ITEM_FIXES } from './reviewed'
 import { REPO_ROOT } from './cache'
 import type { LecturePlan } from './curriculum'
 import { SLOT_KIND } from './drafts'
@@ -95,7 +95,7 @@ export function itemsFx(selected: readonly Candidate[]): ItemFx[] {
     const variant = (used.get(slot) ?? 0) + 1
     used.set(slot, variant)
     // ponytail: the record's kind/payload pairing is guaranteed by draft-items' mappers.
-    return {
+    const fx = {
       concept: r.conceptKey,
       kind: r.kind,
       variant,
@@ -110,6 +110,7 @@ export function itemsFx(selected: readonly Candidate[]): ItemFx[] {
       model: c.model,
       promptVersion: c.promptVersion,
     } as ItemFx
+    return ITEM_FIXES[`${r.conceptKey}/${r.kind}/${variant}`]?.(fx) ?? fx
   })
 }
 

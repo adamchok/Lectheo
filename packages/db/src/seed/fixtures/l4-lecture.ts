@@ -35,19 +35,19 @@ export const lecture4: LectureFx = {
       idx: 2,
       startMs: 3819879,
       endMs: 3844830,
-      text: "Well, I can do this in a bunch of ways, but let me propose that we do it like this for into i equals 0, I is less than the string length of S, whatever that is, I + plus, and then inside of this fairly mundane loop, let's just set this uh I. Value of T equal to the value of S, and copy literally, very mechanically, every character from S into T.",
+      text: "Well, I can do this in a bunch of ways, but let me propose that we do it like this for int i equals 0, I is less than the string length of S, whatever that is, I + plus, and then inside of this fairly mundane loop, let's just set this uh I. Value of T equal to the value of S, and copy literally, very mechanically, every character from S into T.",
     },
     {
       idx: 3,
       startMs: 3846360,
       endMs: 3886110,
-      text: "Then down here let's go ahead and capitalize just the first character of T by using 2 upper as before with or without the syntactic sugar, and then at the very bottom of this program, let's print out the value of S itself just for good measure to make sure we didn't screw it up this time and let's print out the value of T just so we see that I in fact have capitalized T and only T, but I'm not quite done yet. There's a design flaw here and a mistake, but it's subtle. Does anyone want to pluck off one or the other? Check 50 and design 50 are not gonna like this. Yeah.",
+      text: "Then down here let's go ahead and capitalize just the first character of T by using toupper as before with or without the syntactic sugar, and then at the very bottom of this program, let's print out the value of S itself just for good measure to make sure we didn't screw it up this time and let's print out the value of T just so we see that I in fact have capitalized T and only T, but I'm not quite done yet. There's a design flaw here and a mistake, but it's subtle. Does anyone want to pluck off one or the other? Check 50 and design 50 are not gonna like this. Yeah.",
     },
     {
       idx: 4,
       startMs: 3889870,
       endMs: 3920074,
-      text: "Yes, because strlen always returns the sort of real world length of the string, H3, this would seem to accidentally forget to copy the null character. So I can fix this in a few different ways. I could, for instance, at the bottom of my loop actually do something like T4 equals singles and manually terminate it myself because I know it's got to end with a null. This would be frowned upon too. I shouldn't be hard coding the 4. This is all too sloppy. So don't do this.",
+      text: "Yes, because strlen always returns the sort of real world length of the string, H3, this would seem to accidentally forget to copy the null character. So I can fix this in a few different ways. I could, for instance, at the bottom of my loop actually do something like t[4] equals '\\0' and manually terminate it myself because I know it's got to end with a null. This would be frowned upon too. I shouldn't be hard coding the 4. This is all too sloppy. So don't do this.",
     },
     {
       idx: 5,
@@ -59,7 +59,7 @@ export const lecture4: LectureFx = {
       idx: 6,
       startMs: 3951340,
       endMs: 3988909,
-      text: "So this is why we introduced this trick where you can set another integer variable like N equal to that string length, and then after the semicolon just keep comparing I against N, which means you're not calling functions wastefully as before. All right, if I didn't mess up anything else, let me go into my terminal. Let me do uh oh, did I mess something up? I still, yes, I did mess something up. I should have put this back as well. Thank you. All right, so let's go ahead and do make copy, Escopy, and now, I'm gonna go ahead and type in high in all lowercase and hit enter.",
+      text: "So this is why we introduced this trick where you can set another integer variable like N equal to that string length, and then after the semicolon just keep comparing I against N, which means you're not calling functions wastefully as before. All right, if I didn't mess up anything else, let me go into my terminal. Let me do uh oh, did I mess something up? I still, yes, I did mess something up. I should have put this back as well. Thank you. All right, so let's go ahead and do make copy, ./copy, and now, I'm gonna go ahead and type in high in all lowercase and hit enter.",
     },
     {
       idx: 7,
@@ -107,7 +107,7 @@ export const lecture4: LectureFx = {
       idx: 14,
       startMs: 4249270,
       endMs: 4289095,
-      text: "Uh, went wrong. So let's do this one more time. Turns out that even 2 upper is taking for granted the fact that the humans typed in anything at all. What if the human just types enter? Well, that's a valid string. It's the so-called empty string, quote unquote, but what is the length of nothing? It's going to be 0 and that's problematic because if you try to go to T at the first location, what is actually there? Well, that's actually the null character, which is not something you should even try to capitalize it would seem. So what we should really do here too is check only if. The sterling of S is greater than 0.",
+      text: "Uh, went wrong. So let's do this one more time. Turns out that even toupper is taking for granted the fact that the humans typed in anything at all. What if the human just types enter? Well, that's a valid string. It's the so-called empty string, quote unquote, but what is the length of nothing? It's going to be 0 and that's problematic because if you try to go to T at the first location, what is actually there? Well, that's actually the null character, which is not something you should even try to capitalize it would seem. So what we should really do here too is check only if. The sterling of S is greater than 0.",
     },
     {
       idx: 15,
@@ -161,7 +161,7 @@ export const lecture4: LectureFx = {
       idx: 23,
       startMs: 4582459,
       endMs: 4620750,
-      text: "Yeah, my indexing is wrong. Like we've known for weeks now that with the arrays or with the ray syntax you always start counting at 0, then 1, then 2, not 123. So that's an issue, and this is a new detail. But given that I've used malloc Online 8, what other mistake have I done in this version of the program? What's missing? Free. So I didn't actually call free so this program has a memory leak. It's asking for memory and never handing it back. Now that's pretty good, you know, a few of us were able to just kind of eyeball the code and debug it, but that's not gonna be true for all people, all programs, certainly when the programs get larger and more complicated, so a program.",
+      text: "Yeah, my indexing is wrong. Like we've known for weeks now that with the arrays or with the ray syntax you always start counting at 0, then 1, then 2, not 123. So that's an issue, and this is a new detail. But given that I've used malloc on line 8, what other mistake have I done in this version of the program? What's missing? Free. So I didn't actually call free so this program has a memory leak. It's asking for memory and never handing it back. Now that's pretty good, you know, a few of us were able to just kind of eyeball the code and debug it, but that's not gonna be true for all people, all programs, certainly when the programs get larger and more complicated, so a program.",
     },
     {
       idx: 24,

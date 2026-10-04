@@ -71,7 +71,7 @@ export const lecture3: LectureFx = {
       idx: 8,
       startMs: 4630890,
       endMs: 4657209,
-      text: "Now if you remember kind of the cheat sheet at the back of your math books, say growing up, you'll note that this series here can be more simply written as N times N minus 1, all divided by 2. And if you've not seen that before, just take on faith that this is identical to this series of numbers up here. So now we can just kind of multiply this out. So that's technically n2 minus N all divided by 2, which is great if we multiply that out, that's n2d over 2 minus n over 2. We're getting 2 into the weeds.",
+      text: "Now if you remember kind of the cheat sheet at the back of your math books, say growing up, you'll note that this series here can be more simply written as N times N minus 1, all divided by 2. And if you've not seen that before, just take on faith that this is identical to this series of numbers up here. So now we can just kind of multiply this out. So that's technically n² minus N all divided by 2, which is great if we multiply that out, that's n² over 2 minus n over 2. We're getting 2 into the weeds.",
     },
     {
       idx: 9,
@@ -95,7 +95,7 @@ export const lecture3: LectureFx = {
       idx: 12,
       startMs: 4774149,
       endMs: 4811700,
-      text: "The original order of the numbers. So no matter what, this is to say that if we consider whether the lockers or the humans, the omega notation for this algorithm, even in the best case where the data is already sorted, is crazily also n squad. Now I could certainly change the pseudo code, but selection sort as the world knows it is more of a. Constrative algorithm or sort of a quick and dirty one, its running time is going to be in omega of n², and now we can actually deploy our fader notation because the big O notation is n² and the omega notation is n2 1 and the same. We can also say that selection sort is in theta of n², which is not great because that's annoyingly slow.",
+      text: "The original order of the numbers. So no matter what, this is to say that if we consider whether the lockers or the humans, the omega notation for this algorithm, even in the best case where the data is already sorted, is crazily also n squad. Now I could certainly change the pseudo code, but selection sort as the world knows it is more of a. Constrative algorithm or sort of a quick and dirty one, its running time is going to be in omega of n², and now we can actually deploy our fader notation because the big O notation is n² and the omega notation is n², one and the same. We can also say that selection sort is in theta of n², which is not great because that's annoyingly slow.",
     },
     {
       idx: 13,
@@ -143,7 +143,7 @@ export const lecture3: LectureFx = {
       idx: 20,
       startMs: 5063294,
       endMs: 5100272,
-      text: "If we do our little foil method n² minus N minus N + 1 combined like terms, n² minus 2 N + 1, who cares? This is ultimately going to be on the order of big O of. N squared only because again if you ask yourself when I plug in a really big value for N, which of these is really going to contribute most to the answer, it's obviously going to be n2d again and we can ignore the lower order terms. So this doesn't seem to have made any progress. Like selection sort was on the order of big events was on the order of n². Bubble sort, based on this analysis is. Also on the order of n², maybe we're getting lucky in the lower bound.",
+      text: "If we do our little foil method n² minus N minus N + 1 combined like terms, n² minus 2 N + 1, who cares? This is ultimately going to be on the order of big O of. N squared only because again if you ask yourself when I plug in a really big value for N, which of these is really going to contribute most to the answer, it's obviously going to be n² again and we can ignore the lower order terms. So this doesn't seem to have made any progress. Like selection sort was on the order of big O, was on the order of n². Bubble sort, based on this analysis is. Also on the order of n², maybe we're getting lucky in the lower bound.",
     },
     {
       idx: 21,
@@ -161,7 +161,7 @@ export const lecture3: LectureFx = {
       idx: 23,
       startMs: 5171459,
       endMs: 5206319,
-      text: "And if there's an elements, you're going to have to look at all of them to make sure that it's in order. But after that, if you've done no work and made no swaps, no reason to traverse the list again and again and again. So a bubble sort can be said to be an omega of N because indeed we can just terminate. After that single pass if we've done no work, we can't say anything about theta because they're not one and the same big O and Omega, but that does seem to have given us some savings. Unfortunately, it really only saves us time when the list is already or mostly sorted, but in the average case and in the worst case, odds are they're both going to perform just as bad on the order of n2.",
+      text: "And if there's an elements, you're going to have to look at all of them to make sure that it's in order. But after that, if you've done no work and made no swaps, no reason to traverse the list again and again and again. So a bubble sort can be said to be an omega of N because indeed we can just terminate. After that single pass if we've done no work, we can't say anything about theta because they're not one and the same big O and Omega, but that does seem to have given us some savings. Unfortunately, it really only saves us time when the list is already or mostly sorted, but in the average case and in the worst case, odds are they're both going to perform just as bad on the order of n².",
     },
     {
       idx: 24,
@@ -185,7 +185,7 @@ export const lecture3: LectureFx = {
       idx: 27,
       startMs: 5309916,
       endMs: 5330839,
-      text: "But as you can see, and this is where n2d is sort of visual visualizable, we're touching these elements or looking at them so many times again and again. We are making so many darn comparisons. This is taking frustratingly long, and this is only what, a few dozen bars or numbers. You can imagine how long this might take with hundreds, thousands or millions of values.",
+      text: "But as you can see, and this is where n² is sort of visual visualizable, we're touching these elements or looking at them so many times again and again. We are making so many darn comparisons. This is taking frustratingly long, and this is only what, a few dozen bars or numbers. You can imagine how long this might take with hundreds, thousands or millions of values.",
     },
     {
       idx: 28,
@@ -437,7 +437,7 @@ export const lecture3: LectureFx = {
       idx: 69,
       startMs: 6821370,
       endMs: 6860247,
-      text: "So where does this get us with merge sort? Well, with mergesort, it would seem that we have an algorithm that I claim is doing a lot less work. The catch. Is that merge sort requires twice as much space just as we saw when I needed two shelves in order to merge those two lists. So how much less work is actually going to be possible? Well, let's consider sort of the analysis of the original list and how we might describe its its running time in terms of this big O notation. Hopefully it's not going to be as bad as n2d ultimately. So here are some like bread crumbs that if I hadn't kept updating the screen and deleting numbers once we move them around, here's sort of like traces of every.",
+      text: "So where does this get us with merge sort? Well, with mergesort, it would seem that we have an algorithm that I claim is doing a lot less work. The catch. Is that merge sort requires twice as much space just as we saw when I needed two shelves in order to merge those two lists. So how much less work is actually going to be possible? Well, let's consider sort of the analysis of the original list and how we might describe its its running time in terms of this big O notation. Hopefully it's not going to be as bad as n² ultimately. So here are some like bread crumbs that if I hadn't kept updating the screen and deleting numbers once we move them around, here's sort of like traces of every.",
     },
     {
       idx: 70,

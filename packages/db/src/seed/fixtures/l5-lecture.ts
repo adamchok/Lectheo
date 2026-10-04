@@ -23,13 +23,13 @@ export const lecture5: LectureFx = {
       idx: 0,
       startMs: 4591500,
       endMs: 4628208,
-      text: "so I can call any number of times from any number of places. But just so you've seen how I might do that there. Alright, so let's ask the question, after all this, what is the running time of inserting into a linked list? They go of Say a lot, big of. And damn it, like that's no better. All right, what's the running time of searching a linked list? big O of n, damn it, uh, what's the running time of deleting from a linked list? Big O of n. So like everything is literally big O of ends. So there's the price we've suddenly paid.",
+      text: "so I can call any number of times from any number of places. But just so you've seen how I might do that there. Alright, so let's ask the question, after all this, what is the running time of inserting into a linked list? Big O of n. And darn it, like that's no better. All right, what's the running time of searching a linked list? Big O of n, darn it, uh, what's the running time of deleting from a linked list? Big O of n. So like everything is literally big O of n. So there's the price we've suddenly paid.",
     },
     {
       idx: 1,
       startMs: 4628500,
       endMs: 4663708,
-      text: "We have an hour after we started with arrays gotten to the point where we can dynamically grow in a linked lists, and I dare say, even though we've not done it and won't do it today, shrink the linked list by freeing things that we don't need. So we have the dynamism and we can make more efficient use of memory even if it's very fragmented and there's a few bytes here, a few bytes there, but we've paid this price because with arrays recall, even our phone book example, we at least had binary search, the running time for. Which was big O of log and so my God, not only are we spending more space, the darn thing is slower. Surely this is not how our phone contacts are implemented. Surely this is not how stacks and queues are always implemented. And indeed it's not.",
+      text: "We have an hour after we started with arrays gotten to the point where we can dynamically grow in a linked lists, and I dare say, even though we've not done it and won't do it today, shrink the linked list by freeing things that we don't need. So we have the dynamism and we can make more efficient use of memory even if it's very fragmented and there's a few bytes here, a few bytes there, but we've paid this price because with arrays recall, even our phone book example, we at least had binary search, the running time for. Which was big O of log n so my God, not only are we spending more space, the darn thing is slower. Surely this is not how our phone contacts are implemented. Surely this is not how stacks and queues are always implemented. And indeed it's not.",
     },
     {
       idx: 2,
@@ -41,7 +41,7 @@ export const lecture5: LectureFx = {
       idx: 3,
       startMs: 4697166,
       endMs: 4736458,
-      text: "Like arrays insofar as they are stored back to back contiguous in memory means that we could do very simple arithmetic recall to like figure out the length of it and then divide by 2 to get the middle, divide by 2 again to get the. of the middle and so forth. And even though we might have to deal with a little bit of rounding, arrays lent themselves to binary search and thus logarithmic time, so big O of login. But today I claim that the downside of arrays that that you have to decide in advance how big you want it to be and if you guess wrong and it's too small, how much memory you ask for, you then have to reallocate memory and that's fine. It's solvable with malloc or realloc, but it's going to take some amount of time to copy all of the old memory into the new memory.",
+      text: "Like arrays insofar as they are stored back to back contiguous in memory means that we could do very simple arithmetic recall to like figure out the length of it and then divide by 2 to get the middle, divide by 2 again to get the. of the middle and so forth. And even though we might have to deal with a little bit of rounding, arrays lent themselves to binary search and thus logarithmic time, so big O of log n. But today I claim that the downside of arrays that that you have to decide in advance how big you want it to be and if you guess wrong and it's too small, how much memory you ask for, you then have to reallocate memory and that's fine. It's solvable with malloc or realloc, but it's going to take some amount of time to copy all of the old memory into the new memory.",
     },
     {
       idx: 4,
@@ -71,13 +71,13 @@ export const lecture5: LectureFx = {
       idx: 8,
       startMs: 4882166,
       endMs: 4913875,
-      text: "In fact, we didn't talk about it yet, but one common alternative to a singly linked list, which ours is, it's. With a single pointer from node to node, computer scientists also like to talk about doubly linked lists where there's arrows going both directions, which actually would have simplified some of the last code that we looked at because I don't have to look ahead to figure out what I want to free or what and where I want to insert some value, but that too doesn't fundamentally change the speed, it just makes your code a little easier to write. So in short, with Linklis we get dynamism.",
+      text: "In fact, we didn't talk about it yet, but one common alternative to a singly linked list, which ours is, it's. With a single pointer from node to node, computer scientists also like to talk about doubly linked lists where there's arrows going both directions, which actually would have simplified some of the last code that we looked at because I don't have to look ahead to figure out what I want to free or what and where I want to insert some value, but that too doesn't fundamentally change the speed, it just makes your code a little easier to write. So in short, with linked lists we get dynamism.",
     },
     {
       idx: 9,
       startMs: 4913916,
       endMs: 4953708,
-      text: "We can now grow and shrink things without wasting time copying, but we've lost hold of our binary search, and that was very appealing as far back as week zero when we wanted to do something quite quickly. So let's see if we can't make some mashups now. Take some arrays, take some link lists, literally mash them together into a sort of Frankenstein data structure and see if we can't get some of the speed of arrays, but the dynamism of link lists. And so I give you trees. If you think about it in your mind's eye what a family tree looks like, where you typically have some parents and then some children and some grandchildren and so forth, it's this sort of tree-like structure, even though by convention it's drawn top down instead of bottom up like trees in the real world.",
+      text: "We can now grow and shrink things without wasting time copying, but we've lost hold of our binary search, and that was very appealing as far back as week zero when we wanted to do something quite quickly. So let's see if we can't make some mashups now. Take some arrays, take some linked lists, literally mash them together into a sort of Frankenstein data structure and see if we can't get some of the speed of arrays, but the dynamism of linked lists. And so I give you trees. If you think about it in your mind's eye what a family tree looks like, where you typically have some parents and then some children and some grandchildren and so forth, it's this sort of tree-like structure, even though by convention it's drawn top down instead of bottom up like trees in the real world.",
     },
     {
       idx: 10,
@@ -197,7 +197,7 @@ export const lecture5: LectureFx = {
       idx: 29,
       startMs: 5613291,
       endMs: 5652416,
-      text: "It's like a baby tree that's attached to this parent node, so to speak, so it's perfectly reasonable to just call the search function with that child because it in turn has a whole subtree below it or the right child which has the whole subtree below it instead. All right, so I like this direction. We've now kind of improved upon link list. We've gained back some of our performance because we can now find something with big O of log and time. I don't love the fact that I'm using 3 times as much memory roughly. That feels like kind of a high price to pay just to speed things back up. But let's consider whether or not this thing is actually going to work as the data structure gets bigger and bigger as well. So it looks beautiful here as written, and that's.",
+      text: "It's like a baby tree that's attached to this parent node, so to speak, so it's perfectly reasonable to just call the search function with that child because it in turn has a whole subtree below it or the right child which has the whole subtree below it instead. All right, so I like this direction. We've now kind of improved upon link list. We've gained back some of our performance because we can now find something with big O of log n time. I don't love the fact that I'm using 3 times as much memory roughly. That feels like kind of a high price to pay just to speed things back up. But let's consider whether or not this thing is actually going to work as the data structure gets bigger and bigger as well. So it looks beautiful here as written, and that's.",
     },
     {
       idx: 30,
@@ -365,7 +365,7 @@ export const lecture5: LectureFx = {
       idx: 57,
       startMs: 6620708,
       endMs: 6655625,
-      text: "It's not quite as bad as N steps, because if you assume a uniform distribution of names such that the world of Nintendo maybe has as many M names as L names as A names as B names, you could assume that there's a bunch of chains, a bunch of linked lists here chained together, but they're all roughly the same. So maybe you have end names in your phone book this way, but there are these lists are only of size, they're only 126 of that length because you've got that many names there. So what's the running time? Well, ideally we'd move away from link lists with big O of N and achieve our cons.",
+      text: "It's not quite as bad as N steps, because if you assume a uniform distribution of names such that the world of Nintendo maybe has as many M names as L names as A names as B names, you could assume that there's a bunch of chains, a bunch of linked lists here chained together, but they're all roughly the same. So maybe you have end names in your phone book this way, but there are these lists are only of size, they're only 126 of that length because you've got that many names there. So what's the running time? Well, ideally we'd move away from linked lists with big O of N and achieve our cons.",
     },
     {
       idx: 58,

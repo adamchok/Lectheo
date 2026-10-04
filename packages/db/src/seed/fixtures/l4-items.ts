@@ -1700,7 +1700,13 @@ export const lecture4Items: ItemFx[] = [
       'Ask which region of memory malloc draws from, and whether that region is tied to individual function calls.',
       "Compare what happens to a function's local variables when it returns with what happens to memory you got from malloc. Which one needs an explicit step to give it back?",
     ],
-    leakKeywords: ['free', 'memory leak', 'persists', 'heap not stack', 'not part of the frame'],
+    leakKeywords: [
+      'must be freed',
+      'memory leak',
+      'persists',
+      'heap not stack',
+      'not part of the frame',
+    ],
     verification: {
       verdict: 'pass',
       solvedAnswer: 'flawed',

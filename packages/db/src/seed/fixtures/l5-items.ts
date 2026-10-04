@@ -361,54 +361,55 @@ export const lecture5Items: ItemFx[] = [
     concept: 'linked_lists',
     kind: 'diagnostic_mcq',
     variant: 2,
-    segs: [3, 5, 6, 7, 8],
+    segs: [1, 3, 4, 5],
     publicPayload: {
-      stem: "You have a singly linked list of n integers kept in sorted order, from smallest to largest. Why can't you simply run binary search on it and get O(log n) lookups, as you could with a sorted array?",
+      stem: 'A program stores 3 million integers and needs to add one more. In version A, the integers are in a full array. In version B, they are in a singly linked list. Why can version B add the new value without copying the 3 million existing values?',
       options: [
         {
           id: 'a',
-          text: 'The values in a linked list cannot be kept in sorted order, and binary search requires sorted data.',
+          text: 'A linked list reserves a large block of spare memory when it is created, so new values fit into that space.',
         },
         {
           id: 'b',
-          text: 'To reach the middle node, you have to follow pointers from the head of the list, which takes O(n) steps each time you need a middle.',
+          text: 'Each value lives in its own separately allocated node, possibly scattered anywhere in memory. Adding a value means allocating one new node and updating a pointer, and the existing nodes stay where they are.',
         },
         {
           id: 'c',
-          text: 'Each node uses extra memory for its pointer, and binary search only works when every value takes the same small amount of space.',
+          text: 'A linked list keeps its nodes back to back in memory, so realloc can always extend it in place without moving anything.',
         },
         {
           id: 'd',
-          text: 'It only works on a singly linked list. Making the list doubly linked, with a pointer back to the previous node, would allow binary search in O(log n).',
+          text: 'A linked list uses binary search to find a free spot in memory, so it never has to move existing values.',
         },
       ],
     },
     answerKey: {
       correctOptionId: 'b',
       explanation:
-        "Array elements sit back to back in memory, so simple arithmetic lets you jump straight to the middle index. A linked list's nodes can be scattered anywhere in memory and are connected only by pointers. To find the middle, you have to start at the head and walk node by node: once to learn the length, and again to stop halfway. You repeat that work for the middle of the middle, so finding each midpoint alone costs O(n). That cancels the advantage of binary search, and searching the list is O(n).",
+        'An array must be contiguous. When it is full, growing it means allocating a bigger block and copying every old value into it, which is slow for millions of values. A linked list allocates one node per value, wherever free memory happens to be, even if memory is fragmented. To add a value you allocate one node and update pointers, and the existing nodes never move. The cost of this flexibility is the extra pointer stored in each node, and the loss of easy access to the middle of the list.',
     },
     distractorMeta: {
       a: {
-        misconception: 'Linked lists cannot hold sorted data.',
+        misconception: 'Confusing a linked list with an array that is over-allocated in advance.',
         whyWrong:
-          'A linked list can be kept sorted by inserting each value in its proper place. The problem is not the order of the values. It is that there is no fast way to jump to the middle node.',
+          'The point of a linked list is that it does not decide its size in advance. It allocates memory bit by bit, one node for each new value.',
       },
       c: {
-        misconception: 'Binary search fails because of the memory overhead of pointers.',
+        misconception: 'Believing linked-list nodes are stored contiguously, like an array.',
         whyWrong:
-          'The extra pointer costs space, not search time. Binary search is lost because nodes are not contiguous and cannot be reached by index arithmetic, not because of how much memory each node uses.',
+          'Nodes can be anywhere in memory and are connected only by pointers. Contiguity is a property of arrays, and it is exactly what forces arrays to copy when they grow.',
       },
       d: {
-        misconception: 'Doubly linked lists restore fast, random access.',
+        misconception:
+          'Mixing up binary search, which is a way to find values in sorted data, with memory allocation.',
         whyWrong:
-          'A pointer to the previous node makes some insert and delete code simpler, but you still have to walk node by node to reach the middle. So the running time stays the same.',
+          'Binary search plays no part in allocating nodes. A new node simply gets its own chunk of memory from malloc, and pointers link it into the list.',
       },
     },
     rubric: null,
     hints: [
-      'Think about how a computer finds the middle element of an array, and whether that trick depends on where the elements are stored in memory.',
-      'In a linked list, the only way to reach a node is to follow pointers. How many steps does it take to get from the head to the node halfway down the list?',
+      'Think about where in memory each piece of a linked list is allowed to live, compared with an array.',
+      'Must the elements of a linked list sit next to each other, and what changes when one more node is added?',
     ],
     leakKeywords: [],
     verification: {
@@ -487,54 +488,62 @@ export const lecture5Items: ItemFx[] = [
     concept: 'linked_lists',
     kind: 'spot_flaw',
     variant: 2,
-    segs: [3, 4, 5, 6, 7, 9],
+    segs: [0, 4, 5, 6],
     publicPayload: {
       sentences: [
-        'Arrays force us to pick a size in advance, so growing one means allocating new memory and copying every old value over.',
-        'A linked list avoids that by allocating one new node, holding a value and a pointer, each time a value arrives.',
-        'Searching a linked list is O(n), and so is inserting into a list kept in sorted order, because we must walk from the head to find the right spot.',
-        'Even if the list is sorted, we can still run binary search on it in O(log n) time, because the pointers let us jump straight to the middle node.',
+        'Unlike an array, a linked list does not require choosing a size in advance, because each new value gets its own freshly allocated node.',
+        'Since nodes are connected by pointers, they can live anywhere in memory, so the list can keep growing even when free memory is fragmented.',
+        'Searching for a value is O(n), because in the worst case we must follow the pointers from the first node all the way to the last.',
+        'Adding a value to the end of a singly linked list is O(1) even if we only keep a pointer to the first node, since attaching the new node just means updating one pointer.',
+        "Prepending a new node at the front really is O(1), because we only set the new node's next pointer to the old first node and point the list at the new node.",
       ],
     },
     answerKey: {
       hasFlaw: true,
       flawSentenceIdx: 3,
       flawSummary:
-        'Claims binary search works in O(log n) on a sorted linked list, but pointers only lead to the next node, so reaching the middle requires a linear traversal from the head.',
+        'Appending to a singly linked list with only a head pointer is not O(1); you must first walk the whole list to find the last node, which is O(n).',
       correction:
-        'Even if the list is sorted, binary search loses its advantage, because finding the middle node requires traversing from the beginning, which costs O(n) steps each time.',
+        'Adding a value to the end of a singly linked list with only a pointer to the first node is O(n), because you must traverse every node to reach the last one before updating its pointer. Only prepending (or keeping an extra tail pointer) avoids that walk.',
       explanation:
-        "Sentences 0–2 are accurate: arrays need resizing and copying, linked lists allocate a node per value, and search and sorted insertion are linear. Sentence 3 is wrong. A singly linked list's pointers only lead from one node to the next. There is no arithmetic that jumps to the middle the way array indexing does. To find the middle you must walk the list, so the logarithmic benefit of binary search is lost.",
+        "The pointer update at the end is cheap, but reaching the end is not: with only a pointer to the first node, the computer must follow each node's next pointer from the beginning, the same linear traversal that makes searching O(n). The other sentences are true. No size is fixed in advance. Nodes can sit anywhere in memory. Search is linear. Prepending is constant time because it touches only the front of the list.",
     },
     distractorMeta: null,
     rubric: {
       criteria: [
         {
-          id: 'identify',
+          id: 'c1',
           label: 'Identifies the flawed claim',
           description:
-            'Points to the claim that binary search runs in O(log n) on a sorted linked list.',
+            'Points to the claim that appending to the end with only a head pointer is O(1).',
           max: 2,
         },
         {
-          id: 'reason',
-          label: 'Explains why',
+          id: 'c2',
+          label: 'Correct running time with reason',
           description:
-            'Explains that nodes are not contiguous and pointers only lead to the next node, so finding the middle requires traversing from the head in O(n) steps.',
+            'States that appending is O(n) because you must traverse from the first node to find the last node.',
+          max: 2,
+        },
+        {
+          id: 'c3',
+          label: 'Contrast with prepending',
+          description:
+            'Notes that prepending stays O(1), or that an extra pointer to the last node would make appending O(1).',
           max: 2,
         },
       ],
     },
     hints: [
-      'Think about what operation binary search needs to do quickly at every step.',
-      'With an array you can compute the middle index directly. What do you have to do to reach the middle node of a linked list?',
+      'For each operation, ask whether its cost lies in the pointer change itself or in getting to where the change happens.',
+      'With only a pointer to the first node, how does the computer reach the final node of the list?',
     ],
     leakKeywords: [
-      'traverse',
-      'jump to the middle',
-      'contiguous',
-      'binary search lost',
-      'walk from the head',
+      'tail pointer',
+      'traverse to the end',
+      'find the last node',
+      'walk the whole list',
+      'append is O(n)',
     ],
     verification: {
       verdict: 'pass',
@@ -1720,7 +1729,7 @@ export const lecture5Items: ItemFx[] = [
     },
     answerKey: {
       modelSolution:
-        '(a) Each letter contributes a value from 0 to 25. The smallest result is 0 for names starting with "AA". The largest is 25*26 + 25 = 675 for names starting with "ZZ". So the array needs 676 buckets, indices 0 to 675. (b) For "Bob": B = 1 and O = 14, so 1*26 + 14 = 40. For "Zoe": Z = 25 and O = 14, so 25*26 + 14 = 664. (c) Yes. "bonnie" also starts with B, O after case is ignored, so it also hashes to 40. Collisions cannot be avoided in general because the set of possible usernames is infinite (there is no length limit), while there are only finitely many buckets. Infinitely many inputs mapped into 676 outputs means some bucket must receive more than one name. (e) Hashing on the first letter uses only 26 buckets, so there are far more collisions and the chains are longer. Using two letters spreads names over 676 buckets, which shortens chains and speeds up lookups. The price is 26 times as many buckets, and many of them (for example "QX" or "ZZ") will likely stay empty, wasting memory.',
+        '(a) Each letter contributes a value from 0 to 25. The smallest result is 0 for names starting with "AA". The largest is 25*26 + 25 = 675 for names starting with "ZZ". So the array needs 676 buckets, indices 0 to 675. (b) For "Bob": B = 1 and O = 14, so 1*26 + 14 = 40. For "Zoe": Z = 25 and O = 14, so 25*26 + 14 = 664. (c) Yes. "bonnie" also starts with B, O after case is ignored, so it also hashes to 40. Collisions cannot be avoided in general because the set of possible usernames is infinite (there is no length limit), while there are only finitely many buckets. Infinitely many inputs mapped into 676 outputs means some bucket must receive more than one name. (d) Hashing on the first letter uses only 26 buckets, so there are far more collisions and the chains are longer. Using two letters spreads names over 676 buckets, which shortens chains and speeds up lookups. The price is 26 times as many buckets, and many of them (for example "QX" or "ZZ") will likely stay empty, wasting memory.',
       explanation:
         'Hashing maps an infinite domain to a finite range of bucket indices. Using more of the key gives more buckets and fewer collisions, but it costs more memory, and many buckets go unused. No finite range can eliminate collisions for an unbounded input set.',
     },

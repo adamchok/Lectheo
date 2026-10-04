@@ -1,4 +1,4 @@
-import type { LectureKey } from '@lectheo/db/seed'
+import type { ItemFx, LectureKey } from '@lectheo/db/seed'
 import type { SeedEdge } from './extract'
 
 /*
@@ -36,11 +36,25 @@ export const TRANSCRIPT_FIXES: readonly TranscriptFix[] = [
   ...all(/\bBinki\b/g, 'Binky'),
   ...all(/\bD referencing\b/g, 'dereferencing'),
   ...all(/\bde-referenc(e|ing)\b/g, 'dereferenc$1'),
-  { lecture: 'l3', pattern: /\bN2d?\b/g, to: 'n²' },
+  { lecture: 'l3', pattern: /\bn2 1 and the same\b/g, to: 'n², one and the same' },
+  { lecture: 'l3', pattern: /\b[Nn]2d?\b/g, to: 'n²' },
+  { lecture: 'l3', pattern: /\bbig events was\b/g, to: 'big O, was' },
   { lecture: 'l3', pattern: /\bBobble So\b/g, to: 'bubble sort' },
   { lecture: 'l3', pattern: /\bselection So\b/g, to: 'selection sort' },
   { lecture: 'l4', pattern: /\ban ant\b/g, to: 'an int' },
+  { lecture: 'l4', pattern: /\bfor into i\b/g, to: 'for int i' },
+  { lecture: 'l4', pattern: /\bT4 equals singles\b/g, to: "t[4] equals '\\0'" },
+  { lecture: 'l4', pattern: /\b2 upper\b/g, to: 'toupper' },
+  { lecture: 'l4', pattern: /\bEscopy\b/g, to: './copy' },
+  { lecture: 'l4', pattern: /\bmalloc Online 8\b/g, to: 'malloc on line 8' },
+  { lecture: 'l5', pattern: /They go of Say a lot, big of\./g, to: 'Big O of n.' },
   { lecture: 'l5', pattern: /\b[Bb]ig old event\b/g, to: 'big O of n' },
+  { lecture: 'l5', pattern: /\bbig O of ends\b/g, to: 'big O of n' },
+  { lecture: 'l5', pattern: /\bdamn it\b/g, to: 'darn it' },
+  { lecture: 'l5', pattern: /\? big O of n\b/g, to: '? Big O of n' },
+  { lecture: 'l5', pattern: /\bbig O of login\b/g, to: 'big O of log n' },
+  { lecture: 'l5', pattern: /\bof log and\b/g, to: 'of log n' },
+  { lecture: 'l5', pattern: /\b(?:Linklis|link lists)\b/g, to: 'linked lists' },
   { lecture: 'l5', pattern: /\bof end\b/g, to: 'of n' },
   { lecture: 'l5', pattern: /\bthe rays\b/g, to: 'arrays' },
   { lecture: 'l5', pattern: /\bcues\b/g, to: 'queues' },
@@ -100,6 +114,8 @@ export interface Revision {
   /** concept/kind/variant of the item to replace (or to fill, for a shortfall slot). */
   item: string
   note: string
+  /** Bump to redraft an already revised item again (new cache key, new note). */
+  round?: number
 }
 
 export const REVISIONS: readonly Revision[] = [
@@ -113,7 +129,8 @@ export const REVISIONS: readonly Revision[] = [
   },
   {
     item: 'linked_lists/diagnostic_mcq/2',
-    note: 'Never claim linked-list insertion is always O(n): search and delete are O(n), inserting in sorted order is O(n), prepending is O(1).',
+    round: 2,
+    note: 'Variant 1 already asks why a sorted linked list loses O(log n) binary search, and so did the previous version of this item. Test a different idea: prepending is O(1) but appending without a tail pointer is O(n), or nodes scattered in memory vs a contiguous array. Never claim linked-list insertion is always O(n). Every option must be a coherent, complete statement.',
   },
   {
     item: 'linked_lists/spot_flaw/1',
@@ -121,7 +138,8 @@ export const REVISIONS: readonly Revision[] = [
   },
   {
     item: 'linked_lists/spot_flaw/2',
-    note: 'The previous version also claimed "insert is O(n)" in a non-flawed sentence, which is a second candidate flaw. Every non-flawed sentence must be fully true: prepending to a linked list is O(1); inserting in sorted order, search and delete are O(n).',
+    round: 2,
+    note: 'Spot-flaw variant 1 already plants "binary search works on a sorted linked list". Plant a different flaw: e.g. appending to a list without a tail pointer is O(1), or nodes must be contiguous in memory like an array. Every non-flawed sentence must be fully true: prepending is O(1); inserting in sorted order, search and delete are O(n).',
   },
   {
     item: 'bubble_sort/diagnostic_mcq/2',
@@ -168,6 +186,29 @@ export const REVISIONS: readonly Revision[] = [
     note: 'Replace the NULL vs NUL definition question with an applied one (F3.2): e.g. what a program must do after malloc returns NULL, and why.',
   },
 ]
+
+/**
+ * Literal corrections to a generated item that need no redraft (same id, checked by hand): a typo
+ * in a model solution, a leak keyword that matches ordinary scenario words.
+ */
+export const ITEM_FIXES: Readonly<Record<string, (item: ItemFx) => ItemFx>> = {
+  // The prompt has parts (a)–(d); the model solution labelled the last one "(e)".
+  'hash_functions/transfer/1': (item) =>
+    item.kind === 'transfer'
+      ? {
+          ...item,
+          answerKey: {
+            ...item.answerKey,
+            modelSolution: item.answerKey.modelSolution.replace('(e) Hashing', '(d) Hashing'),
+          },
+        }
+      : item,
+  // Whole-word "free" blocks ordinary author replies to a scenario that says "freed".
+  'stack_and_heap/spot_flaw/2': (item) => ({
+    ...item,
+    leakKeywords: item.leakKeywords.map((k) => (k === 'free' ? 'must be freed' : k)),
+  }),
+}
 
 /** The concept's summary and key points with CONCEPT_FIXES applied (ids and citations kept). */
 export function fixConcept<K extends { id: string; text: string }>(

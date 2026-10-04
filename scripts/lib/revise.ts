@@ -63,7 +63,8 @@ async function reviseOne(
 ): Promise<{ candidate: Candidate | null; result: RevisionResult }> {
   const kind = r.item.split('/')[1] as ItemKind
   const slot = previous?.slot ?? KIND_SLOT[kind]
-  const name = `revise-${r.item.replace(/\//g, '-')}`
+  const round = r.round && r.round > 1 ? `-r${r.round}` : ''
+  const name = `revise-${r.item.replace(/\//g, '-')}${round}`
   let reasons: string[] = []
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const counts = { mcq: 0, flawed: 0, correct: 0, transfer: 0, [slot]: 1 }

@@ -42,13 +42,13 @@ pnpm dev                                # http://localhost:3000
 
 `AI_FAKE=1` makes every AI call deterministic and offline (tests, e2e, UI work without keys).
 
-| Command | What |
-|---|---|
-| `pnpm check` | typecheck + lint + unit tests for every package |
-| `pnpm test` | Vitest (domain rules, contracts, DB via in-process PGlite) |
-| `pnpm e2e` | Playwright judge path (see below) |
-| `pnpm db:generate` | new Drizzle migration from `packages/db/src/schema.ts` |
-| `pnpm --filter @lectheo/ai smoke` | one live call per model role (needs `AI_GATEWAY_API_KEY`) |
+| Command                           | What                                                       |
+| --------------------------------- | ---------------------------------------------------------- |
+| `pnpm check`                      | typecheck + lint + unit tests for every package            |
+| `pnpm test`                       | Vitest (domain rules, contracts, DB via in-process PGlite) |
+| `pnpm e2e`                        | Playwright judge path (see below)                          |
+| `pnpm db:generate`                | new Drizzle migration from `packages/db/src/schema.ts`     |
+| `pnpm --filter @lectheo/ai smoke` | one live call per model role (needs `AI_GATEWAY_API_KEY`)  |
 
 `pnpm e2e` needs `npx supabase start` running. It reads keys from `supabase status`, refuses a
 non-local database, migrates + re-seeds it, then builds and serves the app on port 3100 with
@@ -72,12 +72,12 @@ The CS50 library bank is generated offline by `scripts/seed-library.ts` from the
 subtitles (Opus 5.5 extraction and drafting, GPT-6.1 Sol blind verification, at most one redraft
 round) and committed as fixtures, so seeding makes no AI calls. Evals write CSVs to `docs/evals/`:
 
-| Check                                                                | Result                                                                                                                                                                             |
-| -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Library bank (18 concepts, 3 × 45-min windows)                       | 95 drafts, 6 rejected by the verifier (6%), one redraft round; then 16 reviewer-requested redrafts (all verified first try). 90 verified items, full F7.3 set. One-time cost $5.04 |
-| `eval-items`: 20-item sample checked against key and cited subtitles | 20/20 correct key, single answer, grounded. Reviewed by Claude, not a human; a human PR review found content issues this sample missed, now fixed (see `scripts/lib/reviewed.ts`)  |
-| `eval-judge`: 10 corrections × 3 runs (judge-correction)             | 100% score agreement (target ≥ 95%); majority matches the case label 10/10 (labels written by Claude; human review pending)                                                        |
-| `eval-guard`: 15 adversarial author prompts (leak check)             | 2/15 first replies blocked and regenerated, 0/15 deflected to the canned reply, 0/15 shown replies judged leaking                                                                  |
+| Check                                                                | Result                                                                                                                                                                                                     |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Library bank (18 concepts, 3 × 45-min windows)                       | 95 drafts, 6 rejected by the verifier (6%), one redraft round; then 18 reviewer-requested redrafts (all verified first try) and reviewed text fixes. 90 verified items, full F7.3 set. One-time cost $5.25 |
+| `eval-items`: 20-item sample checked against key and cited subtitles | 20/20 correct key, single answer, grounded. Reviewed by Claude, not a human; a human PR review found content issues this sample missed, now fixed (see `scripts/lib/reviewed.ts`)                          |
+| `eval-judge`: 10 corrections × 3 runs (judge-correction)             | 100% score agreement (target ≥ 95%); majority matches the case label 10/10 (labels written by Claude; human review pending)                                                                                |
+| `eval-guard`: 15 adversarial author prompts (leak check)             | 1/15 first replies blocked and regenerated, 0/15 deflected to the canned reply, 0/15 shown replies judged leaking                                                                                          |
 
 ```bash
 pnpm --filter @lectheo/scripts seed-library -- --emit   # AI_FAKE=0, AI_GATEWAY_KEY_NAME=dev
