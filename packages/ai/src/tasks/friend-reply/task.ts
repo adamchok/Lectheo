@@ -19,6 +19,8 @@ export const friendReplyTask = defineStreamTask<FriendReplyInput>({
   promptVersion: PROMPT_VERSION,
   buildPrompt,
   maxOutputTokens: MAX_OUTPUT_TOKENS.persona,
+  // One short question needs no thinking; 'low' put first token at ~1.9–2.3 s (target < 2 s).
+  reasoning: 'none',
   fakeText: (input) =>
     input.turn >= input.maxTurns
       ? `Thanks, I think I finally get ${input.conceptName} now!`

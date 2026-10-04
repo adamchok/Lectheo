@@ -9,6 +9,8 @@ import { activities, attempts, eq, itemSecrets, llmCalls, messages } from '@lect
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DbLike } from '../db'
 import { createActivity, getActivity, postMessage, takeHint } from './service'
+import { friendReplyTask } from '@lectheo/ai'
+import { exchangesOf, friendReplyInput, questionOf, retryHintFor } from './teach-back'
 import { submitActivity } from './submit'
 import { ALICE, IDS, newId, SECRET_KEYS, seedFixture } from './test-fixture'
 
@@ -143,7 +145,7 @@ describe('teach_back', () => {
     expect(created).toMatchObject({
       type: 'teach_back',
       persona: { key: 'first_year', name: 'Sam, a curious first-year' },
-      opener: 'Wait, so what *is* hash tables?',
+      opener: expect.stringContaining('I missed the lecture on hash tables'),
       turnBudget: 6,
     })
     expectNoSecrets(created)
@@ -183,6 +185,9 @@ describe('teach_back', () => {
       maxScore: 4,
     })
     expect(try1.criteria.map((c) => c.label)).toEqual(['Key point 1', 'Key point 2'])
+    // F5.1: question, then a hint that counts the gaps without naming them (F5.3).
+    expect(try1.feedback.guidingQuestion).toBeTruthy()
+    expect(try1.feedback.hint).toContain('1 key point out of 2')
     expect(try1.checks).toBeNull()
     expect(try1.rubric).toBeUndefined()
     expectNoSecrets(try1)
@@ -200,6 +205,58 @@ describe('teach_back', () => {
     expect(final.rubric?.map((r) => r.description)).toContain(
       'Collisions are handled by chaining or probing.',
     )
-    expect(final.explanation).toContain('Key points')
+    expect(final.explanation).toBe(
+      'A hash table stores key/value pairs in buckets chosen by a hash function.',
+    )
+  })
+})
+
+describe('teach_back helpers', () => {
+  it('the friend prompt never contains the concept key points (ADR-009)', () => {
+    const concept = {
+      name: 'hash tables',
+      summary: 'A hash table stores key/value pairs in buckets chosen by a hash function.',
+      keyPoints: [
+        { id: 'k1', text: 'Keys map to buckets via a hash function.' },
+        { id: 'k2', text: 'Collisions are handled by chaining or probing.' },
+      ],
+    }
+    const history = [{ role: 'student', text: 'It puts keys in buckets.' }] as const
+    const json = JSON.stringify(
+      friendReplyTask.buildPrompt(
+        friendReplyInput(concept, { turnsUsed: 6, turnBudget: 6 }, history),
+      ),
+    )
+    for (const k of concept.keyPoints) expect(json).not.toContain(k.text)
+  })
+
+  it('strips the persona style down to its question sentences', () => {
+    expect(questionOf('Oh nice, that makes sense! But why a hash? And then what?')).toBe(
+      'But why a hash? And then what?',
+    )
+    expect(questionOf('Thanks, I get it now.')).toBe('Thanks, I get it now.')
+  })
+
+  it('pairs each student answer with the friend question before it', () => {
+    const turns = [
+      { role: 'persona', text: 'Hmm. What is a bucket?' },
+      { role: 'student', text: 'A slot in an array.' },
+      { role: 'student', text: 'Each key maps to one.' },
+    ] as const
+    expect(exchangesOf(turns)).toEqual([
+      { question: 'What is a bucket?', answer: 'A slot in an array.' },
+      { question: '', answer: 'Each key maps to one.' },
+    ])
+  })
+
+  it('hint counts open key points, null when all are covered', () => {
+    expect(
+      retryHintFor([
+        { score: 2, max: 2 },
+        { score: 0, max: 2 },
+        { score: 1, max: 2 },
+      ]),
+    ).toContain('2 key points out of 3')
+    expect(retryHintFor([{ score: 2, max: 2 }])).toBeNull()
   })
 })
