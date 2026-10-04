@@ -23,6 +23,8 @@ import {
 } from './result-panel'
 import { ScenarioList } from './scenario-list'
 
+// ponytail: GET /activities/{id} doesn't return hintsAvailable (only the create response does);
+// add it to ActivityResponse and drop this if the ladder length ever varies.
 const HINTS_AVAILABLE = 2
 
 const failed = (title: string) => (error: unknown) =>

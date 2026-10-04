@@ -1,10 +1,10 @@
 import { CANNED_DEFLECTION } from '@lectheo/ai'
 import { RubricSnapshot } from '@lectheo/contracts'
-import { activities, eq, items, itemSecrets, llmCalls, messages } from '@lectheo/db'
+import { activities, attempts, eq, items, itemSecrets, llmCalls, messages } from '@lectheo/db'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DbLike } from '../db'
 import { createActivity, postMessage, takeHint } from './service'
-import { effectiveLeakKeywords, GUIDING_QUESTIONS } from './spot-flaw'
+import { effectiveLeakKeywords, GENERIC_CORRECTION, GUIDING_QUESTIONS } from './spot-flaw'
 import { submitActivity } from './submit'
 import { ALICE, IDS, newId, seedFixture } from './test-fixture'
 
@@ -45,11 +45,37 @@ describe('spot_flaw handler', () => {
     expect(res.feedback.guidingQuestion).toBe(GUIDING_QUESTIONS.noCorrection)
   })
 
-  it('wrong sentence → the location question, not the judge question about the real flaw', async () => {
+  it('wrong sentence: no judge, correction 0, and no rubric label before the final reveal', async () => {
     const { id } = await start()
     const body = { verdict: 'flawed', flawSentenceIdx: 0, correction: 'It should say O(n).' }
     const res = await submitActivity(ALICE, id, body, db)
+    expect(await judgeCalls()).toBe(0)
+    expect(res).toMatchObject({ score: 2, outcome: 'incorrect', final: false })
+    expect(res.criteria).toEqual([GENERIC_CORRECTION])
     expect(res.feedback.guidingQuestion).toBe(GUIDING_QUESTIONS.location)
+    const rubricLabel = 'Correction is right' // the fixture rubric's label
+    expect(JSON.stringify(res)).not.toContain(rubricLabel)
+
+    const missed = await submitActivity(ALICE, id, { verdict: 'correct' }, db)
+    expect(missed.final).toBe(true)
+    expect(JSON.stringify(missed.rubric)).toContain(rubricLabel)
+  })
+
+  it('a wrong verdict on a flawed item shows only the generic correction row', async () => {
+    const { id } = await start()
+    const res = await submitActivity(ALICE, id, { verdict: 'correct' }, db)
+    expect(res.criteria).toEqual([GENERIC_CORRECTION])
+  })
+
+  it('drops a judge question that contains a leak keyword', async () => {
+    await setKeywords(IDS.flawed, ['concrete case'])
+    const { id } = await start()
+    const body = { verdict: 'flawed', flawSentenceIdx: 2, correction: 'They can still happen.' }
+    await submitActivity(ALICE, id, body, db)
+    expect(await judgeCalls()).toBe(1)
+    // The fake judge grades it correct (final), so read the question stored with the attempt.
+    const [attempt] = await db.select().from(attempts).where(eq(attempts.activityId, id))
+    expect(attempt?.grading.guidingQuestion).toBe(GUIDING_QUESTIONS.testCorrection)
   })
 
   it('right sentence → the judge guiding question', async () => {

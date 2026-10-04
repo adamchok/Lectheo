@@ -8,10 +8,8 @@ import {
   SubmitResponse,
 } from '@lectheo/contracts'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
-import { apiFetch, isApiClientError } from '@/client/api'
+import { apiFetch } from '@/client/api'
 import { queryKeys } from '@/client/queries'
-import { errorMessage } from '@/components/error-state'
 import { submitBody, type Answer } from './logic'
 
 /* Spot-the-flaw mutations (API Spec §7). Each keeps the cached GET /activities/{id} in step. */
@@ -79,7 +77,12 @@ export function useSubmitAnswer(activityId: string) {
             }
           : old,
       ),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.activity(activityId) }),
+    // Mastery changed: refresh the activity and every course view (map, next step, cards).
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.activity(activityId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.courses }),
+      ]),
   })
 }
 
@@ -91,18 +94,4 @@ export function useShowExplanation(activityId: string) {
         schema: ExplanationResponse,
       }),
   })
-}
-
-/**
- * Toast for POST /activities failures. 409 means the bank has nothing new for this concept: that's
- * news, not an error.
- */
-export function toastStartError(error: unknown): void {
-  if (isApiClientError(error) && error.status === 409) {
-    toast.info("You've done every practice item for this concept", {
-      description: 'New ones are on the way. Try teach-back or another concept meanwhile.',
-    })
-    return
-  }
-  toast.error("Couldn't start the activity", { description: errorMessage(error) })
 }

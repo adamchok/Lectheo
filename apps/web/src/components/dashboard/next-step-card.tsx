@@ -4,9 +4,8 @@ import type { NextStepResponse } from '@lectheo/contracts'
 import { ArrowRight, CircleCheckBig, ClipboardCheck, LoaderCircle, PlayCircle, Sparkles } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useNextStep, useStartActivity } from '@/client/queries'
-import { toastStartError } from '@/components/activity/spot-flaw/api'
+import { useStartPractice } from '@/client/practice'
+import { useNextStep } from '@/client/queries'
 import { ErrorState } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -20,8 +19,7 @@ const ICONS = {
 } as const
 
 function NextStepAction({ step }: { step: NextStepResponse }) {
-  const router = useRouter()
-  const startActivity = useStartActivity()
+  const { startPractice, isPending } = useStartPractice()
 
   if (step.kind === 'watch' && step.lectureId) {
     return (
@@ -45,17 +43,10 @@ function NextStepAction({ step }: { step: NextStepResponse }) {
   }
   if (step.kind === 'activity' && step.conceptId && step.activityType) {
     const { conceptId, activityType } = step
-    const start = () =>
-      startActivity.mutate(
-        { conceptId, type: activityType },
-        {
-          onSuccess: (activity) => router.push(`/activities/${activity.id}` as Route),
-          onError: toastStartError,
-        },
-      )
+    const start = () => startPractice({ conceptId, type: activityType })
     return (
-      <Button size="lg" onClick={start} disabled={startActivity.isPending}>
-        {startActivity.isPending ? (
+      <Button size="lg" onClick={start} disabled={isPending}>
+        {isPending ? (
           <>
             <LoaderCircle aria-hidden className="motion-safe:animate-spin" />
             Preparing…

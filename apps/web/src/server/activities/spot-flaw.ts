@@ -78,6 +78,9 @@ export const GUIDING_QUESTIONS = {
     'not just usually?',
   /** Right sentence, no correction written. */
   noCorrection: 'You found the sentence. What should it say instead, and why?',
+  /** Right sentence and a correction, but the judge's own question can't be shown. */
+  testCorrection:
+    'Try your corrected sentence on the trickiest input you can think of. Does it still hold?',
 } as const
 
 /** Generic ladder for items without their own hints (general, then specific). */
@@ -216,16 +219,25 @@ const scaleToCorrection = (criteria: readonly Criterion[]): number => {
 }
 
 /** Which fallback question fits this try (the judge's own question wins when it applies). */
-export function fallbackQuestion(key: Pick<AnswerKey, 'hasFlaw'>, checks: SpotFlawChecks): string {
+export function fallbackQuestion(
+  key: Pick<AnswerKey, 'hasFlaw'>,
+  checks: SpotFlawChecks,
+  hasCorrection: boolean,
+): string {
   if (!checks.verdictCorrect) {
     return key.hasFlaw ? GUIDING_QUESTIONS.missedFlaw : GUIDING_QUESTIONS.falseAlarm
   }
   if (checks.locationCorrect === false) return GUIDING_QUESTIONS.location
-  return GUIDING_QUESTIONS.noCorrection
+  return hasCorrection ? GUIDING_QUESTIONS.testCorrection : GUIDING_QUESTIONS.noCorrection
 }
 
-const zeroCriteria = (rubric: RubricSecret): Criterion[] =>
-  rubric.criteria.map((c) => ({ id: c.id, label: c.label, score: 0, max: c.max }))
+/** Shown when the judge didn't run: rubric labels describe the fix, so they wait for the reveal. */
+export const GENERIC_CORRECTION: Criterion = {
+  id: 'correction',
+  label: 'Correction',
+  score: 0,
+  max: SPOT_FLAW_CORRECTION_MAX,
+}
 
 export const spotFlawHandler: ActivityTypeHandler<'spot_flaw'> = {
   type: 'spot_flaw',
@@ -283,9 +295,11 @@ export const spotFlawHandler: ActivityTypeHandler<'spot_flaw'> = {
     const checks = checkSpotFlaw(key, body)
     const rubric = frozenRubric(ctx, key)
     const studentCorrection = body.correction?.trim() ?? ''
-    // A blank correction scores 0 without a judge call.
+    // Only a correction of the right sentence is worth grading; a blank one, or one for another
+    // sentence, scores 0 without a judge call (and never sees rubric labels, which hint at the fix).
+    const found = checks.verdictCorrect && checks.locationCorrect === true
     const judge =
-      checks.needsJudge && key.flawSentenceIdx !== null && studentCorrection
+      found && key.flawSentenceIdx !== null && studentCorrection
         ? await runTask(
             judgeCorrectionTask,
             {
@@ -303,16 +317,23 @@ export const spotFlawHandler: ActivityTypeHandler<'spot_flaw'> = {
       ? []
       : judge
         ? gradedCriteria(judge.output, rubric.criteria)
-        : zeroCriteria(rubric)
+        : [GENERIC_CORRECTION]
     const scored = scoreSpotFlaw(checks, checks.needsJudge ? scaleToCorrection(criteria) : null)
-    // The judge's question is about the correction of the real flawed sentence; when the student
-    // picked another sentence it would point them at the answer, so the location question wins.
-    const judgeQuestion = checks.locationCorrect ? judge?.output.guidingQuestion : undefined
+    const judgeQuestion = judge?.output.guidingQuestion
+    const keywords = effectiveLeakKeywords((await ctx.secrets()).leakKeywords, sentencesOf(ctx))
+    const safeJudgeQuestion =
+      judgeQuestion && !keywordHit(judgeQuestion, keywords) ? judgeQuestion : null
+    if (judgeQuestion && !safeJudgeQuestion)
+      log('spot_flaw_question_leak', { itemId: item(ctx).id })
     return {
       checks: { verdict: checks.verdictCorrect, location: checks.locationCorrect },
       criteria,
       ...scored,
-      feedback: { guidingQuestion: judgeQuestion || fallbackQuestion(key, checks), hint: null },
+      feedback: {
+        guidingQuestion:
+          safeJudgeQuestion ?? fallbackQuestion(key, checks, studentCorrection !== ''),
+        hint: null,
+      },
       rationale: judge?.output.rationale ?? null,
       misconceptions: judge?.output.misconceptions ?? [],
       judgeModel: judge?.model ?? null,
