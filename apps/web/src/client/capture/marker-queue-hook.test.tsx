@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act } from 'react'
+import { act, useEffect } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { type MarkerQueueApi, useMarkerQueue } from './marker-queue-hook'
@@ -25,8 +25,11 @@ const fetchMock = vi.fn(async (_url: string, init?: RequestInit) =>
   init?.method === 'DELETE' ? new Response(null, { status: 204 }) : Response.json({}),
 )
 
-function Harness({ userId }: { userId: string | undefined }) {
-  api = useMarkerQueue(LECTURE, userId)
+function Harness({ userId, onApi }: { userId?: string; onApi: (a: MarkerQueueApi) => void }) {
+  const queue = useMarkerQueue(LECTURE, userId)
+  useEffect(() => {
+    onApi(queue)
+  })
   return null
 }
 
@@ -36,7 +39,7 @@ async function mount(userId: string | undefined) {
   await act(async () => {
     root.render(
       <QueryClientProvider client={client}>
-        <Harness userId={userId} />
+        <Harness userId={userId} onApi={(a) => (api = a)} />
       </QueryClientProvider>,
     )
   })
