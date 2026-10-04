@@ -5,14 +5,17 @@ import {
   conceptEdges,
   conceptOccurrences,
   concepts,
+  courses,
   eq,
   isNull,
   lectures,
   markerConcepts,
   markers,
+  sql,
 } from '@lectheo/db'
 import type { MasteryResult } from '@lectheo/domain'
 import type { Actor } from '../auth'
+import { computeLayout, layoutHash, type Layout } from '../concepts/layout'
 import { appDb, type DbLike } from '../db'
 import { loadMasteryForUser } from '../mastery'
 import { loadCourseForRead, type Course } from '../ownership'
@@ -20,7 +23,8 @@ import { toAttribution } from './summary'
 
 /*
  * GET /courses/{id}/map (API Spec §4). 6 queries in 3 round trips: the ownership check; then
- * lectures, concepts⋈occurrences, edges and markers⟕marker_concepts in parallel; then attempts.
+ * lectures, concepts⋈occurrences, edges and markers⟕marker_concepts in parallel; then attempts
+ * (plus one courses.layout write when the graph changed since the stored layout).
  * 🔒 concepts.key_points is never selected.
  */
 
@@ -110,16 +114,46 @@ function groupConcepts(rows: ConceptRow[]): Map<string, ConceptNode> {
   return grouped
 }
 
-type MarkerCounts = { lost: number; important: number }
+type Moment = MapNode['moments'][number]
 
-function markerCountsByConcept(rows: MarkerRow[]): Map<string, MarkerCounts> {
-  const counts = new Map<string, MarkerCounts>()
-  for (const row of rows) {
-    if (!row.conceptId) continue
-    const c = counts.get(row.conceptId) ?? { lost: 0, important: 0 }
-    counts.set(row.conceptId, { ...c, [row.kind]: c[row.kind] + 1 })
+function momentsByConcept(rows: MarkerRow[]): Map<string, Moment[]> {
+  const byConcept = new Map<string, Moment[]>()
+  for (const { conceptId, ...moment } of rows) {
+    if (!conceptId) continue
+    byConcept.set(conceptId, [...(byConcept.get(conceptId) ?? []), moment])
   }
-  return counts
+  return byConcept
+}
+
+const countKind = (moments: readonly Moment[], kind: Moment['kind']) =>
+  moments.filter((m) => m.kind === kind).length
+
+/**
+ * courses.layout, recomputed and stored when missing or the graph changed (layout_hash differs).
+ * Guarded update so concurrent readers of a shared library course write it once. A layout failure
+ * never fails the map: it falls back to the stale layout (the canvas grids unplaced nodes).
+ */
+async function ensureLayout(
+  db: DbLike,
+  course: Course,
+  conceptIds: string[],
+  edges: Awaited<ReturnType<typeof loadEdges>>,
+): Promise<Layout> {
+  const concepts = conceptIds.map((id) => ({ id }))
+  const hash = layoutHash(concepts, edges)
+  if (course.layout && course.layoutHash === hash) return course.layout
+  try {
+    const layout = await computeLayout(concepts, edges)
+    await db
+      .update(courses)
+      .set({ layout, layoutHash: hash })
+      .where(and(eq(courses.id, course.id), sql`${courses.layoutHash} IS DISTINCT FROM ${hash}`))
+    return layout
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    console.warn(JSON.stringify({ event: 'layout_failed', courseId: course.id, reason }))
+    return course.layout ?? {}
+  }
 }
 
 const GRAY: MasteryResult = { state: 'gray', confidentMistake: false, reasons: [] }
@@ -138,16 +172,18 @@ export async function getCourseMap(
   ])
   const grouped = groupConcepts(conceptRows)
   const mastery = await loadMasteryForUser(db, actor.userId, [...grouped.keys()])
-  const counts = markerCountsByConcept(markerRows)
-  const layout = course.layout ?? {}
+  const moments = momentsByConcept(markerRows)
+  const layout = await ensureLayout(db, course, [...grouped.keys()], edges)
 
   const nodes: MapNode[] = [...grouped.values()].map((c) => {
     const m = mastery.get(c.id) ?? GRAY
     const pos = layout[c.id]
+    const own = moments.get(c.id) ?? []
     return {
       ...c,
       mastery: { state: m.state, confidentMistake: m.confidentMistake, reasons: [...m.reasons] },
-      markers: counts.get(c.id) ?? { lost: 0, important: 0 },
+      markers: { lost: countKind(own, 'lost'), important: countKind(own, 'important') },
+      moments: own,
       position: pos ? { x: pos.x, y: pos.y } : null,
     }
   })

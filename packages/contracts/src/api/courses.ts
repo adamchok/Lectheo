@@ -51,6 +51,8 @@ export const MapNode = z.object({
     reasons: z.array(z.string()),
   }),
   markers: z.object({ lost: z.number().int(), important: z.number().int() }),
+  /** This user's markers linked to the concept (node panel: "▶ 12:41" links). */
+  moments: z.array(z.object({ id: Id, lectureId: Id, kind: MarkerKind, tMs: Ms })),
   position: z.object({ x: z.number(), y: z.number() }).nullable(),
 })
 export type MapNode = z.infer<typeof MapNode>

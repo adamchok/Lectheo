@@ -1,11 +1,11 @@
 'use client'
 
-import { List, Network } from 'lucide-react'
+import type { CourseMapResponse } from '@lectheo/contracts'
+import { Info, List, Network } from 'lucide-react'
 import { useState } from 'react'
 import { pluralize } from '@/client/format'
 import { useCourseMap } from '@/client/queries'
 import { ErrorState } from '@/components/error-state'
-import { FeaturePlaceholder } from '@/components/feature-placeholder'
 import { LicenseNotice } from '@/components/license-notice'
 import { MasteryBar } from '@/components/mastery-bar'
 import { countMastery } from '@/components/mastery-meta'
@@ -14,9 +14,65 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { FEATURES } from '@/lib/features'
 import { ConceptList } from './concept-list'
+import { ConceptMap } from './concept-map'
 import { LectureTimeline } from './lecture-timeline'
+import { NodePanel } from './node-panel'
 
 type View = 'map' | 'list'
+
+const VIEW_KEY = 'lectheo.courseView'
+/** Below this many concepts the map gets an explanatory note (F2.9). */
+const SMALL_MAP = 3
+
+function storedView(): View {
+  try {
+    return window.localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'map'
+  } catch {
+    return 'map'
+  }
+}
+
+function rememberView(view: View) {
+  try {
+    window.localStorage.setItem(VIEW_KEY, view)
+  } catch {
+    // Private mode / blocked storage: the toggle still works for this visit.
+  }
+}
+
+/** Canvas + node panel overlay. Closing the panel returns focus to the node (F2.8). */
+function MapView({ map }: { map: CourseMapResponse }) {
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const selected = map.nodes.find((n) => n.id === selectedId)
+
+  if (map.nodes.length === 0) return <ConceptList map={map} />
+
+  const close = () => {
+    const id = selectedId
+    setSelectedId(null)
+    document.querySelector<HTMLElement>(`.react-flow__node[data-id="${id}"]`)?.focus()
+  }
+
+  return (
+    <div className="space-y-3">
+      {map.nodes.length < SMALL_MAP && (
+        <p className="text-muted-foreground flex items-start gap-2 text-sm">
+          <Info aria-hidden className="mt-0.5 size-4 shrink-0" />
+          Only a few concepts so far. Lectures with little conceptual content, like an admin
+          session, produce short maps; more appear as you add lectures.
+        </p>
+      )}
+      <div className="relative">
+        <ConceptMap map={map} selectedId={selectedId} onOpen={setSelectedId} />
+        {selected && (
+          <div className="absolute inset-y-3 right-3 flex items-start w-[min(22rem,calc(100%-1.5rem))]">
+            <NodePanel concept={selected} map={map} onClose={close} />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
 
 function CourseSkeleton() {
   return (
@@ -36,12 +92,19 @@ function CourseSkeleton() {
 /** /courses/[id]: concept map + accessible list view (F2, F2.8). */
 export function CourseView({ courseId }: { courseId: string }) {
   const map = useCourseMap(courseId)
-  const [view, setView] = useState<View>(FEATURES.conceptMapCanvas ? 'map' : 'list')
+  // Safe without a hydration mismatch: the server always renders the skeleton (no prefetch).
+  const [view, setView] = useState<View>(() =>
+    FEATURES.conceptMapCanvas && typeof window !== 'undefined' ? storedView() : 'list',
+  )
 
   if (map.isPending) return <CourseSkeleton />
   if (map.isError) {
     return (
-      <ErrorState title="Couldn't load this course" error={map.error} onRetry={() => map.refetch()} />
+      <ErrorState
+        title="Couldn't load this course"
+        error={map.error}
+        onRetry={() => map.refetch()}
+      />
     )
   }
 
@@ -63,7 +126,11 @@ export function CourseView({ courseId }: { courseId: string }) {
               type="single"
               variant="outline"
               value={view}
-              onValueChange={(next) => next && setView(next as View)}
+              onValueChange={(next) => {
+                if (!next) return
+                setView(next as View)
+                rememberView(next as View)
+              }}
               aria-label="View"
             >
               <ToggleGroupItem value="map" className="px-3">
@@ -83,19 +150,7 @@ export function CourseView({ courseId }: { courseId: string }) {
 
       <div className="grid items-start gap-8 lg:grid-cols-[1fr_18rem]">
         <div className="min-w-0">
-          {activeView === 'map' ? (
-            // TODO(feature-concept-map): React Flow canvas using stored ELK positions
-            // (node.position), mastery rings + icon/label, marker overlay, keyboard navigation.
-            <FeaturePlaceholder
-              feature="feature-concept-map"
-              icon={Network}
-              title="Concept map"
-              description="The interactive map will render here."
-              className="min-h-[28rem]"
-            />
-          ) : (
-            <ConceptList map={map.data} />
-          )}
+          {activeView === 'map' ? <MapView map={map.data} /> : <ConceptList map={map.data} />}
         </div>
         <aside className="space-y-6 lg:sticky lg:top-24">
           <LectureTimeline map={map.data} />
