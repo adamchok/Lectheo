@@ -8,8 +8,10 @@ import type {
 } from '@lectheo/contracts'
 import { ArrowRight, CircleCheck, CircleX, Loader2, Target } from 'lucide-react'
 import type { Route } from 'next'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
+import { isApiClientError } from '@/client/api'
 import { isBareShortcut } from '@/client/keyboard'
 import {
   useDiagnosticAnswer,
@@ -37,9 +39,9 @@ export function DiagnosticView({ lectureId }: { lectureId: string }) {
       section="Diagnostic"
       description="A few questions on the ideas you flagged. Rate your confidence first, then pick an answer."
     >
-      {() => (
+      {(lecture) => (
         <div className="mx-auto max-w-3xl">
-          <DiagnosticRunner lectureId={lectureId} />
+          <DiagnosticRunner lectureId={lectureId} courseId={lecture.courseId} />
         </div>
       )}
     </LectureFrame>
@@ -77,10 +79,41 @@ function Note({ children }: { children: string }) {
   return <p className="bg-muted text-muted-foreground rounded-lg px-4 py-3 text-sm">{children}</p>
 }
 
-function DiagnosticRunner({ lectureId }: { lectureId: string }) {
+/** Every verified question for this lecture has been seen (start → 409 no_items). */
+function FinishedState({ lectureId, courseId }: { lectureId: string; courseId: string }) {
+  return (
+    <section className="bg-card space-y-4 rounded-xl border p-6 text-center shadow-sm">
+      <CircleCheck aria-hidden className="mx-auto size-8 text-emerald-600" />
+      <h2 className="text-xl font-semibold">You&apos;ve finished this diagnostic</h2>
+      <p className="text-muted-foreground text-sm">
+        You&apos;ve answered every question we have for this lecture. Keep going with practice on
+        the concept map.
+      </p>
+      <div className="flex flex-wrap justify-center gap-3">
+        <Button asChild>
+          <Link href={`/courses/${courseId}` as Route}>
+            Open the concept map
+            <ArrowRight aria-hidden />
+          </Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href={`/lectures/${lectureId}` as Route}>Back to the lecture</Link>
+        </Button>
+      </div>
+    </section>
+  )
+}
+
+const isNoItemsLeft = (error: unknown): boolean =>
+  isApiClientError(error) && error.code === 'invalid_state' && error.details?.reason === 'no_items'
+
+function DiagnosticRunner({ lectureId, courseId }: { lectureId: string; courseId: string }) {
   const start = useStartDiagnostic(lectureId)
   const session = useDiagnosticSession(start.data?.sessionId)
 
+  if (start.isError && isNoItemsLeft(start.error)) {
+    return <FinishedState lectureId={lectureId} courseId={courseId} />
+  }
   if (start.isError) {
     return (
       <ErrorState
@@ -429,7 +462,7 @@ function ConfidentMistakeCard({ finding, answer }: ConfidentMistakeCardProps) {
   const practice = useStartActivity()
   const why =
     answer?.whyYourChoiceIsWrong ??
-    'You were sure of your answer, and the follow-up on the same idea was wrong too.'
+    'You were sure of your answer here, but it was wrong. Revisit the lecture moment below.'
 
   const handlePractice = () =>
     practice.mutate(

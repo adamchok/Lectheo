@@ -77,7 +77,7 @@ export async function getResults(
     findings: orderFindings(findings),
     summary: {
       total: findings.length,
-      confidentMistakes: count(findings, 'confident_mistake', 'possible_confident_mistake'),
+      confidentMistakes: count(findings, 'confident_mistake'),
       wrong: count(findings, 'wrong'),
       // A possible slip was right on the follow-up, so it counts with unsure-but-right.
       unsureRight: count(findings, 'unsure_right', 'possible_slip'),

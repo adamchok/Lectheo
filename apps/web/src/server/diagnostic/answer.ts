@@ -111,9 +111,17 @@ async function followUpFor(
   return match ? { itemId: match.id, stem: mcqOf(match).stem } : null
 }
 
-/** Marks the session completed once every planned item and issued follow-up is answered. */
-async function completeIfDone(db: DbLike, session: SessionRow): Promise<void> {
-  if (session.status !== 'active') return
+/**
+ * Marks the session completed once every planned item and issued follow-up is answered. Re-reads
+ * the session and guards on the item count, so a concurrent follow-up append keeps it active.
+ */
+async function completeIfDone(db: DbLike, sessionId: string): Promise<void> {
+  const [session] = await db
+    .select()
+    .from(diagnosticSessions)
+    .where(eq(diagnosticSessions.id, sessionId))
+    .limit(1)
+  if (session?.status !== 'active') return
   const answered = new Set(
     (await loadResponses(db, session.id)).filter((r) => r.optionId !== null).map((r) => r.itemId),
   )
@@ -121,7 +129,13 @@ async function completeIfDone(db: DbLike, session: SessionRow): Promise<void> {
   await db
     .update(diagnosticSessions)
     .set({ status: 'completed', completedAt: new Date() })
-    .where(and(eq(diagnosticSessions.id, session.id), eq(diagnosticSessions.status, 'active')))
+    .where(
+      and(
+        eq(diagnosticSessions.id, session.id),
+        eq(diagnosticSessions.status, 'active'),
+        sql`cardinality(${diagnosticSessions.plannedItemIds}) = ${session.plannedItemIds.length}`,
+      ),
+    )
 }
 
 async function masteryOf(db: DbLike, userId: string, conceptId: string): Promise<MasterySummary> {
@@ -164,20 +178,25 @@ export async function answerItem(
       throw new ApiError('validation_failed', 'Pick one of the options.')
     }
     const correct = optionId === key.correctOptionId
-    const [won] = await db
-      .update(diagnosticResponses)
-      .set({ optionId, correct, answeredAt: new Date() })
-      .where(
-        and(
-          eq(diagnosticResponses.sessionId, session.id),
-          eq(diagnosticResponses.itemId, itemId),
-          isNull(diagnosticResponses.optionId),
-        ),
-      )
-      .returning()
-    if (won) {
-      const misconception = correct ? undefined : distractors[optionId]?.misconception
-      await db
+    const misconception = correct ? undefined : distractors[optionId]?.misconception
+    // One transaction: the graded response, its attempt and any follow-up land together, so a
+    // crash can't leave an answered response without its attempt (which mastery reads).
+    const graded = await db.transaction(async (rawTx) => {
+      // ponytail: a PgTransaction has the same query-builder API as Db (see DbLike).
+      const tx = rawTx as unknown as DbLike
+      const [won] = await tx
+        .update(diagnosticResponses)
+        .set({ optionId, correct, answeredAt: new Date() })
+        .where(
+          and(
+            eq(diagnosticResponses.sessionId, session.id),
+            eq(diagnosticResponses.itemId, itemId),
+            isNull(diagnosticResponses.optionId),
+          ),
+        )
+        .returning()
+      if (!won) return null
+      await tx
         .insert(attempts)
         .values({
           userId: actor.userId,
@@ -199,17 +218,22 @@ export async function answerItem(
           assisted: false,
         })
         .onConflictDoNothing()
-      stored = won
-      session = await maybeIssueFollowUp(db, session, item, won)
+      return { won, session: await maybeIssueFollowUp(tx, session, item, won) }
+    })
+    if (graded) {
+      stored = graded.won
+      session = graded.session
     } else {
+      // Lost a race: the winner committed its answer and any follow-up, so read both fresh.
       stored = (await loadResponse(db, session.id, itemId)) ?? response
+      session = await loadOwnedSession(db, actor, sid)
     }
   }
 
   const chosen = stored.optionId ?? optionId
   const correct = stored.correct === true
   const followUp = await followUpFor(db, session, item, stored)
-  await completeIfDone(db, session)
+  await completeIfDone(db, session.id)
   const [source, mastery] = await Promise.all([
     itemSource(db, item),
     masteryOf(db, actor.userId, item.conceptId),

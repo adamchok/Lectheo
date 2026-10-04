@@ -30,7 +30,8 @@ export const queryKeys = {
   nextStep: (courseId: string) => ['courses', courseId, 'next'] as const,
   lecture: (lectureId: string) => ['lectures', lectureId] as const,
   activity: (activityId: string) => ['activities', activityId] as const,
-  diagnosticStart: (lectureId: string) => ['lectures', lectureId, 'diagnostic'] as const,
+  // Not under ['lectures', id]: a prefix invalidation of the lecture must never re-POST a start.
+  diagnosticStart: (lectureId: string) => ['diagnostic-start', lectureId] as const,
   diagnostic: (sessionId: string) => ['diagnostic', sessionId] as const,
   diagnosticResults: (sessionId: string) => ['diagnostic', sessionId, 'results'] as const,
 }
@@ -135,7 +136,10 @@ export function useStartDiagnostic(lectureId: string) {
         schema: StartDiagnosticResponse,
         signal,
       }),
-    staleTime: Infinity,
+    // Re-POSTing mid-run is harmless (it returns the active session), but after the last answer
+    // it would plan a new session and swap the results away, so only refetch on remount.
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     retry: false,
   })
 }
@@ -171,8 +175,19 @@ export function useDiagnosticAnswer(sessionId: string) {
         body: { optionId: input.optionId },
         schema: AnswerResponse,
       }),
-    // Mastery changed: maps and next-step cards recompute on read.
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.courses }),
+    onSuccess: async () => {
+      // Resume state and the start plan are now stale; refetch them on the next visit only, so
+      // the running flow (and its results screen) isn't swapped out under the student.
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.diagnostic(sessionId),
+          refetchType: 'none',
+        }),
+        queryClient.invalidateQueries({ queryKey: ['diagnostic-start'], refetchType: 'none' }),
+        // Mastery changed: maps and next-step cards recompute on read.
+        queryClient.invalidateQueries({ queryKey: queryKeys.courses }),
+      ])
+    },
   })
 }
 
