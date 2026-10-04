@@ -8,6 +8,8 @@ import { useMemo } from 'react'
 import { API_BASE, apiFetch, ApiClientError } from '@/client/api'
 import { queryKeys } from '@/client/queries'
 
+export const LOST_THREAD = 'Sam lost the thread — try again.'
+
 /** messageMetadata sent by the server on stream start/finish (teach-back.ts). */
 export type TeachBackMessage = UIMessage<{ turnsLeft?: number }>
 
@@ -30,7 +32,7 @@ const fetchOrThrow: typeof fetch = async (input, init) => {
   throw new ApiClientError({
     code: envelope.success ? envelope.data.error.code : 'internal_error',
     status: response.status,
-    message: envelope.success ? envelope.data.error.message : 'Sam lost the thread. Try again.',
+    message: envelope.success ? envelope.data.error.message : LOST_THREAD,
     details: envelope.success ? envelope.data.error.details : undefined,
   })
 }

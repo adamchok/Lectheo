@@ -9,7 +9,8 @@ import { activities, attempts, eq, itemSecrets, llmCalls, messages } from '@lect
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DbLike } from '../db'
 import { createActivity, getActivity, postMessage, takeHint } from './service'
-import { exchangesOf, questionOf, retryHintFor } from './teach-back'
+import { friendReplyTask } from '@lectheo/ai'
+import { exchangesOf, friendReplyInput, questionOf, retryHintFor } from './teach-back'
 import { submitActivity } from './submit'
 import { ALICE, IDS, newId, SECRET_KEYS, seedFixture } from './test-fixture'
 
@@ -203,11 +204,31 @@ describe('teach_back', () => {
     expect(final.rubric?.map((r) => r.description)).toContain(
       'Collisions are handled by chaining or probing.',
     )
-    expect(final.explanation).toContain('Key points')
+    expect(final.explanation).toBe(
+      'A hash table stores key/value pairs in buckets chosen by a hash function.',
+    )
   })
 })
 
 describe('teach_back helpers', () => {
+  it('the friend prompt never contains the concept key points (ADR-009)', () => {
+    const concept = {
+      name: 'hash tables',
+      summary: 'A hash table stores key/value pairs in buckets chosen by a hash function.',
+      keyPoints: [
+        { id: 'k1', text: 'Keys map to buckets via a hash function.' },
+        { id: 'k2', text: 'Collisions are handled by chaining or probing.' },
+      ],
+    }
+    const history = [{ role: 'student', text: 'It puts keys in buckets.' }] as const
+    const json = JSON.stringify(
+      friendReplyTask.buildPrompt(
+        friendReplyInput(concept, { turnsUsed: 6, turnBudget: 6 }, history),
+      ),
+    )
+    for (const k of concept.keyPoints) expect(json).not.toContain(k.text)
+  })
+
   it('strips the persona style down to its question sentences', () => {
     expect(questionOf('Oh nice, that makes sense! But why a hash? And then what?')).toBe(
       'But why a hash? And then what?',
@@ -228,9 +249,13 @@ describe('teach_back helpers', () => {
   })
 
   it('hint counts open key points, null when all are covered', () => {
-    expect(retryHintFor([{ score: 2, max: 2 }, { score: 0, max: 2 }, { score: 1, max: 2 }])).toContain(
-      '2 key points out of 3',
-    )
+    expect(
+      retryHintFor([
+        { score: 2, max: 2 },
+        { score: 0, max: 2 },
+        { score: 1, max: 2 },
+      ]),
+    ).toContain('2 key points out of 3')
     expect(retryHintFor([{ score: 2, max: 2 }])).toBeNull()
   })
 })

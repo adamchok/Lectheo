@@ -6,6 +6,7 @@ import {
   runTask,
   streamPersona,
   type ChatTurn,
+  type FriendReplyInput,
 } from '@lectheo/ai'
 import { RubricSnapshot, type KeyPoints } from '@lectheo/contracts'
 import { messages } from '@lectheo/db'
@@ -57,7 +58,11 @@ const toTurns = (rows: readonly MessageRow[]): ChatTurn[] =>
 
 /** Persona style stripped (Architecture §4.6): only the question sentences, else the whole text. */
 export function questionOf(text: string): string {
-  const questions = text.match(/[^.!?\n]*\?/g)?.map((q) => q.trim()).filter(Boolean) ?? []
+  const questions =
+    text
+      .match(/[^.!?\n]*\?/g)
+      ?.map((q) => q.trim())
+      .filter(Boolean) ?? []
   return questions.length > 0 ? questions.join(' ') : text.trim()
 }
 
@@ -73,6 +78,21 @@ export function exchangesOf(turns: readonly ChatTurn[]): { question: string; ans
 function explanationText(ctx: ActivityContext, keyPoints: KeyPoints): string {
   const points = keyPoints.map((k) => `- ${k.text}`).join('\n')
   return `${ctx.concept.summary}\n\nKey points from the lecture:\n${points}`
+}
+
+/** Friend input: public concept name + summary only, never the 🔒 key points (ADR-009). */
+export function friendReplyInput(
+  concept: Pick<ActivityContext['concept'], 'name' | 'summary'>,
+  activity: Pick<ActivityContext['activity'], 'turnsUsed' | 'turnBudget'>,
+  history: readonly ChatTurn[],
+): FriendReplyInput {
+  return {
+    conceptName: concept.name,
+    conceptSummary: concept.summary,
+    history,
+    turn: activity.turnsUsed,
+    maxTurns: activity.turnBudget,
+  }
 }
 
 export const teachBackHandler: ActivityTypeHandler<'teach_back'> = {
@@ -102,13 +122,7 @@ export const teachBackHandler: ActivityTypeHandler<'teach_back'> = {
     const history = toTurns(await ctx.visibleMessages())
     const result = await streamPersona(
       friendReplyTask,
-      {
-        conceptName: ctx.concept.name,
-        conceptSummary: ctx.concept.summary,
-        history,
-        turn: ctx.activity.turnsUsed,
-        maxTurns: ctx.activity.turnBudget,
-      },
+      friendReplyInput(ctx.concept, ctx.activity, history),
       ctx.ai,
     )
     // Keep generating (and persist) even if the client disconnects mid-stream.
@@ -162,7 +176,8 @@ export const teachBackHandler: ActivityTypeHandler<'teach_back'> = {
   async finalReveal(ctx) {
     const keyPoints = keyPointsOf(ctx)
     return {
-      explanation: explanationText(ctx, keyPoints),
+      // The key points come back as the rubric, so the explanation is the summary alone.
+      explanation: ctx.concept.summary,
       rubric: keyPoints.map((k, i) => ({
         id: k.id,
         label: `Key point ${i + 1}`,

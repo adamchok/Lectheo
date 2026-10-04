@@ -110,8 +110,8 @@ export function FinalReveal({
   before?: MasterySummary
 }) {
   const coverage = new Map(result.criteria.map((c) => [c.id, c]))
-  // ponytail: explanation = "summary\n\nKey points…" (teach-back.ts); the points render below.
-  const summary = result.explanation?.split('\n\n')[0]
+  // teach-back.ts finalReveal: explanation is the concept summary; key points come as the rubric.
+  const summary = result.explanation
   const changed = before && before.state !== result.mastery.state
   return (
     <section

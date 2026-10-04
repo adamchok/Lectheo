@@ -2,6 +2,7 @@
 
 import type { ActivityResponse, MasterySummary, SubmitResponse } from '@lectheo/contracts'
 import { CircleAlert, LoaderCircle, SendHorizontal } from 'lucide-react'
+import type { ChatStatus } from 'ai'
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { isApiClientError } from '@/client/api'
 import { useActivity } from '@/client/queries'
@@ -12,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { FinalReveal, TryFeedback } from './teach-back-result'
 import {
+  LOST_THREAD,
   textOf,
   toUiMessages,
   useFinalReplay,
@@ -26,15 +28,15 @@ const MAX_MESSAGE_CHARS = 2000
 
 /** Friendly copy for 409 (turn budget used / closed) and 503 ai_paused (API Spec §1). */
 function friendlyError(error: unknown, action: 'reply' | 'grade'): string {
-  if (isApiClientError(error)) {
-    if (error.code === 'invalid_state' && action === 'reply') {
-      return `You've used all your turns with ${PERSONA}. Submit when you're ready.`
-    }
-    if (error.code === 'ai_paused') {
-      return action === 'reply'
-        ? `${PERSONA} can't reply right now: AI is paused for a bit. Your messages are saved, so try again later.`
-        : 'Grading is paused for a bit. Your explanation is saved, so try submitting again later.'
-    }
+  // Not an API envelope: the stream broke after it started (or the SDK threw).
+  if (!isApiClientError(error)) return action === 'reply' ? LOST_THREAD : errorMessage(error)
+  if (error.code === 'invalid_state' && action === 'reply') {
+    return `You've used all your turns with ${PERSONA}. Submit when you're ready.`
+  }
+  if (error.code === 'ai_paused') {
+    return action === 'reply'
+      ? `${PERSONA} can't reply right now: AI is paused for a bit. Your messages are saved, so try again later.`
+      : 'Grading is paused for a bit. Your explanation is saved, so try submitting again later.'
   }
   return errorMessage(error)
 }
@@ -61,24 +63,33 @@ function Bubble({ message }: { message: TeachBackMessage }) {
   )
 }
 
-function Transcript({ messages, thinking }: { messages: TeachBackMessage[]; thinking: boolean }) {
+function Transcript({ messages, status }: { messages: TeachBackMessage[]; status: ChatStatus }) {
   const end = useRef<HTMLLIElement>(null)
+  const thinking = status === 'submitted'
   useEffect(() => {
     end.current?.scrollIntoView({ block: 'nearest' })
   }, [messages, thinking])
+  // Announce only the finished reply, not every streamed token.
+  const last = messages.at(-1)
+  const announcement = status === 'ready' && last?.role === 'assistant' ? textOf(last) : ''
   return (
-    <ol aria-label={`Conversation with ${PERSONA}`} aria-live="polite" className="space-y-3">
-      {messages.map((m) => (
-        <Bubble key={m.id} message={m} />
-      ))}
-      {thinking && (
-        <li className="text-muted-foreground flex items-center gap-2 text-sm">
-          <LoaderCircle aria-hidden className="size-4 motion-safe:animate-spin" />
-          {PERSONA} is thinking…
-        </li>
-      )}
-      <li ref={end} aria-hidden />
-    </ol>
+    <>
+      <p aria-live="polite" className="sr-only">
+        {announcement && `${PERSONA}: ${announcement}`}
+      </p>
+      <ol aria-label={`Conversation with ${PERSONA}`} className="space-y-3">
+        {messages.map((m) => (
+          <Bubble key={m.id} message={m} />
+        ))}
+        {thinking && (
+          <li className="text-muted-foreground flex items-center gap-2 text-sm">
+            <LoaderCircle aria-hidden className="size-4 motion-safe:animate-spin" />
+            {PERSONA} is thinking…
+          </li>
+        )}
+        <li ref={end} aria-hidden />
+      </ol>
+    </>
   )
 }
 
@@ -104,6 +115,8 @@ export function TeachBackView({ activity }: { activity: ActivityResponse }) {
   const studentCount = chat.messages.filter((m) => m.role === 'user').length
   // The retry needs new explanation since try 1 (submit.ts treats an unchanged chat as a replay).
   const [countAtTry, setCountAtTry] = useState(studentCount)
+  // Text of the in-flight message; restored into the draft if the server never stored it.
+  const pending = useRef<string | null>(null)
 
   const closed = activity.status === 'closed' || final !== null
   const replay = useFinalReplay(activity.id, activity.status === 'closed' && final === null)
@@ -116,8 +129,12 @@ export function TeachBackView({ activity }: { activity: ActivityResponse }) {
     if (!chatError) return
     const message = friendlyError(chatError, 'reply')
     clearError()
+    const text = pending.current
+    pending.current = null
     void refetch().then(({ data }) => {
       setNotice(message)
+      const lastStudent = data?.messages.findLast((m) => m.role === 'student')
+      if (text && lastStudent?.content !== text) setDraft((d) => d || text)
       if (!data) return
       setMessages(toUiMessages(data.messages))
       setBaseTurnsLeft(data.turnBudget - data.turnsUsed)
@@ -130,7 +147,11 @@ export function TeachBackView({ activity }: { activity: ActivityResponse }) {
   const canSend = !closed && !busy && !submit.isPending && turnsLeft > 0
   const hasNewExplanation = studentCount > countAtTry || turnsLeft === 0
   const canSubmit =
-    !closed && !busy && !submit.isPending && studentCount > 0 && (!awaitingRetry || hasNewExplanation)
+    !closed &&
+    !busy &&
+    !submit.isPending &&
+    studentCount > 0 &&
+    (!awaitingRetry || hasNewExplanation)
 
   const send = (event?: FormEvent) => {
     event?.preventDefault()
@@ -138,6 +159,7 @@ export function TeachBackView({ activity }: { activity: ActivityResponse }) {
     if (!text || !canSend) return
     setNotice(null)
     setDraft('')
+    pending.current = text
     void chat.sendMessage({ text })
   }
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -201,7 +223,7 @@ export function TeachBackView({ activity }: { activity: ActivityResponse }) {
         </header>
 
         <div className="max-h-[28rem] overflow-y-auto px-5 py-4">
-          <Transcript messages={chat.messages} thinking={chat.status === 'submitted'} />
+          <Transcript messages={chat.messages} status={chat.status} />
         </div>
 
         {!closed && (
@@ -224,7 +246,12 @@ export function TeachBackView({ activity }: { activity: ActivityResponse }) {
                 }
                 className="max-h-40 min-h-11 resize-none"
               />
-              <Button type="submit" size="icon" disabled={!canSend || !draft.trim()} aria-label="Send">
+              <Button
+                type="submit"
+                size="icon"
+                disabled={!canSend || !draft.trim()}
+                aria-label="Send"
+              >
                 <SendHorizontal aria-hidden />
               </Button>
             </div>
