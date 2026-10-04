@@ -15,6 +15,10 @@ export const CreateLectureRequest = z.object({
   courseId: Id,
   title: z.string().trim().min(1).max(200),
   source: LectureSource.exclude(['library']),
+  /** Import (B) only: metadata of the local file. The file itself is never uploaded. */
+  media: z
+    .object({ localFileName: z.string().trim().min(1).max(255), durationMs: Ms.nullable() })
+    .optional(),
 })
 
 export const LectureMedia = z.object({
@@ -70,6 +74,8 @@ export const TranscriptUploadResponse = z.object({
   segments: z.number().int(),
   hasTimestamps: z.boolean(),
   durationMs: Ms.nullable(),
+  /** True when the transcript was cut to the account's length limit. */
+  truncated: z.boolean().optional(),
 })
 export const TranscriptQuery = z.object({
   fromMs: z.coerce.number().int().nonnegative().optional(),

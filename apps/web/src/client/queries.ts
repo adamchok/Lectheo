@@ -16,11 +16,13 @@ import {
   NextStepResponse,
   RedirectResponse,
   TranscriptResponse,
+  CourseSummary,
+  ProcessResponse,
   type ActivityType,
   type LectureStatus,
 } from '@lectheo/contracts'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { apiFetch } from './api'
+import { apiFetch, isApiClientError } from './api'
 import { newId } from './ids'
 
 /** Query-key factory. Feature teams: add keys here so invalidation stays consistent. */
@@ -210,5 +212,74 @@ export function useDiagnosticResults(sessionId: string, enabled = true) {
     queryFn: ({ signal }) =>
       apiFetch(`/diagnostic/${sessionId}/results`, { schema: DiagnosticResultsResponse, signal }),
     enabled,
+  })
+}
+
+/** POST /courses with a caller-held UUIDv7, so a retry replays instead of creating twice. */
+export function useCreateCourse() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { id: string; title: string }) =>
+      apiFetch('/courses', { method: 'POST', body: input, schema: CourseSummary }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.courses }),
+  })
+}
+
+export interface CreateLectureInput {
+  id: string
+  courseId: string
+  title: string
+  source: 'import' | 'audio' | 'transcript'
+  media?: { localFileName: string; durationMs: number | null }
+}
+
+/** POST /lectures (replay-safe on the caller-held id). */
+export function useCreateLecture() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: CreateLectureInput) =>
+      apiFetch('/lectures', { method: 'POST', body: input, schema: LectureResponse }),
+    onSuccess: (lecture) => {
+      queryClient.setQueryData(queryKeys.lecture(lecture.id), lecture)
+      return queryClient.invalidateQueries({ queryKey: queryKeys.courses })
+    },
+  })
+}
+
+/**
+ * POST /lectures/{id}/process → 'started', or 'pending' while the pipeline route isn't deployed
+ * yet (404). Already processing counts as started.
+ */
+export function useStartProcessing() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (lectureId: string): Promise<'started' | 'pending'> => {
+      try {
+        await apiFetch(`/lectures/${lectureId}/process`, {
+          method: 'POST',
+          body: {},
+          schema: ProcessResponse,
+        })
+        return 'started'
+      } catch (error) {
+        if (isApiClientError(error) && error.code === 'not_found') return 'pending'
+        if (isApiClientError(error) && error.code === 'already_processing') return 'started'
+        throw error
+      }
+    },
+    onSuccess: (_result, lectureId) =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.lecture(lectureId) }),
+  })
+}
+
+/** DELETE /lectures/{id} (F8.2). */
+export function useDeleteLecture() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (lectureId: string) => apiFetch(`/lectures/${lectureId}`, { method: 'DELETE' }),
+    onSuccess: (_result, lectureId) => {
+      queryClient.removeQueries({ queryKey: queryKeys.lecture(lectureId) })
+      return queryClient.invalidateQueries({ queryKey: queryKeys.courses })
+    },
   })
 }

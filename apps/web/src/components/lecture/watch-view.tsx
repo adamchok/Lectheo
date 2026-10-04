@@ -7,10 +7,12 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useMarkerQueue } from '@/client/capture/marker-queue-hook'
+import { LocalPlayer } from '@/client/capture/local-player'
 import { useMarkerHotkeys } from '@/client/capture/use-marker-hotkeys'
 import { WatchPlayer, type WatchPlayerHandle } from '@/client/capture/watch-player'
 import { formatTimestamp } from '@/client/format'
 import { useMe, useTranscript } from '@/client/queries'
+import { BuildMapCta } from '@/components/capture/build-map-cta'
 import { errorMessage } from '@/components/error-state'
 import { KeyHint } from '@/components/key-hint'
 import { MarkerCounts } from '@/components/marker-counts'
@@ -131,12 +133,22 @@ function WatchSession({ lecture }: { lecture: LectureResponse }) {
     <PlayerProvider value={playerContext}>
       <div className="grid items-start gap-6 lg:grid-cols-[1fr_20rem]">
         <div className="min-w-0 space-y-4">
-          <WatchPlayer
-            media={lecture.media ?? NO_MEDIA}
-            onReady={onReady}
-            onPlayingChange={onPlayingChange}
-            onEnded={onEnded}
-          />
+          {lecture.source === 'import' ? (
+            <LocalPlayer
+              lectureId={lecture.id}
+              media={lecture.media ?? NO_MEDIA}
+              onReady={onReady}
+              onPlayingChange={onPlayingChange}
+              onEnded={onEnded}
+            />
+          ) : (
+            <WatchPlayer
+              media={lecture.media ?? NO_MEDIA}
+              onReady={onReady}
+              onPlayingChange={onPlayingChange}
+              onEnded={onEnded}
+            />
+          )}
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" disabled={!canMark} onClick={() => mark('lost')}>
               <Flag aria-hidden className="text-marker-lost fill-current" />
@@ -161,7 +173,12 @@ function WatchSession({ lecture }: { lecture: LectureResponse }) {
               This lecture has no timestamps, so markers are turned off.
             </p>
           )}
-          {done && <DiagnosticCta lectureId={lecture.id} lost={counts.lost} />}
+          {done &&
+            (lecture.status === 'draft' || lecture.status === 'failed' ? (
+              <BuildMapCta lectureId={lecture.id} lost={counts.lost} />
+            ) : (
+              <DiagnosticCta lectureId={lecture.id} lost={counts.lost} />
+            ))}
         </div>
         <TranscriptPanel lectureId={lecture.id} nowMs={nowMs} onSeek={ready ? seek : null} />
       </div>

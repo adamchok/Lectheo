@@ -11,7 +11,7 @@ export const FEATURES = {
   /** "Teach-back" practice button in the map's node panel. */
   practiceTeachBack: true,
   /** "Add lecture" entry points → /lectures/new (TODO(feature-capture-import)). */
-  addLecture: false,
+  addLecture: true,
   /** Creating personal courses from the dashboard. */
-  createCourse: false,
+  createCourse: true,
 } as const

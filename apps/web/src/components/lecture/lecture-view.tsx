@@ -6,6 +6,7 @@ import type { Route } from 'next'
 import Link from 'next/link'
 import { formatTimestamp } from '@/client/format'
 import { useLecture } from '@/client/queries'
+import { DeleteLectureButton } from '@/components/capture/delete-lecture-button'
 import { ErrorState } from '@/components/error-state'
 import { FeaturePlaceholder } from '@/components/feature-placeholder'
 import { LectureStatusChip } from '@/components/lecture-status-chip'
@@ -59,7 +60,7 @@ function LectureActions({ lecture }: { lecture: LectureResponse }) {
   const mapReady = lecture.status === 'map_ready' || lecture.status === 'ready'
   return (
     <>
-      {lecture.source === 'library' && lecture.status === 'ready' && (
+      {(lecture.source === 'import' || (lecture.source === 'library' && lecture.status === 'ready')) && (
         <Button asChild>
           <Link href={`/lectures/${lecture.id}/watch` as Route}>
             <PlayCircle aria-hidden />
@@ -83,6 +84,7 @@ function LectureActions({ lecture }: { lecture: LectureResponse }) {
           </Link>
         </Button>
       )}
+      {lecture.source !== 'library' && <DeleteLectureButton lecture={lecture} />}
     </>
   )
 }
