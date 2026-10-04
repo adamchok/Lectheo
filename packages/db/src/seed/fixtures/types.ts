@@ -1,14 +1,25 @@
+import type {
+  DistractorMeta,
+  HintsSecret,
+  ItemVerification,
+  McqAnswerKey,
+  McqPublicPayload,
+  RubricSecret,
+  SpotFlawAnswerKey,
+  SpotFlawPublicPayload,
+  TransferAnswerKey,
+  TransferPublicPayload,
+} from '@lectheo/contracts'
 import type { LectureKey } from '../ids'
 
 /** 'mm:ss' or 'h:mm:ss' of media time. */
 export type Clock = string
 
-/** One ≤ 40 s transcript segment, paraphrased in lecture voice (not verbatim subtitles). */
+/** One ≤ 40 s transcript segment of the official subtitles, in media (video) time. */
 export interface SegmentFx {
   idx: number
-  at: Clock
-  /** Seconds, default 30. */
-  dur?: number
+  startMs: number
+  endMs: number
   text: string
 }
 
@@ -22,6 +33,7 @@ export interface ConceptFx {
   key: string
   name: string
   summary: string
+  /** Also the teach-back rubric (F7.3): teach-back snapshots concept.keyPoints. */
   keyPoints: KeyPointFx[]
   /** Occurrence in the concept's own (first) lecture. */
   segs: number[]
@@ -43,50 +55,30 @@ export interface LectureFx {
   concepts: ConceptFx[]
 }
 
-type OptionId = 'a' | 'b' | 'c' | 'd'
-
-export interface McqFx {
-  kind: 'diagnostic_mcq'
+/**
+ * One generated, verified practice item. `publicPayload` becomes `items.public_payload`; every
+ * other content field is 🔒 and becomes the `item_secrets` row (ADR-009).
+ */
+interface ItemBase<K extends string, P, A> {
   concept: string
+  kind: K
   variant: number
   segs: number[]
-  stem: string
-  options: Record<OptionId, string>
-  correct: OptionId
-  explanation: string
-  /** Every wrong option: [misconception, whyWrong]. */
-  distractors: Partial<Record<OptionId, [string, string]>>
+  publicPayload: P
+  answerKey: A
+  distractorMeta: DistractorMeta | null
+  rubric: RubricSecret | null
+  hints: HintsSecret | null
+  leakKeywords: string[]
+  verification: ItemVerification
+  /** Gateway slug that drafted the item. */
+  model: string
+  promptVersion: string
 }
 
-export interface FlawFx {
-  kind: 'spot_flaw'
-  concept: string
-  variant: number
-  segs: number[]
-  sentences: string[]
-  /** null = the scenario is fully correct. */
-  flaw: { idx: number; summary: string; correction: string } | null
-  explanation: string
-  /** Single correction criterion, max 2 (F4c.6). For correct scenarios: the justification. */
-  rubric: [label: string, description: string]
-  hints: [general: string, specific: string]
-  leak: string[]
-}
-
-export interface TransferFx {
-  kind: 'transfer'
-  concept: string
-  variant: number
-  segs: number[]
-  prompt: string
-  modelSolution: string
-  explanation: string
-  /** 2–4 criteria, each max 2: [id, label, description]. */
-  rubric: [id: string, label: string, description: string][]
-  hints: [general: string, specific: string]
-  leak: string[]
-}
-
+export type McqFx = ItemBase<'diagnostic_mcq', McqPublicPayload, McqAnswerKey>
+export type FlawFx = ItemBase<'spot_flaw', SpotFlawPublicPayload, SpotFlawAnswerKey>
+export type TransferFx = ItemBase<'transfer', TransferPublicPayload, TransferAnswerKey>
 export type ItemFx = McqFx | FlawFx | TransferFx
 
 export interface EdgeFx {

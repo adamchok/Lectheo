@@ -14,3 +14,11 @@ export {
 export { seedAll, seedLibrary, seedStudent, type SeedDb, type SeedCounts } from './load'
 export { buildLibraryRows, clockToMs, ITEMS, LECTURES, type LibraryRows } from './library'
 export { buildStudentRows, DEFAULT_SEED_BASE_DATE, type StudentRows } from './student'
+export type {
+  ConceptFx,
+  EdgeFx,
+  ExtraOccurrenceFx,
+  ItemFx,
+  LectureFx,
+  SegmentFx,
+} from './fixtures/types'

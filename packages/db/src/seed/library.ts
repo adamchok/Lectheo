@@ -10,37 +10,36 @@ import {
   RubricSecret,
 } from '@lectheo/contracts'
 import type * as s from '../schema'
+import { EDGES, EXTRA_OCCURRENCES } from './fixtures/edges'
 import { lecture3Items } from './fixtures/l3-items'
 import { lecture3 } from './fixtures/l3-lecture'
 import { lecture4Items } from './fixtures/l4-items'
 import { lecture4 } from './fixtures/l4-lecture'
 import { lecture5Items } from './fixtures/l5-items'
 import { lecture5 } from './fixtures/l5-lecture'
-import { transferItems } from './fixtures/transfer-items'
-import {
-  EDGES,
-  EXTRA_OCCURRENCES,
-  LIBRARY_ATTRIBUTION,
-  LIBRARY_COURSE_TITLE,
-} from './fixtures/graph'
-import type { Clock, FlawFx, ItemFx, LectureFx, McqFx, TransferFx } from './fixtures/types'
+import type { Clock, ItemFx, LectureFx } from './fixtures/types'
 import { LIBRARY_COURSE_ID, conceptId, edgeId, itemId, lectureId, type LectureKey } from './ids'
 
-/** Provenance of the dev/demo fixture (the real bank comes from scripts/seed-library.ts). */
-export const FIXTURE_PROMPT_VERSION = 'fixture-v1'
-export const FIXTURE_MODEL = 'fixture'
+/*
+ * The CS50x library bank (Product Spec F7). Fixtures are generated offline by
+ * scripts/seed-library.ts from the official subtitles and committed, so seeding is deterministic
+ * and makes no AI calls (ADR-010).
+ */
+
+export const LIBRARY_COURSE_TITLE = 'CS50x 2026'
+export const LIBRARY_ATTRIBUTION: CourseAttributionJson = {
+  source: 'CS50x 2026 by Harvard University',
+  license: 'CC BY-NC-SA 4.0',
+  url: 'https://cs50.harvard.edu/x/license/',
+  adaptedBy: 'Lectheo',
+}
 /** Fixed so library rows are byte-identical across machines. */
 export const FIXTURE_CREATED_AT = new Date('2026-09-28T00:00:00.000Z')
-const DEFAULT_SEGMENT_SECONDS = 30
-const MAX_SEGMENT_SECONDS = 40
+/** Architecture §4.3: segments are ≤ 40 s (a single longer subtitle cue is the only exception). */
+const MAX_SEGMENT_MS = 40_000
 
 export const LECTURES: readonly LectureFx[] = [lecture3, lecture4, lecture5]
-export const ITEMS: readonly ItemFx[] = [
-  ...lecture3Items,
-  ...lecture4Items,
-  ...lecture5Items,
-  ...transferItems,
-]
+export const ITEMS: readonly ItemFx[] = [...lecture3Items, ...lecture4Items, ...lecture5Items]
 
 export const clockToMs = (clock: Clock): number => {
   const parts = clock.split(':').map(Number)
@@ -111,114 +110,37 @@ const buildSegments = (lecture: LectureFx): Insert<typeof s.transcriptSegments>[
   const windowStart = clockToMs(lecture.start)
   const windowEnd = clockToMs(lecture.end)
   return lecture.segments.map((seg, position) => {
-    const dur = seg.dur ?? DEFAULT_SEGMENT_SECONDS
-    const startMs = clockToMs(seg.at)
-    const endMs = startMs + dur * 1000
-    if (seg.idx !== position)
-      throw new Error(`seed: ${lecture.key} segment ${seg.idx} out of order`)
-    if (dur > MAX_SEGMENT_SECONDS)
-      throw new Error(`seed: ${lecture.key} s${seg.idx} longer than 40 s`)
-    if (startMs < windowStart || endMs > windowEnd) {
-      throw new Error(`seed: ${lecture.key} s${seg.idx} outside the core window`)
+    const where = `${lecture.key} s${seg.idx}`
+    if (seg.idx !== position) throw new Error(`seed: ${where} out of order`)
+    if (seg.endMs - seg.startMs > MAX_SEGMENT_MS) throw new Error(`seed: ${where} longer than 40 s`)
+    if (seg.startMs < windowStart || seg.endMs > windowEnd) {
+      throw new Error(`seed: ${where} outside the core window`)
     }
-    return { lectureId: lectureId(lecture.key), idx: seg.idx, startMs, endMs, text: seg.text }
+    return { lectureId: lectureId(lecture.key), ...seg }
   })
 }
 
-const verification = (solvedAnswer: string | null): ItemVerification =>
-  ItemVerification.parse({
-    verdict: 'pass',
-    solvedAnswer,
-    reasons: ['fixture: hand-verified'],
-    model: FIXTURE_MODEL,
-  })
-
-interface ItemParts {
-  publicPayload: unknown
-  answerKey: unknown
-  solvedAnswer: string | null
-  distractorMeta: DistractorMeta | null
-  rubric: RubricSecret | null
-  hints: HintsSecret | null
-  leakKeywords: string[]
-}
-
-const mcqParts = (item: McqFx): ItemParts => {
-  const options = Object.entries(item.options).map(([id, text]) => ({ id, text }))
-  const distractorMeta = Object.fromEntries(
-    Object.entries(item.distractors).map(([id, [misconception, whyWrong]]) => [
-      id,
-      { misconception, whyWrong },
-    ]),
-  )
-  return {
-    publicPayload: { stem: item.stem, options },
-    answerKey: { correctOptionId: item.correct, explanation: item.explanation },
-    solvedAnswer: item.correct,
-    distractorMeta: DistractorMeta.parse(distractorMeta),
-    rubric: null,
-    hints: null,
-    leakKeywords: [],
+/** Re-validates a generated item against the contracts (ADR-009 shapes) before it is stored. */
+const checkItem = (item: ItemFx, where: string): void => {
+  PublicPayloadByKind[item.kind].parse(item.publicPayload)
+  AnswerKeyByKind[item.kind].parse(item.answerKey)
+  if (ItemVerification.parse(item.verification).verdict !== 'pass') {
+    throw new Error(`seed: ${where} is not verified`)
   }
-}
-
-const flawParts = (item: FlawFx): ItemParts => ({
-  publicPayload: { sentences: item.sentences },
-  answerKey: {
-    hasFlaw: item.flaw !== null,
-    flawSentenceIdx: item.flaw?.idx ?? null,
-    flawSummary: item.flaw?.summary ?? null,
-    correction: item.flaw?.correction ?? null,
-    explanation: item.explanation,
-  },
-  solvedAnswer: item.flaw ? `flawed:${item.flaw.idx}` : 'correct',
-  distractorMeta: null,
-  rubric: RubricSecret.parse({
-    criteria: [
-      {
-        id: item.flaw ? 'correction' : 'justification',
-        label: item.rubric[0],
-        description: item.rubric[1],
-        max: 2,
-      },
-    ],
-  }),
-  hints: HintsSecret.parse(item.hints),
-  leakKeywords: [...item.leak],
-})
-
-const transferParts = (item: TransferFx): ItemParts => ({
-  publicPayload: { prompt: item.prompt },
-  answerKey: { modelSolution: item.modelSolution, explanation: item.explanation },
-  solvedAnswer: item.modelSolution,
-  distractorMeta: null,
-  rubric: RubricSecret.parse({
-    criteria: item.rubric.map(([id, label, description]) => ({ id, label, description, max: 2 })),
-  }),
-  hints: HintsSecret.parse(item.hints),
-  leakKeywords: [...item.leak],
-})
-
-const itemParts = (item: ItemFx): ItemParts => {
-  const parts =
-    item.kind === 'diagnostic_mcq'
-      ? mcqParts(item)
-      : item.kind === 'spot_flaw'
-        ? flawParts(item)
-        : transferParts(item)
-  PublicPayloadByKind[item.kind].parse(parts.publicPayload)
-  AnswerKeyByKind[item.kind].parse(parts.answerKey)
-  return parts
+  if (item.kind === 'diagnostic_mcq') DistractorMeta.parse(item.distractorMeta)
+  else RubricSecret.parse(item.rubric)
+  if (item.hints) HintsSecret.parse(item.hints)
 }
 
 const buildItems = (owners: Map<string, LectureFx>): Pick<LibraryRows, 'items' | 'itemSecrets'> => {
   const items: LibraryRows['items'] = []
   const itemSecrets: LibraryRows['itemSecrets'] = []
   for (const item of ITEMS) {
+    const where = `item ${item.concept}/${item.kind}/${item.variant}`
     const lecture = owners.get(item.concept)
-    if (!lecture) throw new Error(`seed: item for unknown concept ${item.concept}`)
+    if (!lecture) throw new Error(`seed: ${where} has an unknown concept`)
+    checkItem(item, where)
     const id = itemId(item.concept, item.kind, item.variant)
-    const parts = itemParts(item)
     items.push({
       id,
       conceptId: conceptId(item.concept),
@@ -226,24 +148,20 @@ const buildItems = (owners: Map<string, LectureFx>): Pick<LibraryRows, 'items' |
       kind: item.kind,
       variant: item.variant,
       status: 'verified',
-      publicPayload: parts.publicPayload,
-      segmentIdxs: assertCites(
-        lecture,
-        item.segs,
-        `item ${item.concept}/${item.kind}/${item.variant}`,
-      ),
-      verification: verification(parts.solvedAnswer),
-      promptVersion: FIXTURE_PROMPT_VERSION,
-      model: FIXTURE_MODEL,
+      publicPayload: item.publicPayload,
+      segmentIdxs: assertCites(lecture, item.segs, where),
+      verification: item.verification,
+      promptVersion: item.promptVersion,
+      model: item.model,
       createdAt: FIXTURE_CREATED_AT,
     })
     itemSecrets.push({
       itemId: id,
-      answerKey: parts.answerKey,
-      distractorMeta: parts.distractorMeta,
-      rubric: parts.rubric,
-      hints: parts.hints,
-      leakKeywords: parts.leakKeywords,
+      answerKey: item.answerKey,
+      distractorMeta: item.distractorMeta,
+      rubric: item.rubric,
+      hints: item.hints,
+      leakKeywords: item.leakKeywords,
     })
   }
   return { items, itemSecrets }
