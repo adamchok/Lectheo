@@ -118,6 +118,8 @@ export interface ActivityTypeHandler<T extends ActivityType = ActivityType> {
   readonly hintsAvailable: number
   /** Submits before the activity closes (default 2: try + Socratic retry). */
   readonly maxTries?: number
+  /** An identical body on a later try replays the previous attempt (default: counts as a try). */
+  readonly retryNeedsNewBody?: boolean
   /** Pick content and freeze the rubric. Throw ApiError (e.g. 409) if nothing can be served. */
   start(ctx: StartContext): Promise<StartResult>
   /** The type-specific 201 body, rebuilt from the stored row (also used for replays). */

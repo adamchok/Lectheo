@@ -94,6 +94,8 @@ export const stumpHandler: ActivityTypeHandler<'stump'> = {
   turnBudget: 0,
   hintsAvailable: 0,
   maxTries: STUMP_MAX_TRIES,
+  // Resubmitting a rejected question unchanged would get the same verdict: replay it instead.
+  retryNeedsNewBody: true,
 
   async start(ctx) {
     return {
@@ -143,6 +145,9 @@ export const stumpHandler: ActivityTypeHandler<'stump'> = {
       ctx.ai,
     )
     const aiAnswer = answer.output.answer
+    // ponytail: if compare fails, nothing is stored and a retry re-runs all three calls (up to 5
+    // llm_tasks for one attempt), like the no-refund rule elsewhere. Cache pass results per
+    // activity if quota complaints show up.
     const compare = await runTask(stumpRefereeTask, { ...base, mode: 'compare', aiAnswer }, ctx.ai)
     const stump: StumpResult = {
       valid: true,

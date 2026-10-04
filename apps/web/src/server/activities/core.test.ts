@@ -9,6 +9,9 @@ import {
 } from '@lectheo/db'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DbLike } from '../db'
+import { FEATURES } from '../features'
+import { ACTIVITY_HANDLERS } from './registry'
+import type { ActivityTypeHandler } from './types'
 import { createActivity, getActivity, postMessage, showExplanation, takeHint } from './service'
 import { submitActivity } from './submit'
 import { ALICE, BOB, IDS, newId, seedFixture } from './test-fixture'
@@ -75,9 +78,15 @@ describe('POST /activities', () => {
   })
 
   it('hides disabled types and unknown concepts behind 404', async () => {
-    await expect(
-      createActivity(ALICE, { id: newId(), conceptId: IDS.concept, type: 'transfer' }, db),
-    ).rejects.toMatchObject({ code: 'not_found' })
+    const was = FEATURES.stump
+    Object.assign(FEATURES, { stump: false })
+    try {
+      await expect(
+        createActivity(ALICE, { id: newId(), conceptId: IDS.concept, type: 'stump' }, db),
+      ).rejects.toMatchObject({ code: 'not_found' })
+    } finally {
+      Object.assign(FEATURES, { stump: was })
+    }
     await expect(
       createActivity(ALICE, { ...spotFlaw(), conceptId: newId() }, db),
     ).rejects.toMatchObject({ code: 'not_found' })
@@ -156,5 +165,54 @@ describe('hints and explanation', () => {
     const byActivity = new Map(rows.map((r) => [r.activityId, r.assisted]))
     expect(byActivity.get(plain.id)).toBe(false)
     expect(byActivity.get(shown.id)).toBe(true)
+  })
+})
+
+describe('submit retry rule for a no-turn handler (default maxTries)', () => {
+  // A stub on the `transfer` slot: no turns, no retryNeedsNewBody, never correct.
+  const stub: ActivityTypeHandler<'transfer'> = {
+    type: 'transfer',
+    turnBudget: 0,
+    hintsAvailable: 0,
+    start: async (ctx) => ({
+      itemId: null,
+      rubricSnapshot: { kind: 'key_points', keyPoints: ctx.concept.keyPoints },
+      persona: null,
+    }),
+    publicStart: async () => ({ prompt: 'Write swap.' }),
+    submit: async () => ({
+      checks: null,
+      criteria: [],
+      score: 1,
+      maxScore: 2,
+      outcome: 'partial',
+      feedback: { guidingQuestion: 'What does C copy?', hint: null },
+      rationale: null,
+      judgeModel: null,
+      sources: [],
+    }),
+    explanation: async () => ({ explanation: 'e', sources: [] }),
+    finalReveal: async () => ({ explanation: 'e', rubric: [] }),
+  }
+
+  it('an identical retry body counts as try 2 (not a replay of try 1)', async () => {
+    const saved = { handler: ACTIVITY_HANDLERS.transfer, flag: FEATURES.transfer }
+    Object.assign(ACTIVITY_HANDLERS, { transfer: stub })
+    Object.assign(FEATURES, { transfer: true })
+    try {
+      const { id } = await createActivity(
+        ALICE,
+        { id: newId(), conceptId: IDS.concept, type: 'transfer' },
+        db,
+      )
+      const body = { answer: 'void swap(int *a, int *b)' }
+      const try1 = await submitActivity(ALICE, id, body, db)
+      const try2 = await submitActivity(ALICE, id, body, db)
+      expect(try1).toMatchObject({ tryNo: 1, final: false })
+      expect(try2).toMatchObject({ tryNo: 2, final: true })
+    } finally {
+      Object.assign(ACTIVITY_HANDLERS, { transfer: saved.handler })
+      Object.assign(FEATURES, { transfer: saved.flag })
+    }
   })
 })

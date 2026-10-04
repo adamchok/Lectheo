@@ -65,20 +65,21 @@ async function lastAttempt(db: DbLike, activityId: string) {
 }
 
 /**
- * A client retry of the previous try (lost response) arrives while the activity is awaiting_retry. Treat it
- * as a duplicate when the body is identical and the student wrote nothing since try 1 (so a
- * teach-back retry, whose body is always {}, needs new explanation first). If no turns are left,
- * nothing new can be written, so the submit counts as the next try. Types without turns (stump)
- * must change the body to get a new try.
+ * A client retry of the previous try (lost response) arrives while the activity is
+ * awaiting_retry. Treat it as a duplicate when the body is identical and the student wrote nothing
+ * since (so a teach-back retry, whose body is always {}, needs new explanation first). If no turns
+ * are left, nothing new can be written, so the submit counts as the next try. Handlers with
+ * `retryNeedsNewBody` (stump) always replay an identical body.
  */
 async function isDuplicateOf(
   ctx: ActivityContext,
+  handler: ActivityTypeHandler,
   prev: AttemptRow,
   body: unknown,
 ): Promise<boolean> {
   if (canonical(prev.response) !== canonical(body)) return false
-  const { turnsUsed, turnBudget } = ctx.activity
-  if (turnBudget > 0 && turnsUsed >= turnBudget) return false
+  if (handler.retryNeedsNewBody) return true
+  if (ctx.activity.turnsUsed >= ctx.activity.turnBudget) return false
   const visible = await ctx.visibleMessages()
   return !visible.some((m) => m.role === 'student' && m.createdAt > prev.createdAt)
 }
@@ -153,7 +154,7 @@ export async function submitActivity(
   const tryNo = prev ? prev.tryNo + 1 : 1
   const existing = await findAttempt(db, id, tryNo)
   if (existing) return replayOrConflict(ctx, handler, existing, body)
-  if (prev && (await isDuplicateOf(ctx, prev, body))) {
+  if (prev && (await isDuplicateOf(ctx, handler, prev, body))) {
     return replayOrConflict(ctx, handler, prev, body)
   }
 

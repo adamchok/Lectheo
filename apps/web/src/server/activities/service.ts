@@ -1,9 +1,11 @@
 import {
   SpotFlawPublicPayload,
+  SubmitStump,
   type ActivityResponse,
   type ActivityType,
   type CreateActivityResponse,
   type MasterySummary,
+  type StumpResult,
 } from '@lectheo/contracts'
 import { activities, and, asc, attempts, eq, lt, messages, ne, sql } from '@lectheo/db'
 import { aiContext, toApiError } from '../ai-hooks'
@@ -101,6 +103,13 @@ function scenarioOf(ctx: ActivityContext): ActivityResponse['scenario'] {
   return { sentences: SpotFlawPublicPayload.parse(ctx.item.publicPayload).sentences }
 }
 
+/** Stump tries carry the student's own question + key and the referee result (reloads). */
+function stumpTry(stump: StumpResult | undefined, response: unknown) {
+  const body = SubmitStump.safeParse(response)
+  if (!stump || !body.success) return {}
+  return { stump: { ...stump, question: body.data.question, studentKey: body.data.answerKey } }
+}
+
 /** GET /activities/{id}: visible messages only; tries from attempts. */
 export async function getActivity(
   actor: Actor,
@@ -129,6 +138,7 @@ export async function getActivity(
         guidingQuestion: t.final ? null : (t.grading.guidingQuestion ?? null),
         hint: null,
       },
+      ...stumpTry(t.grading.stump, t.response),
     })),
     messages: visible.map((m) => ({
       role: m.role,

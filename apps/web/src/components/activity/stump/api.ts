@@ -20,7 +20,12 @@ export function useSubmitStump(activityId: string) {
         body: { question: draft.question.trim(), answerKey: draft.answerKey.trim() },
         schema: SubmitResponse,
       }),
-    onSuccess: (res) =>
+    onSuccess: (res, draft) => {
+      const stump = res.stump && {
+        ...res.stump,
+        question: draft.question.trim(),
+        studentKey: draft.answerKey.trim(),
+      }
       queryClient.setQueryData<ActivityResponse>(queryKeys.activity(activityId), (old) =>
         old
           ? {
@@ -28,11 +33,17 @@ export function useSubmitStump(activityId: string) {
               status: res.final ? 'closed' : 'awaiting_retry',
               tries: [
                 ...old.tries.filter((t) => t.tryNo !== res.tryNo),
-                { tryNo: res.tryNo, outcome: res.outcome, feedback: res.feedback },
+                {
+                  tryNo: res.tryNo,
+                  outcome: res.outcome,
+                  feedback: res.feedback,
+                  ...(stump ? { stump } : {}),
+                },
               ],
             }
           : old,
-      ),
+      )
+    },
     // An accepted question changes mastery: refresh the activity and every course view.
     onSettled: () =>
       Promise.all([

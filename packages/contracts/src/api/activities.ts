@@ -38,6 +38,13 @@ export const Feedback = z.object({
   hint: z.string().nullable(),
 })
 
+/**
+ * Stump try as GET returns it: the student's own question + key with the referee result.
+ * `studentKey`, not `answerKey`: responses never carry a field named like the 🔒 item key.
+ */
+export const StumpTry = StumpResult.extend({ question: z.string(), studentKey: z.string() })
+export type StumpTry = z.infer<typeof StumpTry>
+
 export const ActivityResponse = z.object({
   id: Id,
   type: ActivityType,
@@ -48,7 +55,15 @@ export const ActivityResponse = z.object({
   hintsUsed: z.number().int(),
   /** spot_flaw only: scenario sentences (public payload). */
   scenario: z.object({ sentences: z.array(z.string()) }).nullable(),
-  tries: z.array(z.object({ tryNo: z.number().int(), outcome: Outcome, feedback: Feedback })),
+  tries: z.array(
+    z.object({
+      tryNo: z.number().int(),
+      outcome: Outcome,
+      feedback: Feedback,
+      /** Stump only, so a reload can show the last verdict. */
+      stump: StumpTry.optional(),
+    }),
+  ),
   messages: z.array(
     z.object({
       role: z.enum(['student', 'persona']),

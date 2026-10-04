@@ -27,6 +27,12 @@ test('stump the AI: rejected, revised, accepted', async ({ page }) => {
   const result = page.getByRole('region', { name: 'Result' })
   await expect(result.getByText('Not accepted')).toBeVisible()
   await expect(result.getByText(/2 tries left/)).toBeVisible()
+  await expect(page.getByRole('heading', { name: "Referee's verdict" })).toBeFocused()
+
+  // A reload keeps the verdict and the rejected text to edit.
+  await page.reload()
+  await expect(result.getByText('Not accepted')).toBeVisible()
+  await expect(question).toHaveValue('Dereferencing a NULL pointer in C')
 
   await question.fill('What happens when you dereference a NULL pointer in C?')
   await page.getByRole('button', { name: 'Resubmit' }).click()

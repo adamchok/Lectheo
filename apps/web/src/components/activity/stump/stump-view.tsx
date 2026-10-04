@@ -1,17 +1,16 @@
 'use client'
 
-import type { ActivityResponse, SubmitResponse } from '@lectheo/contracts'
+import type { ActivityResponse, StumpTry, SubmitResponse } from '@lectheo/contracts'
 import { STUMP_LABELS, STUMP_MAX_TRIES } from '@lectheo/domain'
 import { BookOpen, CircleCheck, CircleX, GraduationCap, LoaderCircle, Trophy } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
-import { type FormEvent, useState } from 'react'
+import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { errorMessage } from '@/components/error-state'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
-import { cn } from '@/lib/utils'
 import { parseMasteryState } from '../spot-flaw/logic'
 import { MasteryChange, Sources } from '../spot-flaw/result-panel'
 import { type StumpDraft, useSubmitStump } from './api'
@@ -19,8 +18,6 @@ import { type StumpDraft, useSubmitStump } from './api'
 /* Limits mirror SubmitStump in @lectheo/contracts (API Spec §7). */
 const QUESTION = { min: 10, max: 1000 }
 const KEY = { min: 1, max: 2000 }
-
-type StumpData = NonNullable<SubmitResponse['stump']>
 
 function submitBlocker(draft: StumpDraft): string | null {
   if (draft.question.trim().length < QUESTION.min) return 'Write a question (10+ characters).'
@@ -76,7 +73,7 @@ function StumpForm({ draft, onChange, onSubmit, pending, revising }: StumpFormPr
     if (!blocker && !pending) onSubmit()
   }
   return (
-    <form onSubmit={submit} className="space-y-4" aria-label="Your question">
+    <form onSubmit={submit} className="space-y-4" aria-label="Your question" aria-busy={pending}>
       <Field
         id="stump-question"
         label="Your question"
@@ -102,6 +99,11 @@ function StumpForm({ draft, onChange, onSubmit, pending, revising }: StumpFormPr
         </Button>
         {blocker && <p className="text-muted-foreground text-sm">{blocker}</p>}
       </div>
+      {pending && (
+        <p role="status" className="text-muted-foreground text-sm">
+          The referee and the AI are both thinking. This takes about 15 seconds.
+        </p>
+      )}
     </form>
   )
 }
@@ -133,7 +135,7 @@ function Detail({ label, children }: { label: string; children: string | null })
   )
 }
 
-function Accepted({ stump, draft }: { stump: StumpData; draft: StumpDraft }) {
+function Accepted({ stump }: { stump: StumpTry }) {
   const lecture = stump.groundedIn === 'lecture'
   const GroundIcon = lecture ? BookOpen : GraduationCap
   const Icon = stump.aiStumped ? Trophy : CircleCheck
@@ -144,8 +146,8 @@ function Accepted({ stump, draft }: { stump: StumpData; draft: StumpDraft }) {
         {stump.aiStumped ? STUMP_LABELS.stumped : STUMP_LABELS.accepted}
       </p>
       <dl className="space-y-4">
-        <Detail label="Your question">{draft.question}</Detail>
-        <Detail label="Your answer key">{draft.answerKey}</Detail>
+        <Detail label="Your question">{stump.question}</Detail>
+        <Detail label="Your answer key">{stump.studentKey}</Detail>
         <Detail label="The AI's answer">{stump.aiAnswer}</Detail>
         <Detail label="Referee">{stump.refereeNotes}</Detail>
       </dl>
@@ -157,40 +159,36 @@ function Accepted({ stump, draft }: { stump: StumpData; draft: StumpDraft }) {
   )
 }
 
-/** Reopened page: the GET has try outcomes but not the referee's details. */
-function PastOutcome({ activity }: { activity: ActivityResponse }) {
-  const accepted = activity.tries.some((t) => t.outcome === 'correct')
-  return (
-    <p className={cn('font-medium', accepted ? 'text-mastery-green' : 'text-mastery-gray')}>
-      {accepted ? STUMP_LABELS.accepted : `${STUMP_LABELS.rejected}: no tries left.`}
-    </p>
-  )
-}
-
 const EMPTY: StumpDraft = { question: '', answerKey: '' }
+
+/** Edit & resubmit starts from the rejected question, also after a reload. */
+const draftFrom = (stump: StumpTry | undefined): StumpDraft =>
+  stump && !stump.valid ? { question: stump.question, answerKey: stump.studentKey } : EMPTY
 
 /**
  * Stump the AI (F4d, beta): question + key → referee → the AI answers without the key →
- * "Accepted" / "Accepted · you stumped the AI". No points (F6.3). Submit responses live in
- * component state; the GET only has try outcomes and the guidance (first message).
+ * "Accepted" / "Accepted · you stumped the AI". No points (F6.3). The verdict comes from the
+ * last try in GET /activities/{id}, so a reload shows it too; sources and mastery are per session.
  */
 export function StumpView({ activity }: { activity: ActivityResponse }) {
   const startState = parseMasteryState(useSearchParams().get('from'))
-  const [draft, setDraft] = useState<StumpDraft>(EMPTY)
-  const [submitted, setSubmitted] = useState<StumpDraft>(EMPTY)
+  const stump = activity.tries.at(-1)?.stump
+  const [draft, setDraft] = useState<StumpDraft>(() => draftFrom(stump))
   const [results, setResults] = useState<SubmitResponse[]>([])
+  const resultHeading = useRef<HTMLHeadingElement>(null)
   const submit = useSubmitStump(activity.id)
 
   const guidance = activity.messages[0]?.content
-  const stump = results.at(-1)?.stump
   const closed = activity.status === 'closed'
+
+  // After each submit, move focus to the verdict (the form may have unmounted).
+  useEffect(() => {
+    if (results.length > 0) resultHeading.current?.focus()
+  }, [results.length])
 
   const onSubmit = () =>
     submit.mutate(draft, {
-      onSuccess: (res) => {
-        setResults((prev) => [...prev, res])
-        setSubmitted(draft)
-      },
+      onSuccess: (res) => setResults((prev) => [...prev, res]),
       onError: (error) =>
         toast.error("The referee couldn't check your question", {
           description: errorMessage(error),
@@ -214,14 +212,18 @@ export function StumpView({ activity }: { activity: ActivityResponse }) {
       <Separator />
 
       <section aria-label="Result" aria-live="polite" className="space-y-5">
-        {stump?.valid && <Accepted stump={stump} draft={submitted} />}
+        {stump && (
+          <h3 ref={resultHeading} tabIndex={-1} className="font-medium outline-none">
+            Referee&apos;s verdict
+          </h3>
+        )}
+        {stump?.valid && <Accepted stump={stump} />}
         {stump && !stump.valid && (
           <Rejected
             reason={stump.rejectionReason ?? stump.refereeNotes}
             triesLeft={STUMP_MAX_TRIES - activity.tries.length}
           />
         )}
-        {!stump && closed && <PastOutcome activity={activity} />}
       </section>
 
       {!closed && (

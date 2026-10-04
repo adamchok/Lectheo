@@ -1,5 +1,5 @@
 import { stumpAnswerTask, stumpRefereeTask, type StumpRefereeOutput } from '@lectheo/ai'
-import { CreateActivityResponse, SubmitResponse } from '@lectheo/contracts'
+import { ActivityResponse, CreateActivityResponse, SubmitResponse } from '@lectheo/contracts'
 import { STUMP_MAX_TRIES } from '@lectheo/domain'
 import { activities, attempts, eq, llmCalls, usageCounters } from '@lectheo/db'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -97,6 +97,23 @@ describe('stump: submit', () => {
     expect(res.mastery.state).toBe('gray')
     expect([res.score, res.maxScore]).toEqual([0, 0])
     expect(SubmitResponse.parse(res)).toEqual(res)
+  })
+
+  it('GET returns each try with its verdict and the student text (reloads)', async () => {
+    const { id } = await start()
+    await submitActivity(ALICE, id, NOT_A_QUESTION, db)
+    await submitActivity(ALICE, id, GOOD, db)
+    const { tries } = ActivityResponse.parse(await getActivity(ALICE, id, db))
+
+    expect(tries[0]?.stump).toMatchObject({ valid: false, question: NOT_A_QUESTION.question })
+    expect(tries[0]?.stump?.studentKey).toBe(NOT_A_QUESTION.answerKey)
+    expect(tries[0]?.stump?.rejectionReason).toBeTruthy()
+    expect(tries[1]?.stump).toMatchObject({
+      valid: true,
+      aiStumped: false,
+      question: GOOD.question,
+    })
+    expect(tries[1]?.stump?.aiAnswer).toBeTruthy()
   })
 
   it('revise after a rejection → accepted counts once (not green alone, F6.2)', async () => {
