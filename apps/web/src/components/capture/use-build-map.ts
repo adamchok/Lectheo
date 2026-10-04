@@ -1,9 +1,11 @@
 'use client'
 
+import { LectureResponse } from '@lectheo/contracts'
 import type { Route } from 'next'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { useStartProcessing } from '@/client/queries'
+import { apiFetch, isApiClientError } from '@/client/api'
+import { POLLING_LECTURE_STATUSES, useProcessLecture } from '@/client/queries'
 import { limitMessage } from './upload'
 
 export interface BuildMap {
@@ -11,17 +13,26 @@ export interface BuildMap {
   pending: boolean
 }
 
-/** Last capture step: POST /process, then the lecture page (the pipeline owns both). */
+/** True when a 409 `already_processing` is about this lecture (not another in the course). */
+async function isProcessing(lectureId: string): Promise<boolean> {
+  const lecture = await apiFetch(`/lectures/${lectureId}`, { schema: LectureResponse })
+  return POLLING_LECTURE_STATUSES.includes(lecture.status)
+}
+
+/** Last capture step: POST /process, then the lecture page (it polls the progress). */
 export function useBuildMap(): BuildMap {
   const router = useRouter()
-  const processing = useStartProcessing()
+  const processing = useProcessLecture()
   const start = async (lectureId: string) => {
     try {
-      const result = await processing.mutateAsync(lectureId)
-      if (result === 'pending') {
-        toast.info('Processing will start shortly', {
-          description: 'Your lecture is saved. Its concept map will appear on the lecture page.',
-        })
+      try {
+        await processing.mutateAsync({ lectureId })
+      } catch (error) {
+        const thisLecture =
+          isApiClientError(error) &&
+          error.code === 'already_processing' &&
+          (await isProcessing(lectureId))
+        if (!thisLecture) throw error
       }
       router.push(`/lectures/${lectureId}` as Route)
     } catch (error) {

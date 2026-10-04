@@ -2,7 +2,7 @@ import { lectureContext, UNTRUSTED_RULE } from '../../prompt'
 import type { PromptSpec } from '../../run-task'
 import type { ExtractConceptsInput } from './schema'
 
-export const PROMPT_VERSION = 'extract-concepts@0.1'
+export const PROMPT_VERSION = 'extract-concepts@0.2'
 
 // TODO(feature-pipeline): first draft. Add CS50 few-shot examples and tune on Lectures 3–5.
 export const SYSTEM = [
@@ -19,6 +19,8 @@ export const SYSTEM = [
   '- edges: relations between concepts by canonicalKey; depends_on means "must understand',
   '  first"; no self-edges; depends_on must not form a cycle.',
   '- Cite only segment indexes that appear in the transcript.',
+  '- If the lecture teaches no real concepts (e.g. an admin or logistics session), return empty',
+  '  concepts and edges instead of inventing any.',
   UNTRUSTED_RULE,
 ].join('\n')
 

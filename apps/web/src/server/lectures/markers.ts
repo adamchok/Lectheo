@@ -67,7 +67,8 @@ export async function postMarkers(
   })
 }
 
-async function alignOnWrite(
+/** Links newly written markers to this lecture's concepts (also the pipeline's alignMarkers). */
+export async function alignOnWrite(
   db: DbLike,
   lectureId: string,
   inserted: readonly InsertedMarker[],
