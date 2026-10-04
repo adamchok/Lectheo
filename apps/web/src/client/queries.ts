@@ -2,6 +2,12 @@
 
 import {
   ActivityResponse,
+  AnswerResponse,
+  ConfidenceResponse,
+  DiagnosticResultsResponse,
+  DiagnosticSessionResponse,
+  StartDiagnosticResponse,
+  type ConfidenceLevel,
   CourseMapResponse,
   CreateActivityResponse,
   LectureResponse,
@@ -24,6 +30,9 @@ export const queryKeys = {
   nextStep: (courseId: string) => ['courses', courseId, 'next'] as const,
   lecture: (lectureId: string) => ['lectures', lectureId] as const,
   activity: (activityId: string) => ['activities', activityId] as const,
+  diagnosticStart: (lectureId: string) => ['lectures', lectureId, 'diagnostic'] as const,
+  diagnostic: (sessionId: string) => ['diagnostic', sessionId] as const,
+  diagnosticResults: (sessionId: string) => ['diagnostic', sessionId, 'results'] as const,
 }
 
 /** Lecture statuses that change on their own; polled every 2 s (API Spec §5). */
@@ -112,5 +121,66 @@ export function useStartActivity() {
         body: { id: newId(), conceptId: input.conceptId, type: input.type },
         schema: CreateActivityResponse,
       }),
+  })
+}
+
+/** POST /lectures/{id}/diagnostic: the active session or a new plan (idempotent per lecture). */
+export function useStartDiagnostic(lectureId: string) {
+  return useQuery({
+    queryKey: queryKeys.diagnosticStart(lectureId),
+    queryFn: ({ signal }) =>
+      apiFetch(`/lectures/${lectureId}/diagnostic`, {
+        method: 'POST',
+        body: {},
+        schema: StartDiagnosticResponse,
+        signal,
+      }),
+    staleTime: Infinity,
+    retry: false,
+  })
+}
+
+export function useDiagnosticSession(sessionId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.diagnostic(sessionId ?? ''),
+    queryFn: ({ signal }) =>
+      apiFetch(`/diagnostic/${sessionId}`, { schema: DiagnosticSessionResponse, signal }),
+    enabled: Boolean(sessionId),
+    staleTime: Infinity,
+  })
+}
+
+/** Records confidence; the only call that returns answer options (F3.3). */
+export function useDiagnosticConfidence(sessionId: string) {
+  return useMutation({
+    mutationFn: (input: { itemId: string; level: ConfidenceLevel }) =>
+      apiFetch(`/diagnostic/${sessionId}/items/${input.itemId}/confidence`, {
+        method: 'POST',
+        body: { level: input.level },
+        schema: ConfidenceResponse,
+      }),
+  })
+}
+
+export function useDiagnosticAnswer(sessionId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { itemId: string; optionId: string }) =>
+      apiFetch(`/diagnostic/${sessionId}/items/${input.itemId}/answer`, {
+        method: 'POST',
+        body: { optionId: input.optionId },
+        schema: AnswerResponse,
+      }),
+    // Mastery changed: maps and next-step cards recompute on read.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.courses }),
+  })
+}
+
+export function useDiagnosticResults(sessionId: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.diagnosticResults(sessionId),
+    queryFn: ({ signal }) =>
+      apiFetch(`/diagnostic/${sessionId}/results`, { schema: DiagnosticResultsResponse, signal }),
+    enabled,
   })
 }
