@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test'
 import { E2E_BASE_URL, E2E_PORT, e2eEnv } from './e2e/env'
 
 const CI = Boolean(process.env.CI)
+const NEXT_CLI = 'node_modules/next/dist/bin/next'
 
 /*
  * Judge path e2e (Architecture §1 goal 1, §10): a production build with AI_FAKE=1 against the
@@ -27,7 +28,10 @@ export default defineConfig({
   },
   projects: [{ name: 'chrome', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: `pnpm exec next build && pnpm exec next start -p ${E2E_PORT}`,
+    // `node` straight on Next's CLI, not `pnpm exec`: through pnpm, next-server outlived
+    // Playwright's kill on Linux and teardown waited out its 10 min limit.
+    command: `node ${NEXT_CLI} build && node ${NEXT_CLI} start -p ${E2E_PORT}`,
+    gracefulShutdown: { signal: 'SIGTERM', timeout: 5_000 },
     url: `${E2E_BASE_URL}/api/v1/health`,
     // Never reuse a stale server: it would run an old build with whatever env it started with.
     reuseExistingServer: false,
