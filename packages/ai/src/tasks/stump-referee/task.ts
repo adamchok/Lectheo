@@ -31,15 +31,21 @@ export const stumpRefereeTask = defineTask<StumpRefereeInput, StumpRefereeOutput
   buildPrompt,
   validate: validateReferee,
   maxOutputTokens: MAX_OUTPUT_TOKENS.judge,
-  fake: (input) => ({
-    valid: true,
-    onConcept: true,
-    unambiguous: true,
-    answerable: true,
-    keyCorrect: true,
-    aiCorrect: input.mode === 'compare' ? true : null,
-    reason: 'A fair question about the lecture with a correct key.',
-    segmentIdxs: firstIdxs(input.segments, 1),
-    usesCourseKnowledge: input.segments.length === 0,
-  }),
+  // A question needs a "?" in fake mode, so tests and e2e can drive the reject → revise path.
+  fake: (input) => {
+    const valid = input.question.includes('?')
+    return {
+      valid,
+      onConcept: true,
+      unambiguous: valid,
+      answerable: true,
+      keyCorrect: true,
+      aiCorrect: input.mode === 'compare' ? true : null,
+      reason: valid
+        ? 'A fair question about the lecture with a correct key.'
+        : 'This is not phrased as a question. Ask one specific thing, ending with "?".',
+      segmentIdxs: firstIdxs(input.segments, 1),
+      usesCourseKnowledge: input.segments.length === 0,
+    }
+  },
 })

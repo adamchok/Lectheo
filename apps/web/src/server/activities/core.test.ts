@@ -76,7 +76,7 @@ describe('POST /activities', () => {
 
   it('hides disabled types and unknown concepts behind 404', async () => {
     await expect(
-      createActivity(ALICE, { id: newId(), conceptId: IDS.concept, type: 'stump' }, db),
+      createActivity(ALICE, { id: newId(), conceptId: IDS.concept, type: 'transfer' }, db),
     ).rejects.toMatchObject({ code: 'not_found' })
     await expect(
       createActivity(ALICE, { ...spotFlaw(), conceptId: newId() }, db),

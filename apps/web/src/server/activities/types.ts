@@ -4,6 +4,7 @@ import type {
   Outcome,
   RubricSnapshot,
   SourceRef,
+  StumpResult,
   SubmitBodyByType,
 } from '@lectheo/contracts'
 import type { activities, concepts, items, itemSecrets, messages } from '@lectheo/db'
@@ -96,6 +97,8 @@ export interface GradingResult {
   /** TaskResult.model of the judge call, or null when no judge ran. */
   readonly judgeModel: string | null
   readonly sources: readonly SourceRef[]
+  /** Stump only: referee + answerer result, stored in attempts.grading.stump. */
+  readonly stump?: StumpResult
 }
 
 export interface Explanation {
@@ -113,6 +116,8 @@ export interface ActivityTypeHandler<T extends ActivityType = ActivityType> {
   readonly turnBudget: number
   /** 0 = no hint ladder (POST /hints → 404). */
   readonly hintsAvailable: number
+  /** Submits before the activity closes (default 2: try + Socratic retry). */
+  readonly maxTries?: number
   /** Pick content and freeze the rubric. Throw ApiError (e.g. 409) if nothing can be served. */
   start(ctx: StartContext): Promise<StartResult>
   /** The type-specific 201 body, rebuilt from the stored row (also used for replays). */
@@ -121,7 +126,7 @@ export interface ActivityTypeHandler<T extends ActivityType = ActivityType> {
   reply?(ctx: ActivityContext, input: ReplyInput): Promise<ReplyResult>
   /** `n` is 1-based and already counted in hints_used. */
   hint?(ctx: ActivityContext, n: number): Promise<string>
-  submit(ctx: ActivityContext, body: SubmitBody<T>, tryNo: 1 | 2): Promise<GradingResult>
+  submit(ctx: ActivityContext, body: SubmitBody<T>, tryNo: number): Promise<GradingResult>
   explanation(ctx: ActivityContext): Promise<Explanation>
   /** Revealed once the activity is closed (F4c.8, API Spec §7). */
   finalReveal(ctx: ActivityContext): Promise<FinalReveal>

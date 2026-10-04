@@ -134,6 +134,17 @@ export const MessageGuard = z.object({
 })
 export type MessageGuard = z.infer<typeof MessageGuard>
 
+/** Stump the AI referee result (F4d, API Spec §7), stored in attempts.grading.stump. */
+export const StumpResult = z.object({
+  valid: z.boolean(),
+  rejectionReason: z.string().nullable(),
+  aiAnswer: z.string().nullable(),
+  aiStumped: z.boolean(),
+  refereeNotes: z.string(),
+  groundedIn: z.enum(['lecture', 'course_knowledge']),
+})
+export type StumpResult = z.infer<typeof StumpResult>
+
 export const AttemptGrading = z.object({
   checks: z.object({ verdict: z.boolean(), location: z.boolean().nullable() }).nullable(),
   criteria: z.array(
@@ -143,6 +154,8 @@ export const AttemptGrading = z.object({
   misconceptions: z.array(z.string()).optional(),
   /** Socratic guiding question returned with this try. */
   guidingQuestion: z.string().nullable().optional(),
+  /** Stump only. */
+  stump: StumpResult.optional(),
 })
 export type AttemptGrading = z.infer<typeof AttemptGrading>
 

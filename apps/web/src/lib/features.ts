@@ -10,6 +10,8 @@ export const FEATURES = {
   practiceSpotFlaw: true,
   /** "Teach-back" practice button in the map's node panel. */
   practiceTeachBack: true,
+  /** "Stump the AI" (beta) practice button in the map's node panel. */
+  stump: true,
   /** "Add lecture" entry points → /lectures/new (TODO(feature-capture-import)). */
   addLecture: true,
   /** Creating personal courses from the dashboard. */

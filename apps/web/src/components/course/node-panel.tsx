@@ -16,6 +16,7 @@ import { ACTIVITY_LABELS, RELATION_LABELS } from '@/lib/labels'
 const PRACTICE: readonly { type: ActivityType; label: string; enabled: boolean }[] = [
   { type: 'spot_flaw', label: ACTIVITY_LABELS.spot_flaw, enabled: FEATURES.practiceSpotFlaw },
   { type: 'teach_back', label: ACTIVITY_LABELS.teach_back, enabled: FEATURES.practiceTeachBack },
+  { type: 'stump', label: ACTIVITY_LABELS.stump, enabled: FEATURES.stump },
 ]
 
 function Section({ title, children }: { title: string; children: ReactNode }) {

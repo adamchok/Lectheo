@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { ClientId, Id, MasterySummary, SourceRef } from '../common'
 import { ActivityStatus, ActivityType, Outcome } from '../enums'
+import { StumpResult } from '../payloads'
 
 export const CreateActivityRequest = z.object({
   id: ClientId,
@@ -116,16 +117,7 @@ export const SubmitResponse = z.object({
   explanation: z.string().optional(),
   rubric: z.array(RubricCriterion).optional(),
   /** Stump only. */
-  stump: z
-    .object({
-      valid: z.boolean(),
-      rejectionReason: z.string().nullable(),
-      aiAnswer: z.string().nullable(),
-      aiStumped: z.boolean(),
-      refereeNotes: z.string(),
-      groundedIn: z.enum(['lecture', 'course_knowledge']),
-    })
-    .optional(),
+  stump: StumpResult.optional(),
 })
 export type SubmitResponse = z.infer<typeof SubmitResponse>
 
