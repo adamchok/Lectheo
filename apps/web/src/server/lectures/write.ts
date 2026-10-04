@@ -1,7 +1,9 @@
-import { and, concepts, eq, isNotNull, lectureAssets, lectures, sql } from '@lectheo/db'
+import { LECTURE_STATUSES } from '@lectheo/contracts'
+import { and, concepts, eq, inArray, isNotNull, lectureAssets, lectures, sql } from '@lectheo/db'
 import type { Actor } from '../auth'
 import { appDb, type DbLike } from '../db'
-import { loadLectureForWrite } from '../ownership'
+import { invalidState } from '../errors'
+import { type Lecture, loadLectureForWrite } from '../ownership'
 import { getLecture } from './read'
 
 /* PATCH / DELETE /lectures/{id}. Write ownership: library and other users' lectures → 404. */
@@ -11,6 +13,9 @@ type StorageBucket = 'audio' | 'transcripts' | 'assets'
 export type RemoveObjects = (bucket: StorageBucket, paths: string[]) => Promise<void>
 
 const TRANSCRIPT_EXTS = ['vtt', 'srt', 'txt', 'docx'] as const
+/** Statuses where the pipeline is still running: delete → 409. */
+const MID_RUN_STATUSES: readonly Lecture['status'][] = ['processing', 'map_ready']
+const DELETABLE_STATUSES = LECTURE_STATUSES.filter((s) => !MID_RUN_STATUSES.includes(s))
 
 const defaultRemoveObjects: RemoveObjects = async (bucket, paths) => {
   const { deleteObjects } = await import('../storage')
@@ -47,7 +52,14 @@ export async function deleteLecture(
       .select({ path: lectureAssets.storagePath })
       .from(lectureAssets)
       .where(and(eq(lectureAssets.lectureId, lecture.id), isNotNull(lectureAssets.storagePath)))
-    await tx.delete(lectures).where(eq(lectures.id, lecture.id))
+    // Guarded: a mid-run lecture would orphan its STT job and fail the workflow on FKs.
+    const deleted = await tx
+      .delete(lectures)
+      .where(and(eq(lectures.id, lecture.id), inArray(lectures.status, DELETABLE_STATUSES)))
+      .returning({ id: lectures.id })
+    if (deleted.length === 0) {
+      throw invalidState('Wait until processing finishes, then delete the lecture.')
+    }
     await tx
       .delete(concepts)
       .where(

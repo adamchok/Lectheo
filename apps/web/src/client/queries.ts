@@ -18,6 +18,7 @@ import {
   type ReprocessFromStep,
   RedirectResponse,
   TranscriptResponse,
+  CourseSummary,
   type ActivityType,
   type LectureStatus,
 } from '@lectheo/contracts'
@@ -215,6 +216,50 @@ export function useDiagnosticResults(sessionId: string, enabled = true) {
     queryFn: ({ signal }) =>
       apiFetch(`/diagnostic/${sessionId}/results`, { schema: DiagnosticResultsResponse, signal }),
     enabled,
+  })
+}
+
+/** POST /courses with a caller-held UUIDv7, so a retry replays instead of creating twice. */
+export function useCreateCourse() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { id: string; title: string }) =>
+      apiFetch('/courses', { method: 'POST', body: input, schema: CourseSummary }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.courses }),
+  })
+}
+
+export interface CreateLectureInput {
+  id: string
+  courseId: string
+  title: string
+  source: 'import' | 'audio' | 'transcript'
+  media?: { localFileName: string; durationMs: number | null }
+}
+
+/** POST /lectures (replay-safe on the caller-held id). */
+export function useCreateLecture() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: CreateLectureInput) =>
+      apiFetch('/lectures', { method: 'POST', body: input, schema: LectureResponse }),
+    onSuccess: (lecture) => {
+      queryClient.setQueryData(queryKeys.lecture(lecture.id), lecture)
+      // Not awaited: the upload shouldn't wait for the course list to refetch.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.courses })
+    },
+  })
+}
+
+/** DELETE /lectures/{id} (F8.2). */
+export function useDeleteLecture() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (lectureId: string) => apiFetch(`/lectures/${lectureId}`, { method: 'DELETE' }),
+    onSuccess: (_result, lectureId) => {
+      queryClient.removeQueries({ queryKey: queryKeys.lecture(lectureId) })
+      return queryClient.invalidateQueries({ queryKey: queryKeys.courses })
+    },
   })
 }
 

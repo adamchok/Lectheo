@@ -1,7 +1,8 @@
-import { TranscriptQuery, TranscriptResponse } from '@lectheo/contracts'
+import { TranscriptQuery, TranscriptResponse, TranscriptUploadResponse } from '@lectheo/contracts'
 import { z } from 'zod'
 import { route } from '@/server/http'
 import { getTranscript } from '@/server/lectures/read'
+import { readTranscriptRequest, uploadTranscript } from '@/server/lectures/transcript-upload'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,6 +14,13 @@ export const GET = route(
   async ({ actor, params, query }) => getTranscript(actor, params.id, query),
 )
 
-// TODO(F1 import): POST /lectures/{id}/transcript (multipart .vtt/.srt/.txt/.docx or JSON
-// `{ text }`, API Spec §5) is a later feature: parse, strip speakers, store segments, set
-// hasTimestamps → 201 TranscriptUploadResponse.
+/**
+ * POST /api/v1/lectures/{id}/transcript: multipart `file` (.vtt/.srt/.txt ≤ 2 MB) or JSON
+ * `{ text }` → 201 { segments, hasTimestamps, durationMs, truncated } · 422 unreadable.
+ * The body is read by the handler (multipart), so the route declares no body schema.
+ */
+export const POST = route(
+  { auth: 'required', params: Params, response: TranscriptUploadResponse, status: 201 },
+  async ({ actor, params, req }) =>
+    uploadTranscript(actor, params.id, await readTranscriptRequest(req)),
+)

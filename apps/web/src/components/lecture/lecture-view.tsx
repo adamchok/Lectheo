@@ -16,6 +16,7 @@ import Link from 'next/link'
 import { useEffect } from 'react'
 import { formatTimestamp, formatTimestampLong } from '@/client/format'
 import { useCourseMap, useLecture, useProcessLecture, useTranscript } from '@/client/queries'
+import { DeleteLectureButton } from '@/components/capture/delete-lecture-button'
 import { ErrorState, errorMessage } from '@/components/error-state'
 import { LectureStatusChip } from '@/components/lecture-status-chip'
 import { LicenseNotice } from '@/components/license-notice'
@@ -319,7 +320,7 @@ function LectureActions({
   const mapReady = (lecture.status === 'map_ready' || lecture.status === 'ready') && !empty
   return (
     <>
-      {lecture.source === 'library' && lecture.status === 'ready' && (
+      {(lecture.source === 'import' || (lecture.source === 'library' && lecture.status === 'ready')) && (
         <Button asChild>
           <Link href={`/lectures/${lecture.id}/watch` as Route}>
             <PlayCircle aria-hidden />
@@ -343,6 +344,7 @@ function LectureActions({
           </Link>
         </Button>
       )}
+      {lecture.source !== 'library' && <DeleteLectureButton lecture={lecture} />}
     </>
   )
 }
