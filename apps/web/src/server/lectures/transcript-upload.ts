@@ -24,6 +24,9 @@ export interface TranscriptInput {
 export type StoreTranscript = (path: string, raw: string, contentType: string) => Promise<void>
 
 export const MAX_TRANSCRIPT_BYTES = 2 * 1024 * 1024
+/** Multipart framing / JSON escaping on top of the 2 MB of transcript text. */
+const MULTIPART_OVERHEAD_BYTES = 64 * 1024
+const TRANSCRIPT_EXTS: readonly TranscriptExt[] = ['vtt', 'srt', 'txt']
 const MINUTE_MS = 60_000
 /** ≈150 spoken words/min × 1.33 tokens/word; tokens estimated as chars / 4. */
 const TOKENS_PER_MINUTE = 200
@@ -67,7 +70,10 @@ export async function uploadTranscript(
   if (sizeBytes > MAX_TRANSCRIPT_BYTES) throw tooLarge({ sizeBytes })
 
   const { segments, hasTimestamps, truncated } = toSegments(actor, input)
-  const durationMs = hasTimestamps ? Math.max(...segments.map((s) => s.endMs)) : null
+  // Untimed text keeps a known length (an import's media duration).
+  const durationMs = hasTimestamps
+    ? Math.max(...segments.map((s) => s.endMs))
+    : lecture.durationMs
 
   await store(`${actor.userId}/${lecture.id}.${input.ext}`, input.raw, CONTENT_TYPES[input.ext])
   await db.transaction(async (tx) => {
@@ -126,6 +132,11 @@ function looksBinary(raw: string): boolean {
 
 /** Multipart `file` (.vtt / .srt / .txt ≤ 2 MB) or JSON `{ text }`. */
 export async function readTranscriptRequest(req: Request): Promise<TranscriptInput> {
+  // Reject before buffering the body; the per-file check below is exact.
+  const declared = Number(req.headers.get('content-length') ?? 0)
+  if (declared > MAX_TRANSCRIPT_BYTES + MULTIPART_OVERHEAD_BYTES) {
+    throw tooLarge({ sizeBytes: declared })
+  }
   const type = req.headers.get('content-type') ?? ''
   if (type.startsWith('multipart/form-data')) {
     const form = await req.formData().catch(() => null)
@@ -159,5 +170,12 @@ const defaultStore: StoreTranscript = async (path, raw, contentType) => {
       service: 'storage',
       op: 'upload',
     })
+  }
+  // Drop an earlier upload in another format so a re-parse can't pick the stale file.
+  const base = path.replace(/\.[^.]+$/, '')
+  const stale = TRANSCRIPT_EXTS.map((ext) => `${base}.${ext}`).filter((p) => p !== path)
+  const { error: removeError } = await supabaseAdmin().storage.from('transcripts').remove(stale)
+  if (removeError) {
+    console.warn(JSON.stringify({ event: 'storage_cleanup_failed', reason: removeError.message }))
   }
 }

@@ -24,6 +24,13 @@ const input = (over: Partial<CreateLectureInput> = {}): CreateLectureInput => ({
   ...over,
 })
 
+const lecturesUsed = async (userId: string): Promise<number> => {
+  const result = (await f.exec(
+    `SELECT count FROM usage_counters WHERE user_id = '${userId}' AND metric = 'lectures'`,
+  )) as Array<{ rows: Array<{ count: number }> }>
+  return result[0]?.rows[0]?.count ?? 0
+}
+
 beforeEach(async () => {
   f = await createFixture()
   await f.exec(`INSERT INTO courses (id, kind, owner_id, title)
@@ -53,10 +60,7 @@ describe('POST /lectures', () => {
     expect(again).toMatchObject({ id: NEW, title: 'Week 3' })
     const rows = await f.db.select().from(lectures).where(eq(lectures.id, NEW))
     expect(rows).toHaveLength(1)
-    const counter = (await f.exec(
-      `SELECT count FROM usage_counters WHERE user_id = '${ID.A}' AND metric = 'lectures'`,
-    )) as Array<{ rows: Array<{ count: number }> }>
-    expect(counter[0]?.rows[0]?.count).toBe(1)
+    expect(await lecturesUsed(ID.A)).toBe(1)
   })
 
   it('404s a replay of someone else’s id, a foreign course, library courses and live', async () => {
@@ -85,6 +89,24 @@ describe('POST /lectures', () => {
       status: 429,
       details: { metric: 'lectures', limit: 1, resetAt: '2026-10-05T00:00:00.000Z' },
     })
+  })
+
+  it('a double submit creates one lecture and counts quota once', async () => {
+    const [a, b] = await Promise.all([
+      createLecture(ACTOR_S, input({ courseId: SAMPLE_COURSE }), f.db),
+      createLecture(ACTOR_S, input({ courseId: SAMPLE_COURSE }), f.db),
+    ])
+    expect(a.id).toBe(NEW)
+    expect(b.id).toBe(NEW)
+    expect(await lecturesUsed(ID.S)).toBe(1)
+  })
+
+  it('a 429 rolls the insert back, so nothing half-created is left', async () => {
+    await createLecture(ACTOR_S, input({ courseId: SAMPLE_COURSE }), f.db)
+    await expect(
+      createLecture(ACTOR_S, input({ id: NEW2, courseId: SAMPLE_COURSE }), f.db),
+    ).rejects.toMatchObject({ code: 'quota_exceeded' })
+    expect(await f.db.select().from(lectures).where(eq(lectures.id, NEW2))).toHaveLength(0)
   })
 
   it('limits sample imports to 20 min (403) and everyone to 2 h (413)', async () => {

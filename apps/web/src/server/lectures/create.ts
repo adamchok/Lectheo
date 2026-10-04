@@ -43,27 +43,31 @@ export async function createLecture(
   if (input.source === 'import' && input.media?.durationMs != null) {
     assertDuration(actor, input.media.durationMs)
   }
-  await consume(actor, 'lectures', db, now)
-
   const media: LectureMediaJson | null =
     input.source === 'import' && input.media
       ? { localFileName: input.media.localFileName, durationMs: input.media.durationMs }
       : null
-  const [row] = await db
-    .insert(lectures)
-    .values({
-      id: input.id,
-      courseId: course.id,
-      title: input.title,
-      // ponytail: max+1 without a lock; two concurrent creates in one course may share a seq.
-      seq: sql`(select coalesce(max(l.seq), 0) + 1 from lectures l where l.course_id = ${course.id})`,
-      source: input.source,
-      status: 'draft',
-      media,
-      durationMs: media?.durationMs ?? null,
-    })
-    .onConflictDoNothing({ target: lectures.id })
-    .returning()
+  // Insert first, then count quota in the same transaction: a failed insert or a lost
+  // double-submit race never spends quota, and a 429 rolls the insert back.
+  const row = await db.transaction(async (tx) => {
+    const [inserted] = await tx
+      .insert(lectures)
+      .values({
+        id: input.id,
+        courseId: course.id,
+        title: input.title,
+        // ponytail: max+1 without a lock; two concurrent creates in one course may share a seq.
+        seq: sql`(select coalesce(max(l.seq), 0) + 1 from lectures l where l.course_id = ${course.id})`,
+        source: input.source,
+        status: 'draft',
+        media,
+        durationMs: media?.durationMs ?? null,
+      })
+      .onConflictDoNothing({ target: lectures.id })
+      .returning()
+    if (inserted) await consume(actor, 'lectures', tx as unknown as DbLike, now)
+    return inserted
+  })
   if (row) return toLectureDto(row, NO_MARKERS)
   // Lost a race with a concurrent request carrying the same id.
   const raced = await findOwned(db, actor, input.id)

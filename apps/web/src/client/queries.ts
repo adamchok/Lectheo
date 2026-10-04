@@ -241,14 +241,17 @@ export function useCreateLecture() {
       apiFetch('/lectures', { method: 'POST', body: input, schema: LectureResponse }),
     onSuccess: (lecture) => {
       queryClient.setQueryData(queryKeys.lecture(lecture.id), lecture)
-      return queryClient.invalidateQueries({ queryKey: queryKeys.courses })
+      // Not awaited: the upload shouldn't wait for the course list to refetch.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.courses })
     },
   })
 }
 
 /**
  * POST /lectures/{id}/process → 'started', or 'pending' while the pipeline route isn't deployed
- * yet (404). Already processing counts as started.
+ * yet (404). `already_processing` counts as started only when this lecture is the one
+ * processing; a 409 from another lecture in the course is shown to the student.
+ * TODO(capture-import): replace with useProcessLecture once pipeline (#8) merges.
  */
 export function useStartProcessing() {
   const queryClient = useQueryClient()
@@ -263,7 +266,9 @@ export function useStartProcessing() {
         return 'started'
       } catch (error) {
         if (isApiClientError(error) && error.code === 'not_found') return 'pending'
-        if (isApiClientError(error) && error.code === 'already_processing') return 'started'
+        if (!isApiClientError(error) || error.code !== 'already_processing') throw error
+        const lecture = await apiFetch(`/lectures/${lectureId}`, { schema: LectureResponse })
+        if (POLLING_LECTURE_STATUSES.includes(lecture.status)) return 'started'
         throw error
       }
     },

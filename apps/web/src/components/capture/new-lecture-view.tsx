@@ -22,16 +22,37 @@ import { type CourseChoice, CoursePicker } from './course-picker'
 import { ImportForm } from './import-form'
 import { TranscriptForm } from './transcript-form'
 
-/** Creates the course (if new) and the draft lecture; ids are kept so retries replay. */
-export type CreateDraft = (
-  source: CreateLectureInput['source'],
-  media?: CreateLectureInput['media'],
-) => Promise<LectureResponse>
+export interface DraftInput {
+  source: CreateLectureInput['source']
+  media?: CreateLectureInput['media']
+  /** Identity of the picked file(s) / text: a changed input gets a fresh lecture id. */
+  fileKey: string
+}
+
+/**
+ * Creates the course (if new) and the draft lecture. Ids are reused only for an identical
+ * retry (same source, course, title and file), so a retry replays instead of spending quota,
+ * while a corrected retry never gets the old row back.
+ */
+export type CreateDraft = (input: DraftInput) => Promise<LectureResponse>
 
 export interface DraftFormProps {
   /** Course, title and consent are all set. */
   ready: boolean
+  isSample: boolean
   createDraft: CreateDraft
+}
+
+/** Inactive tabs stay mounted (hidden) so a picked file survives switching tabs. */
+const tabPanelClass = 'pt-4 data-[state=inactive]:hidden'
+
+/** Returns the id stored under `key`, creating one on first use. */
+function idFor(ids: Map<string, string>, key: string): string {
+  const existing = ids.get(key)
+  if (existing) return existing
+  const id = newId()
+  ids.set(key, id)
+  return id
 }
 
 /** /lectures/new: "add your own lecture" (F0.7, F1 modes B and D, F1.11). */
@@ -43,7 +64,7 @@ export function NewLectureView() {
   const createLecture = useCreateLecture()
   const [title, setTitle] = useState('')
   const [choice, setChoice] = useState<CourseChoice | null>(null)
-  const newCourseId = useRef(newId())
+  const courseIds = useRef(new Map<string, string>())
   const lectureIds = useRef(new Map<string, string>())
 
   if (courses.isPending || me.isPending) {
@@ -64,11 +85,14 @@ export function NewLectureView() {
     )
   }
 
+  const isSample = me.data?.isSample ?? false
   const personal = courses.data.filter((course) => course.kind === 'personal')
-  const canCreate = !(me.data?.isSample && personal.length > 0)
+  const canCreate = !(isSample && personal.length > 0)
   const firstCourse = personal[0]
+  // A "new course" choice is dropped once it can't be created (a sample account's one course).
+  const usable = choice && !(choice.kind === 'new' && !canCreate) ? choice : null
   const course: CourseChoice =
-    choice ?? (firstCourse ? { kind: 'existing', id: firstCourse.id } : { kind: 'new', title: '' })
+    usable ?? (firstCourse ? { kind: 'existing', id: firstCourse.id } : { kind: 'new', title: '' })
   const missing = [
     course.kind === 'new' && !course.title.trim() && 'name the course',
     !title.trim() && 'add a title',
@@ -76,17 +100,21 @@ export function NewLectureView() {
   ].filter((step): step is string => Boolean(step))
   const ready = missing.length === 0
 
-  const createDraft: CreateDraft = async (source, media) => {
-    const courseId =
-      course.kind === 'existing'
-        ? course.id
-        : (await createCourse.mutateAsync({ id: newCourseId.current, title: course.title.trim() }))
-            .id
-    const id = lectureIds.current.get(source) ?? newId()
-    lectureIds.current.set(source, id)
-    return createLecture.mutateAsync({ id, courseId, title: title.trim(), source, media })
+  const createDraft: CreateDraft = async ({ source, media, fileKey }) => {
+    const lectureTitle = title.trim()
+    let courseId: string
+    if (course.kind === 'existing') {
+      courseId = course.id
+    } else {
+      const courseTitle = course.title.trim()
+      const id = idFor(courseIds.current, courseTitle)
+      courseId = (await createCourse.mutateAsync({ id, title: courseTitle })).id
+    }
+    const key = JSON.stringify([source, courseId, lectureTitle, fileKey])
+    const id = idFor(lectureIds.current, key)
+    return createLecture.mutateAsync({ id, courseId, title: lectureTitle, source, media })
   }
-  const formProps: DraftFormProps = { ready, createDraft }
+  const formProps: DraftFormProps = { ready, isSample, createDraft }
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -119,16 +147,16 @@ export function NewLectureView() {
             Transcript only
           </TabsTrigger>
         </TabsList>
-        <TabsContent value="import" className="pt-4">
+        <TabsContent value="import" forceMount className={tabPanelClass}>
           <ImportForm
             {...formProps}
             onSuggestTitle={(suggested) => setTitle((current) => current || suggested)}
           />
         </TabsContent>
-        <TabsContent value="audio" className="pt-4">
+        <TabsContent value="audio" forceMount className={tabPanelClass}>
           <AudioForm {...formProps} />
         </TabsContent>
-        <TabsContent value="transcript" className="pt-4">
+        <TabsContent value="transcript" forceMount className={tabPanelClass}>
           <TranscriptForm {...formProps} />
         </TabsContent>
       </Tabs>

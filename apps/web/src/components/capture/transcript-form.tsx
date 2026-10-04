@@ -1,7 +1,9 @@
 'use client'
 
+import { useQueryClient } from '@tanstack/react-query'
 import { type FormEvent, useState } from 'react'
 import { toast } from 'sonner'
+import { queryKeys } from '@/client/queries'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -9,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import type { DraftFormProps } from './new-lecture-view'
 import {
+  fileKey,
   limitMessage,
   MAX_TRANSCRIPT_BYTES,
   NO_TIMESTAMPS_MESSAGE,
@@ -17,9 +20,13 @@ import {
 } from './upload'
 import { useBuildMap } from './use-build-map'
 
+/** How much pasted text goes into the retry key (enough to tell two pastes apart). */
+const PASTE_KEY_CHARS = 200
+
 /** Mode D, transcript only (F1.7): .vtt / .srt / .txt file or pasted text, then processing. */
 export function TranscriptForm({ ready, createDraft }: DraftFormProps) {
   const buildMap = useBuildMap()
+  const queryClient = useQueryClient()
   const [mode, setMode] = useState<'file' | 'paste'>('file')
   const [file, setFile] = useState<File | null>(null)
   const [text, setText] = useState('')
@@ -36,11 +43,16 @@ export function TranscriptForm({ ready, createDraft }: DraftFormProps) {
       setError('Transcripts can be up to 2 MB.')
       return
     }
+    const key =
+      mode === 'file' && file
+        ? fileKey(file)
+        : `text:${text.length}:${text.slice(0, PASTE_KEY_CHARS)}`
     setBusy(true)
     setError(null)
     try {
-      const lecture = await createDraft('transcript')
+      const lecture = await createDraft({ source: 'transcript', fileKey: key })
       const result = await uploadTranscript(lecture.id, input)
+      void queryClient.invalidateQueries({ queryKey: queryKeys.lecture(lecture.id) })
       if (!result.hasTimestamps) toast.info(NO_TIMESTAMPS_MESSAGE)
       if (result.truncated) toast.warning(TRUNCATED_MESSAGE)
       await buildMap.start(lecture.id)
@@ -57,7 +69,7 @@ export function TranscriptForm({ ready, createDraft }: DraftFormProps) {
           <TabsTrigger value="file">Upload a file</TabsTrigger>
           <TabsTrigger value="paste">Paste text</TabsTrigger>
         </TabsList>
-        <TabsContent value="file" className="space-y-2 pt-2">
+        <TabsContent value="file" forceMount className="space-y-2 pt-2 data-[state=inactive]:hidden">
           <Label htmlFor="transcript-file">Transcript (.vtt, .srt or .txt, up to 2 MB)</Label>
           <Input
             id="transcript-file"
@@ -66,7 +78,7 @@ export function TranscriptForm({ ready, createDraft }: DraftFormProps) {
             onChange={(e) => setFile(e.currentTarget.files?.[0] ?? null)}
           />
         </TabsContent>
-        <TabsContent value="paste" className="space-y-2 pt-2">
+        <TabsContent value="paste" forceMount className="space-y-2 pt-2 data-[state=inactive]:hidden">
           <Label htmlFor="transcript-text">Transcript text</Label>
           <Textarea
             id="transcript-text"

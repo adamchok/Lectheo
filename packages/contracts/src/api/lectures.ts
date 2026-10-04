@@ -69,7 +69,7 @@ export const UploadUrlResponse = z.object({
 })
 
 /** JSON variant of POST /lectures/{id}/transcript (the file variant is multipart). */
-export const TranscriptTextRequest = z.object({ text: z.string().min(1) })
+export const TranscriptTextRequest = z.object({ text: z.string().min(1).max(2 * 1024 * 1024) })
 export const TranscriptUploadResponse = z.object({
   segments: z.number().int(),
   hasTimestamps: z.boolean(),

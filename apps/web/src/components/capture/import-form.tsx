@@ -1,19 +1,24 @@
 'use client'
 
+import { useQueryClient } from '@tanstack/react-query'
 import type { Route } from 'next'
 import { useRouter } from 'next/navigation'
 import { type FormEvent, useState } from 'react'
 import { toast } from 'sonner'
 import { registerLocalMedia } from '@/client/capture/local-player-registry'
+import { queryKeys } from '@/client/queries'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { DraftFormProps } from './new-lecture-view'
 import {
+  durationProblem,
+  fileKey,
   limitMessage,
   MAX_TRANSCRIPT_BYTES,
-  readMediaDuration,
+  probeMedia,
   TRUNCATED_MESSAGE,
+  UNPLAYABLE_MESSAGE,
   uploadTranscript,
 } from './upload'
 
@@ -25,10 +30,12 @@ const stripExt = (name: string): string => name.replace(/\.[^.]+$/, '')
  */
 export function ImportForm({
   ready,
+  isSample,
   createDraft,
   onSuggestTitle,
 }: DraftFormProps & { onSuggestTitle: (title: string) => void }) {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const [media, setMedia] = useState<File | null>(null)
   const [transcript, setTranscript] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
@@ -44,10 +51,24 @@ export function ImportForm({
     setBusy(true)
     setError(null)
     try {
-      const durationMs = await readMediaDuration(media)
-      const lecture = await createDraft('import', { localFileName: media.name, durationMs })
+      // Checked before the lecture exists, so an unplayable or too-long file spends no quota.
+      const probe = await probeMedia(media)
+      const problem = probe.playable
+        ? durationProblem(probe.durationMs, isSample)
+        : UNPLAYABLE_MESSAGE
+      if (problem) {
+        setError(problem)
+        setBusy(false)
+        return
+      }
+      const lecture = await createDraft({
+        source: 'import',
+        media: { localFileName: media.name, durationMs: probe.durationMs },
+        fileKey: `${fileKey(media)}|${fileKey(transcript)}`,
+      })
       const result = await uploadTranscript(lecture.id, { file: transcript })
       registerLocalMedia(lecture.id, media)
+      void queryClient.invalidateQueries({ queryKey: queryKeys.lecture(lecture.id) })
       if (result.truncated) toast.warning(TRUNCATED_MESSAGE)
       router.push(`/lectures/${lecture.id}/watch` as Route)
     } catch (err) {
@@ -71,7 +92,7 @@ export function ImportForm({
           }}
         />
         <p className="text-muted-foreground text-xs">
-          It plays from this device and is never uploaded.
+          It plays from this device and is never uploaded. MP4 (H.264) or WebM work best.
         </p>
       </div>
       <div className="space-y-2">

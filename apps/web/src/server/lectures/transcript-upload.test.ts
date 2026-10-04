@@ -77,6 +77,13 @@ describe('POST /lectures/{id}/transcript', () => {
     expect(await lecture()).toMatchObject({ hasTimestamps: false, durationMs: null })
   })
 
+  it('untimed text keeps an import’s known duration', async () => {
+    await f.exec(`UPDATE lectures SET duration_ms = 600000 WHERE id = '${DRAFT}'`)
+    const res = await uploadTranscript(ACTOR_A, DRAFT, { raw: 'Some text.', ext: 'txt' }, f.db, store)
+    expect(res).toMatchObject({ hasTimestamps: false, durationMs: 600_000 })
+    expect(await lecture()).toMatchObject({ durationMs: 600_000 })
+  })
+
   it('422s garbage: binary, empty captions, an .srt without cues', async () => {
     const inputs = [
       { raw: 'PK\u0000\u0003\u0000binary', ext: 'txt' as const },
@@ -138,6 +145,15 @@ describe('readTranscriptRequest', () => {
       body: JSON.stringify({ text: 'hello' }),
     })
     expect(await readTranscriptRequest(json)).toEqual({ raw: 'hello', ext: 'txt' })
+  })
+
+  it('rejects an oversized body from Content-Length before reading it', async () => {
+    const req = new Request('http://x', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'content-length': String(3 * 1024 * 1024) },
+      body: '{}',
+    })
+    await expect(readTranscriptRequest(req)).rejects.toMatchObject({ code: 'payload_too_large' })
   })
 
   it('rejects other extensions (422) and files over 2 MB (413)', async () => {

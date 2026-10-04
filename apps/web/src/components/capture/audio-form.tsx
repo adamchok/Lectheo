@@ -1,38 +1,56 @@
 'use client'
 
-import { type FormEvent, useState } from 'react'
+import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import type { DraftFormProps } from './new-lecture-view'
-import { audioContentType, limitMessage, uploadAudio } from './upload'
+import {
+  audioContentType,
+  audioSizeProblem,
+  fileKey,
+  isAbort,
+  limitMessage,
+  uploadAudio,
+} from './upload'
 import { useBuildMap } from './use-build-map'
 
 /** Mode D, audio (F1.6): signed-URL upload with progress, then processing transcribes it. */
-export function AudioForm({ ready, createDraft }: DraftFormProps) {
+export function AudioForm({ ready, isSample, createDraft }: DraftFormProps) {
   const buildMap = useBuildMap()
   const [file, setFile] = useState<File | null>(null)
   const [progress, setProgress] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const upload = useRef<AbortController | null>(null)
+  // Leaving the page cancels the upload, so nothing navigates later on its own.
+  useEffect(() => () => upload.current?.abort(), [])
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     if (!file) return
     const contentType = audioContentType(file)
-    if (!contentType) {
-      setError('Use an mp3, m4a, webm, ogg or wav file.')
+    // Checked before the lecture exists, so a rejected file spends no quota.
+    const problem = contentType
+      ? audioSizeProblem(file.size, isSample)
+      : 'Use an mp3, m4a, webm, ogg or wav file.'
+    if (problem || !contentType) {
+      setError(problem)
       return
     }
+    const controller = new AbortController()
+    upload.current = controller
     setBusy(true)
     setError(null)
     try {
-      const lecture = await createDraft('audio')
+      const lecture = await createDraft({ source: 'audio', fileKey: fileKey(file) })
       setProgress(0)
-      await uploadAudio(lecture.id, file, contentType, setProgress)
+      await uploadAudio(lecture.id, file, contentType, setProgress, controller.signal)
+      if (controller.signal.aborted) return
       await buildMap.start(lecture.id)
     } catch (err) {
+      if (isAbort(err)) return
       setError(limitMessage(err))
       setProgress(null)
     }
@@ -42,7 +60,9 @@ export function AudioForm({ ready, createDraft }: DraftFormProps) {
   return (
     <form onSubmit={(e) => void submit(e)} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="audio-file">Audio file (mp3, m4a, webm, ogg or wav)</Label>
+        <Label htmlFor="audio-file">
+          Audio file (mp3, m4a, webm, ogg or wav, up to {isSample ? '20' : '50'} MB)
+        </Label>
         <Input
           id="audio-file"
           type="file"

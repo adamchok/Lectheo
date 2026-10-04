@@ -12,7 +12,7 @@ import { useMarkerHotkeys } from '@/client/capture/use-marker-hotkeys'
 import { WatchPlayer, type WatchPlayerHandle } from '@/client/capture/watch-player'
 import { formatTimestamp } from '@/client/format'
 import { useMe, useTranscript } from '@/client/queries'
-import { BuildMapCta } from '@/components/capture/build-map-cta'
+import { BuildMapCta, MapBuildingNote } from '@/components/capture/build-map-cta'
 import { errorMessage } from '@/components/error-state'
 import { KeyHint } from '@/components/key-hint'
 import { MarkerCounts } from '@/components/marker-counts'
@@ -174,10 +174,12 @@ function WatchSession({ lecture }: { lecture: LectureResponse }) {
             </p>
           )}
           {done &&
-            (lecture.status === 'draft' || lecture.status === 'failed' ? (
-              <BuildMapCta lectureId={lecture.id} lost={counts.lost} />
-            ) : (
+            (lecture.status === 'ready' ? (
               <DiagnosticCta lectureId={lecture.id} lost={counts.lost} />
+            ) : lecture.status === 'processing' || lecture.status === 'map_ready' ? (
+              <MapBuildingNote lectureId={lecture.id} />
+            ) : (
+              <BuildMapCta lectureId={lecture.id} lost={counts.lost} />
             ))}
         </div>
         <TranscriptPanel lectureId={lecture.id} nowMs={nowMs} onSeek={ready ? seek : null} />

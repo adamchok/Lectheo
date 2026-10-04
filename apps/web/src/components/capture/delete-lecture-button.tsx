@@ -26,6 +26,8 @@ export function DeleteLectureButton({ lecture }: { lecture: LectureResponse }) {
   const router = useRouter()
   const remove = useDeleteLecture()
   const [open, setOpen] = useState(false)
+  // Deleting mid-run would orphan the transcription job and fail the workflow on its FKs.
+  const processing = lecture.status === 'processing' || lecture.status === 'map_ready'
 
   const confirm = async () => {
     try {
@@ -51,15 +53,20 @@ export function DeleteLectureButton({ lecture }: { lecture: LectureResponse }) {
         <DialogHeader>
           <DialogTitle>Delete “{lecture.title}”?</DialogTitle>
           <DialogDescription>
-            This removes its transcript, your markers, any uploaded audio, and the concepts and
-            questions made from it. Concepts other lectures share stay. This can&apos;t be undone.
+            {processing
+              ? 'This lecture is still being processed. Wait until processing finishes, then you can delete it.'
+              : "This removes its transcript, your markers, any uploaded audio, and the concepts and questions made from it. Concepts other lectures share stay. This can't be undone."}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>
-          <Button variant="destructive" disabled={remove.isPending} onClick={() => void confirm()}>
+          <Button
+            variant="destructive"
+            disabled={processing || remove.isPending}
+            onClick={() => void confirm()}
+          >
             {remove.isPending ? 'Deleting…' : 'Delete lecture'}
           </Button>
         </DialogFooter>

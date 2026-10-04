@@ -2,12 +2,14 @@
 
 import { FileVideo } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { UNPLAYABLE_MESSAGE } from '@/components/capture/upload'
 import { Button } from '@/components/ui/button'
 import {
   getLocalMedia,
   type LocalMedia,
   matchesImportedMedia,
   registerLocalMedia,
+  releaseLocalMedia,
 } from './local-player-registry'
 import type { WatchPlayerEvents, WatchPlayerProps } from './watch-player'
 
@@ -23,6 +25,7 @@ export interface LocalPlayerProps extends WatchPlayerProps {
  */
 export function LocalPlayer({ lectureId, media, ...events }: LocalPlayerProps) {
   const [entry, setEntry] = useState<LocalMedia | undefined>(() => getLocalMedia(lectureId))
+  const [unplayable, setUnplayable] = useState(false)
   const [lengthMismatch, setLengthMismatch] = useState(false)
   const latest = useRef<WatchPlayerEvents>(events)
   useEffect(() => {
@@ -30,14 +33,18 @@ export function LocalPlayer({ lectureId, media, ...events }: LocalPlayerProps) {
   })
   useEffect(() => () => latest.current.onReady(null), [])
 
-  if (!entry) {
+  const pick = (file: File) => {
+    registerLocalMedia(lectureId, file)
+    setUnplayable(false)
+    setEntry(getLocalMedia(lectureId))
+  }
+
+  if (!entry || unplayable) {
     return (
       <RepickMedia
         expectedName={media.localFileName ?? null}
-        onPick={(file) => {
-          registerLocalMedia(lectureId, file)
-          setEntry(getLocalMedia(lectureId))
-        }}
+        problem={unplayable ? UNPLAYABLE_MESSAGE : null}
+        onPick={pick}
       />
     )
   }
@@ -52,6 +59,12 @@ export function LocalPlayer({ lectureId, media, ...events }: LocalPlayerProps) {
           playsInline
           preload="metadata"
           className="absolute inset-0 h-full w-full"
+          onError={() => {
+            // Undecodable (mkv, avi, HEVC…): onReady never fires, so say why and offer a re-pick.
+            latest.current.onReady(null)
+            releaseLocalMedia(lectureId)
+            setUnplayable(true)
+          }}
           onLoadedMetadata={(e) => {
             const el = e.currentTarget
             const durationMs = Number.isFinite(el.duration) ? Math.round(el.duration * 1000) : null
@@ -77,7 +90,7 @@ export function LocalPlayer({ lectureId, media, ...events }: LocalPlayerProps) {
       </div>
       {lengthMismatch && (
         <p role="status" className="text-muted-foreground text-sm">
-          This file&apos;s length doesn&apos;t match the transcript, so markers may land at the
+          This file&apos;s length differs from the file you imported, so markers may land at the
           wrong moments.
         </p>
       )}
@@ -87,18 +100,20 @@ export function LocalPlayer({ lectureId, media, ...events }: LocalPlayerProps) {
 
 function RepickMedia({
   expectedName,
+  problem,
   onPick,
 }: {
   expectedName: string | null
+  problem: string | null
   onPick: (file: File) => void
 }) {
   const [mismatch, setMismatch] = useState<File | null>(null)
   return (
     <div className={`${frameClass} flex flex-col items-center justify-center gap-4 p-6 text-center`}>
       <FileVideo aria-hidden className="text-muted-foreground size-10" />
-      <p className="text-muted-foreground max-w-sm text-sm">
-        Your recording stays on this device, so after a reload we need it again.
-        {expectedName && (
+      <p role={problem ? 'alert' : undefined} className="text-muted-foreground max-w-sm text-sm">
+        {problem ?? 'Your recording stays on this device, so after a reload we need it again.'}
+        {!problem && expectedName && (
           <>
             {' '}
             Pick <span className="text-foreground font-medium">{expectedName}</span>.
@@ -119,9 +134,13 @@ function RepickMedia({
           </div>
         </div>
       ) : (
-        <Button asChild variant="outline">
+        <Button
+          asChild
+          variant="outline"
+          className="has-[:focus-visible]:ring-ring/50 has-[:focus-visible]:ring-[3px]"
+        >
           <label className="cursor-pointer">
-            Choose file
+            {problem ? 'Choose another file' : 'Choose file'}
             <input
               type="file"
               accept="video/*,audio/*"
