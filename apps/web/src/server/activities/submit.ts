@@ -1,0 +1,192 @@
+import { SubmitBodyByType, type ActivityType, type SubmitResponse } from '@lectheo/contracts'
+import { activities, and, attempts, eq } from '@lectheo/db'
+import type { Actor } from '../auth'
+import { appDb, type DbLike } from '../db'
+import { ApiError, invalidState } from '../errors'
+import { buildContext, loadOwnedActivity } from './load'
+import { handlerFor } from './registry'
+import { masteryFor, withAiErrors } from './service'
+import { activitySources } from './sources'
+import type { ActivityContext, ActivityTypeHandler, GradingResult } from './types'
+
+/*
+ * POST /activities/{id}/submit (API Spec §7, F4c.8, F5). State machine:
+ *   active --try 1 (not correct)--> awaiting_retry --try 2--> closed
+ *   active --try 1 correct--> closed
+ * UNIQUE (activity_id, try_no) is the race guard. Same body again → the stored attempt.
+ */
+
+type AttemptRow = typeof attempts.$inferSelect
+
+/** Body validation per type (the route can't know the type before loading the activity). */
+export function parseSubmitBody(type: ActivityType, raw: unknown): unknown {
+  const parsed = SubmitBodyByType[type].safeParse(raw ?? {})
+  if (parsed.success) return parsed.data
+  const issues = parsed.error.issues.map((i) => ({
+    path: ['body', ...i.path.map(String)].join('.'),
+    code: i.code,
+    message: i.message,
+  }))
+  throw new ApiError('validation_failed', undefined, { issues })
+}
+
+/** JSON with sorted keys (jsonb reorders keys, so compare canonical forms). */
+export function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`).join(',')}}`
+  }
+  return JSON.stringify(value)
+}
+
+async function findAttempt(db: DbLike, activityId: string, tryNo: number) {
+  const [row] = await db
+    .select()
+    .from(attempts)
+    .where(and(eq(attempts.activityId, activityId), eq(attempts.tryNo, tryNo)))
+    .limit(1)
+  return row
+}
+
+/**
+ * A client retry of try 1 (lost response) arrives while the activity is awaiting_retry. Treat it
+ * as a duplicate when the body is identical and the student wrote nothing since try 1 (so a
+ * teach-back retry, whose body is always {}, needs new explanation first). If no turns are left,
+ * nothing new can be written, so the submit counts as try 2.
+ */
+async function isDuplicateOf(
+  ctx: ActivityContext,
+  first: AttemptRow,
+  body: unknown,
+): Promise<boolean> {
+  if (canonical(first.response) !== canonical(body)) return false
+  if (ctx.activity.turnsUsed >= ctx.activity.turnBudget) return false
+  const visible = await ctx.visibleMessages()
+  return !visible.some((m) => m.role === 'student' && m.createdAt > first.createdAt)
+}
+
+async function replayOrConflict(
+  ctx: ActivityContext,
+  handler: ActivityTypeHandler,
+  stored: AttemptRow,
+  body: unknown,
+): Promise<SubmitResponse> {
+  if (canonical(stored.response) !== canonical(body)) {
+    throw invalidState('This try was already submitted.', { tryNo: stored.tryNo })
+  }
+  const sources = await activitySources(ctx.db, ctx.concept, ctx.item)
+  return buildSubmitResponse(ctx, handler, stored, { sources, hint: null })
+}
+
+async function buildSubmitResponse(
+  ctx: ActivityContext,
+  handler: ActivityTypeHandler,
+  attempt: AttemptRow,
+  extra: Pick<GradingResult, 'sources'> & { hint: string | null },
+): Promise<SubmitResponse> {
+  const { final } = attempt
+  const [mastery, reveal] = await Promise.all([
+    masteryFor(ctx.db, ctx.actor.userId, ctx.concept),
+    final ? handler.finalReveal(ctx) : Promise.resolve(null),
+  ])
+  return {
+    attemptId: attempt.id,
+    tryNo: attempt.tryNo,
+    final,
+    outcome: attempt.outcome,
+    score: attempt.score,
+    maxScore: attempt.maxScore,
+    checks: attempt.grading.checks,
+    criteria: attempt.grading.criteria,
+    // F5.3: the guiding question comes before the answer; once final, the explanation replaces it.
+    feedback: {
+      guidingQuestion: final ? null : (attempt.grading.guidingQuestion ?? null),
+      hint: final ? null : extra.hint,
+    },
+    canRetry: !final,
+    explanationAvailable: true,
+    sources: [...extra.sources],
+    mastery,
+    ...(reveal ? { explanation: reveal.explanation, rubric: [...reveal.rubric] } : {}),
+  }
+}
+
+export async function submitActivity(
+  actor: Actor,
+  id: string,
+  rawBody: unknown,
+  db: DbLike = appDb(),
+): Promise<SubmitResponse> {
+  const activity = await loadOwnedActivity(db, actor, id)
+  const handler = handlerFor(activity.type)
+  const body = parseSubmitBody(activity.type, rawBody)
+  const ctx = await buildContext(db, actor, activity)
+
+  if (activity.status === 'closed') {
+    // A retry of the final submit gets the stored final attempt; anything else is 409.
+    const stored = (await findAttempt(db, id, 2)) ?? (await findAttempt(db, id, 1))
+    if (stored?.final && canonical(stored.response) === canonical(body)) {
+      return replayOrConflict(ctx, handler, stored, body)
+    }
+    throw invalidState('This activity is closed.')
+  }
+  const tryNo: 1 | 2 = activity.status === 'active' ? 1 : 2
+  const existing = await findAttempt(db, id, tryNo)
+  if (existing) return replayOrConflict(ctx, handler, existing, body)
+  if (tryNo === 2) {
+    const first = await findAttempt(db, id, 1)
+    if (first && (await isDuplicateOf(ctx, first, body))) {
+      return replayOrConflict(ctx, handler, first, body)
+    }
+  }
+
+  // F6: hints and "Show me" make later tries assisted; the Socratic guiding question does not.
+  const assisted = activity.hintsUsed > 0 || activity.explanationShown
+  const grading = await withAiErrors(db, () => handler.submit(ctx, body as never, tryNo))
+  const final = tryNo === 2 || grading.outcome === 'correct'
+
+  const [inserted] = await db
+    .insert(attempts)
+    .values({
+      userId: actor.userId,
+      conceptId: activity.conceptId,
+      activityType: activity.type,
+      activityId: id,
+      itemId: activity.itemId,
+      tryNo,
+      final,
+      response: body,
+      grading: {
+        checks: grading.checks,
+        criteria: [...grading.criteria],
+        rationale: grading.rationale,
+        ...(grading.misconceptions ? { misconceptions: [...grading.misconceptions] } : {}),
+        guidingQuestion: grading.feedback.guidingQuestion,
+      },
+      score: grading.score,
+      maxScore: grading.maxScore,
+      outcome: grading.outcome,
+      assisted,
+      judgeModel: grading.judgeModel,
+    })
+    .onConflictDoNothing({ target: [attempts.activityId, attempts.tryNo] })
+    .returning()
+  if (!inserted) {
+    const raced = await findAttempt(db, id, tryNo)
+    if (!raced) throw new Error(`Attempt ${id}#${tryNo} missing after ON CONFLICT`)
+    return replayOrConflict(ctx, handler, raced, body)
+  }
+
+  await db
+    .update(activities)
+    .set({ status: final ? 'closed' : 'awaiting_retry' })
+    .where(and(eq(activities.id, id), eq(activities.status, activity.status)))
+
+  return buildSubmitResponse(ctx, handler, inserted, {
+    sources: grading.sources,
+    hint: grading.feedback.hint,
+  })
+}
