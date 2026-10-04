@@ -4,8 +4,12 @@
  * (buttons, toggles, links) check these flags.
  */
 export const FEATURES = {
-  /** React Flow concept-map canvas on /courses/[id] (TODO(feature-concept-map)). List view is always on. */
-  conceptMapCanvas: false,
+  /** React Flow concept-map canvas on /courses/[id]. List view is always on. */
+  conceptMapCanvas: true,
+  /** "Spot the flaw" practice button in the map's node panel. */
+  practiceSpotFlaw: true,
+  /** "Teach-back" practice button in the map's node panel. */
+  practiceTeachBack: true,
   /** "Add lecture" entry points → /lectures/new (TODO(feature-capture-import)). */
   addLecture: false,
   /** Creating personal courses from the dashboard. */

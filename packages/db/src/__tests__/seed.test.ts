@@ -101,6 +101,16 @@ describe('CS50x library + seed student fixture', () => {
     expect(firstCounts.concept_edges).toBeGreaterThanOrEqual(20)
   })
 
+  it('stores the library concept-map layout (never computed at runtime)', async () => {
+    const [course] = await rows<{ layout: Record<string, unknown>; layout_hash: string }>(
+      db,
+      'SELECT layout, layout_hash FROM courses',
+    )
+    const concepts = await rows<{ id: string }>(db, 'SELECT id FROM concepts')
+    expect(Object.keys(course!.layout).sort()).toEqual(concepts.map((c) => c.id).sort())
+    expect(course!.layout_hash).toMatch(/^[0-9a-f]{64}$/)
+  })
+
   it('is idempotent: seeding twice changes nothing', async () => {
     await seedAll(db)
     expect(await tableCounts(db)).toEqual(firstCounts)
