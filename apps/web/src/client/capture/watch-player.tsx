@@ -25,6 +25,8 @@ export interface WatchPlayerProps extends WatchPlayerEvents {
 }
 
 const NOCOOKIE_HOST = 'https://www.youtube-nocookie.com'
+/** How far before startMs the first PLAYING position may be before we distrust the timeline. */
+const START_SLACK_MS = 30_000
 const frameClass = 'bg-muted relative aspect-video w-full overflow-hidden rounded-xl'
 
 /**
@@ -95,7 +97,17 @@ function YouTubePlayer({
     root.appendChild(target)
     let player: YTPlayer | null = null
     let cancelled = false
+    let checkedOnPlay = false
     const unready = () => events.current.onReady(null)
+    /*
+     * A video shorter than the lecture window is a different cut than the transcript: YouTube
+     * would silently play from 0:00 and markers would land on the wrong time. getDuration() can
+     * be 0 at onReady, so this runs again on the first PLAYING state.
+     */
+    const offTimeline = (p: YTPlayer): boolean => {
+      const durationMs = p.getDuration() * 1000
+      return durationMs > 0 && durationMs < (endMs ?? startMs)
+    }
 
     loadYouTubeApi()
       .then((YT) => {
@@ -114,10 +126,7 @@ function YouTubePlayer({
           },
           events: {
             onReady: () => {
-              // A video shorter than the lecture window is a different cut than the transcript:
-              // YouTube would silently play from 0:00, so markers would land on the wrong time.
-              const durationMs = created.getDuration() * 1000
-              if (durationMs > 0 && durationMs < (endMs ?? startMs)) {
+              if (offTimeline(created)) {
                 blocked.current()
                 return
               }
@@ -131,6 +140,15 @@ function YouTubePlayer({
               })
             },
             onStateChange: ({ data }) => {
+              if (data === YT_STATE.PLAYING && !checkedOnPlay) {
+                checkedOnPlay = true
+                // Also catches an ignored `start` (playing from far before the window).
+                const behindMs = startMs - created.getCurrentTime() * 1000
+                if (offTimeline(created) || behindMs > START_SLACK_MS) {
+                  blocked.current()
+                  return
+                }
+              }
               if (data === YT_STATE.PLAYING) events.current.onPlayingChange(true)
               if (data === YT_STATE.PAUSED) events.current.onPlayingChange(false)
               if (data === YT_STATE.ENDED) {
@@ -160,21 +178,10 @@ function YouTubePlayer({
 }
 
 function AudioPlayer({ src, startMs, endMs, events }: PlayerProps & { src: string }) {
-  const audio = useRef<HTMLAudioElement>(null)
   const startApplied = useRef(false)
 
   useEffect(() => {
-    const el = audio.current
-    if (!el) return
     const unready = () => events.current.onReady(null)
-    events.current.onReady({
-      currentMs: () => Math.round(el.currentTime * 1000),
-      seek: (ms) => {
-        el.currentTime = ms / 1000
-        void el.play().catch(() => undefined)
-      },
-      pause: () => el.pause(),
-    })
     return unready
   }, [events])
 
@@ -186,7 +193,6 @@ function AudioPlayer({ src, startMs, endMs, events }: PlayerProps & { src: strin
         timeline. Markers work the same way.
       </p>
       <audio
-        ref={audio}
         controls
         preload="metadata"
         src={src}
@@ -194,7 +200,17 @@ function AudioPlayer({ src, startMs, endMs, events }: PlayerProps & { src: strin
         onLoadedMetadata={(e) => {
           if (startApplied.current) return
           startApplied.current = true
-          e.currentTarget.currentTime = startMs / 1000
+          const el = e.currentTarget
+          el.currentTime = startMs / 1000
+          // Ready only once startMs is applied, so a marker can't be saved at t = 0.
+          events.current.onReady({
+            currentMs: () => Math.round(el.currentTime * 1000),
+            seek: (ms) => {
+              el.currentTime = ms / 1000
+              void el.play().catch(() => undefined)
+            },
+            pause: () => el.pause(),
+          })
         }}
         onPlay={() => events.current.onPlayingChange(true)}
         onPause={() => events.current.onPlayingChange(false)}

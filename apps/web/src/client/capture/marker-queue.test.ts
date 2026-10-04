@@ -36,8 +36,9 @@ describe('createMarkerQueue', () => {
     await queue.add(marker(1))
     await queue.add(marker(2))
     expect(store.saved()).toHaveLength(2)
-    await queue.flush()
+    expect(await queue.flush()).toBe(2)
     expect(t.send).toHaveBeenCalledWith([marker(1), marker(2)], { keepalive: false })
+    expect(await queue.flush()).toBe(0)
     expect(store.saved()).toEqual([])
   })
 
@@ -59,7 +60,7 @@ describe('createMarkerQueue', () => {
     })
     const queue = await createMarkerQueue(memoryStore(), t)
     await queue.add(marker(1))
-    await queue.flush()
+    expect(await queue.flush()).toBe(0)
     expect(queue.pendingCount()).toBe(0)
   })
 
@@ -110,6 +111,19 @@ describe('createMarkerQueue', () => {
     release()
     await undoing
     expect(order).toEqual(['send', 'remove'])
+    expect(t.remove).toHaveBeenCalledWith(marker(1).id)
+  })
+
+  it('undo after a failed in-flight send drops it locally and still DELETEs (may have landed)', async () => {
+    let fail: (e: Error) => void = () => undefined
+    const t = transport({ send: vi.fn(() => new Promise<void>((_, reject) => (fail = reject))) })
+    const queue = await createMarkerQueue(memoryStore(), t)
+    await queue.add(marker(1))
+    const flushing = queue.flush().catch(() => 0)
+    const undoing = queue.undo(marker(1).id)
+    fail(new Error('timeout'))
+    await Promise.all([flushing, undoing])
+    expect(queue.pendingCount()).toBe(0)
     expect(t.remove).toHaveBeenCalledWith(marker(1).id)
   })
 })

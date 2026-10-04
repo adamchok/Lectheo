@@ -10,7 +10,7 @@ import { useMarkerQueue } from '@/client/capture/marker-queue-hook'
 import { useMarkerHotkeys } from '@/client/capture/use-marker-hotkeys'
 import { WatchPlayer, type WatchPlayerHandle } from '@/client/capture/watch-player'
 import { formatTimestamp } from '@/client/format'
-import { useTranscript } from '@/client/queries'
+import { useMe, useTranscript } from '@/client/queries'
 import { errorMessage } from '@/components/error-state'
 import { KeyHint } from '@/components/key-hint'
 import { MarkerCounts } from '@/components/marker-counts'
@@ -50,7 +50,8 @@ export function WatchView({ lectureId }: { lectureId: string }) {
 }
 
 function WatchSession({ lecture }: { lecture: LectureResponse }) {
-  const queue = useMarkerQueue(lecture.id)
+  const me = useMe()
+  const queue = useMarkerQueue(lecture.id, me.data?.id)
   const player = useRef<WatchPlayerHandle | null>(null)
   const [ready, setReady] = useState(false)
   const [playing, setPlaying] = useState(false)
@@ -84,11 +85,12 @@ function WatchSession({ lecture }: { lecture: LectureResponse }) {
     flush()
   }, [flush])
 
-  const canMark = ready && lecture.hasTimestamps
+  // The queue is keyed by user, so marking waits for /me.
+  const canMark = ready && lecture.hasTimestamps && Boolean(me.data)
   const mark = useCallback(
     (kind: MarkerKind) => {
       const handle = player.current
-      if (!handle || !lecture.hasTimestamps) return
+      if (!handle || !canMark) return
       const tMs = handle.currentMs()
       const id = queue.add(kind, tMs)
       const bump = (by: number) => setCounts((c) => ({ ...c, [kind]: Math.max(0, c[kind] + by) }))
@@ -109,7 +111,7 @@ function WatchSession({ lecture }: { lecture: LectureResponse }) {
         },
       })
     },
-    [queue, lecture.hasTimestamps],
+    [queue, canMark],
   )
   useMarkerHotkeys(mark, { enabled: canMark })
 

@@ -1,10 +1,12 @@
 'use client'
 
 import type { MarkerInput, MarkerKind } from '@lectheo/contracts'
+import { useQueryClient } from '@tanstack/react-query'
 import { get, set } from 'idb-keyval'
 import { useCallback, useEffect, useRef } from 'react'
-import { API_BASE, apiFetch } from '../api'
+import { API_BASE, apiFetch, isApiClientError } from '../api'
 import { newId } from '../ids'
+import { queryKeys } from '../queries'
 import {
   createMarkerQueue,
   type MarkerQueue,
@@ -32,8 +34,9 @@ const isPermanent = (error: unknown): boolean =>
  * ponytail: IndexedDB can be unavailable (private mode, blocked storage); the queue then keeps
  * markers in memory only, which still covers the 10 s flush window.
  */
-function idbStore(lectureId: string): MarkerStore {
-  const key = `lectheo:markers:${lectureId}`
+function idbStore(userId: string, lectureId: string): MarkerStore {
+  // Keyed by user so a shared browser never posts one user's leftovers as another's.
+  const key = `lectheo:markers:${userId}:${lectureId}`
   return {
     load: async () => (await get<MarkerInput[]>(key).catch(() => undefined)) ?? [],
     save: (markers) => set(key, markers).catch(() => undefined),
@@ -54,7 +57,10 @@ function httpTransport(lectureId: string): MarkerTransport {
       })
       if (!res.ok) throw new MarkerSendError(res.status)
     },
-    remove: (markerId) => apiFetch(`${base}/${markerId}`, { method: 'DELETE' }),
+    remove: (markerId) =>
+      apiFetch(`${base}/${markerId}`, { method: 'DELETE' }).catch((error: unknown) => {
+        if (!(isApiClientError(error) && error.status === 404)) throw error
+      }),
     isPermanent,
   }
 }
@@ -66,16 +72,31 @@ export interface MarkerQueueApi {
   flush: () => void
 }
 
-/** The lecture's marker queue: flushes every 10 s, on pagehide / hidden tab, and on unmount. */
-export function useMarkerQueue(lectureId: string): MarkerQueueApi {
+/**
+ * The lecture's marker queue: flushes every 10 s, on pagehide / hidden tab, and on unmount.
+ * Inactive until `userId` is known (the IndexedDB key is per user).
+ */
+export function useMarkerQueue(lectureId: string, userId: string | undefined): MarkerQueueApi {
   const queue = useRef<Promise<MarkerQueue> | null>(null)
+  const queryClient = useQueryClient()
+  // Course map and next step show marker counts / unlinked markers.
+  const refreshCourses = useCallback(
+    () => void queryClient.invalidateQueries({ queryKey: queryKeys.courses }),
+    [queryClient],
+  )
 
   useEffect(() => {
-    const q = createMarkerQueue(idbStore(lectureId), httpTransport(lectureId))
+    if (!userId) return
+    const q = createMarkerQueue(idbStore(userId, lectureId), httpTransport(lectureId))
     queue.current = q
     // Failures stay queued for the next tick; nothing to surface mid-lecture.
     const flush = (keepalive = false) =>
-      void q.then((x) => x.flush({ keepalive })).catch(() => undefined)
+      void q
+        .then((x) => x.flush({ keepalive }))
+        .then((sent) => {
+          if (sent > 0) refreshCourses()
+        })
+        .catch(() => undefined)
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') flush(true)
     }
@@ -89,9 +110,11 @@ export function useMarkerQueue(lectureId: string): MarkerQueueApi {
       window.clearInterval(timer)
       window.removeEventListener('pagehide', onPageHide)
       document.removeEventListener('visibilitychange', onVisibility)
+      queue.current = null
       flush(true)
+      refreshCourses()
     }
-  }, [lectureId])
+  }, [lectureId, userId, refreshCourses])
 
   const add = useCallback<MarkerQueueApi['add']>((kind, tMs) => {
     const id = newId()
@@ -106,8 +129,13 @@ export function useMarkerQueue(lectureId: string): MarkerQueueApi {
   }, [])
 
   const flush = useCallback(() => {
-    void queue.current?.then((q) => q.flush()).catch(() => undefined)
-  }, [])
+    void queue.current
+      ?.then((q) => q.flush())
+      .then((sent) => {
+        if (sent > 0) refreshCourses()
+      })
+      .catch(() => undefined)
+  }, [refreshCourses])
 
   return { add, undo, flush }
 }
