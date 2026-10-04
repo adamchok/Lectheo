@@ -1,9 +1,10 @@
 import { and, eq, isNull, lectures } from '@lectheo/db'
+import { RetryableError } from 'workflow'
 import { parseTranscript, segmentCues } from '@lectheo/domain'
 import type { DbLike } from '../db'
 import { MEDIA_LIMITS } from '../quota'
 import { BUCKETS, createDownloadUrl, deleteObjects } from '../storage'
-import type { SttClient } from '../stt/assemblyai'
+import { SttHttpError, type SttClient } from '../stt/assemblyai'
 import { supabaseAdmin } from '../supabase'
 import { capToTier, hasSegments, loadLecture, replaceSegments } from './segments'
 import { mergeStepOutput, PipelineError, runStep, stepOutput } from './state'
@@ -12,6 +13,9 @@ import { mergeStepOutput, PipelineError, runStep, stepOutput } from './state'
  * Transcript steps (Architecture §4.3, ADR-004). Transcript sources arrive with segments already
  * written by capture-import, so parseTranscript is a no-op unless ?from=parseTranscript asked for
  * a re-parse of the stored raw file. Audio sources are transcribed by AssemblyAI (polled).
+ * Retention (Arch §9.3): the audio object and the remote transcript are deleted once segments are
+ * written. When transcription fails the remote job is deleted, but the audio is kept so a retry
+ * can re-submit it; it goes when the lecture is deleted or re-processed to completion.
  */
 
 /** Written to lectures.stt_job_id before submitting, so a retry never submits twice. */
@@ -20,12 +24,18 @@ const RESERVATION_PREFIX = 'reserving:'
 const RESERVATION_STALE_MS = 5 * 60_000
 const TRANSCRIPT_FILE = /\.(vtt|srt|txt|docx)$/
 
+const fileTime = (f: { updated_at?: string | null; created_at?: string | null }): number =>
+  Date.parse(f.updated_at ?? f.created_at ?? '') || 0
+
 /** Raw transcript text from Storage (`transcripts/{ownerId}/{lectureId}.*`), or null. */
 async function downloadTranscript(ownerId: string, lectureId: string): Promise<string | null> {
   const bucket = supabaseAdmin().storage.from(BUCKETS.transcripts)
   const { data: files, error } = await bucket.list(ownerId, { search: lectureId })
   if (error) throw error
-  const file = files?.find((f) => f.name.startsWith(lectureId) && TRANSCRIPT_FILE.test(f.name))
+  // Newest upload wins when several formats were uploaded over time (e.g. .srt, then .vtt).
+  const file = (files ?? [])
+    .filter((f) => f.name.startsWith(lectureId) && TRANSCRIPT_FILE.test(f.name))
+    .sort((a, b) => fileTime(b) - fileTime(a))[0]
   if (!file) return null
   if (file.name.endsWith('.docx')) {
     throw new PipelineError(
@@ -90,7 +100,10 @@ export async function submitTranscriptionStep(
     const current = lecture.sttJobId
     if (current && !current.startsWith(RESERVATION_PREFIX)) return { jobId: current }
     if (current && reservationAge(current) < RESERVATION_STALE_MS) {
-      throw new Error('transcription submit already in progress')
+      // Another attempt is submitting; come back once its reservation would count as stale.
+      throw new RetryableError('transcription submit already in progress', {
+        retryAfter: RESERVATION_STALE_MS,
+      })
     }
     if (!lecture.audioPath) {
       throw new PipelineError(
@@ -129,6 +142,37 @@ export async function submitTranscriptionStep(
   })
 }
 
+const HTTP_TOO_MANY_REQUESTS = 429
+const HTTP_SERVER_ERROR = 500
+
+/** 429 / 5xx / network failures (fetch throws a TypeError). */
+function isTransientStt(err: unknown): boolean {
+  if (err instanceof SttHttpError) {
+    return err.status === HTTP_TOO_MANY_REQUESTS || err.status >= HTTP_SERVER_ERROR
+  }
+  return err instanceof TypeError
+}
+
+/** Best-effort delete of the remote transcript on a failure path (never masks the failure). */
+async function removeQuietly(stt: SttClient, jobId: string): Promise<void> {
+  try {
+    await stt.remove(jobId)
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err)
+    console.warn(JSON.stringify({ event: 'stt_remove_failed', jobId, reason }))
+  }
+}
+
+/** After a transcription timeout: delete the remote job (the audio stays for a retry). */
+export async function abandonTranscription(
+  db: DbLike,
+  lectureId: string,
+  stt: SttClient,
+): Promise<void> {
+  const { sttJobId } = await loadLecture(db, lectureId)
+  if (sttJobId && !sttJobId.startsWith(RESERVATION_PREFIX)) await removeQuietly(stt, sttJobId)
+}
+
 export type PollStatus = 'pending' | 'completed'
 
 /** One status check; the workflow sleeps 15 s between calls (max 60 min). */
@@ -146,8 +190,16 @@ export async function pollTranscriptionStep(
       if (!sttJobId || sttJobId.startsWith(RESERVATION_PREFIX)) {
         throw new PipelineError('stt_failed', 'The transcription job was lost. Please retry.')
       }
-      const job = await stt.get(sttJobId)
+      let job
+      try {
+        job = await stt.get(sttJobId)
+      } catch (err) {
+        // A blip while waiting is not a failure: the workflow's loop bounds the total wait.
+        if (isTransientStt(err)) return 'pending'
+        throw err
+      }
       if (job.status === 'error') {
+        await removeQuietly(stt, sttJobId)
         throw new PipelineError(
           'stt_failed',
           `Transcription failed${job.error ? ` (${job.error})` : ''}. Try uploading a transcript instead.`,

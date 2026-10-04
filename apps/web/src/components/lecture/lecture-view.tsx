@@ -59,7 +59,9 @@ const stepsFor = (source: LectureSource): readonly PipelineStep[] =>
 type ReprocessFrom = 'parseTranscript' | 'submitTranscription' | 'extractConcepts' | 'draftItems'
 
 /** Earliest re-runnable step (API `?from=`) that redoes the failed one. */
-function retryFrom(step: string, source: LectureSource): ReprocessFrom {
+function retryFrom(step: string, code: string, source: LectureSource): ReprocessFrom {
+  // A missing transcript is fixed by reading it again, whichever step noticed.
+  if (code === 'no_transcript') return isAudio(source) ? 'submitTranscription' : 'parseTranscript'
   if (['submitTranscription', 'pollTranscription', 'fetchTranscript'].includes(step)) {
     return 'submitTranscription'
   }
@@ -178,7 +180,9 @@ function FailedPanel({ lecture }: { lecture: LectureResponse }) {
       }
       action={
         <Button
-          onClick={() => processLecture.mutate(retryFrom(step, lecture.source))}
+          onClick={() =>
+            processLecture.mutate(retryFrom(step, lecture.error?.code ?? '', lecture.source))
+          }
           disabled={processLecture.isPending}
         >
           <RotateCw aria-hidden className={cn(processLecture.isPending && 'animate-spin')} />
@@ -191,6 +195,19 @@ function FailedPanel({ lecture }: { lecture: LectureResponse }) {
 
 function DraftPanel({ lecture }: { lecture: LectureResponse }) {
   const processLecture = useProcessLecture(lecture.id)
+  if (lecture.status === 'uploading') {
+    return (
+      <section className="bg-card border-border space-y-3 rounded-xl border p-6">
+        <h2 className="font-medium">Upload not finished</h2>
+        <p className="text-muted-foreground text-sm">
+          The recording or transcript didn’t finish uploading. Add the lecture again to continue.
+        </p>
+        <Button asChild variant="outline">
+          <Link href={'/lectures/new' as Route}>Add lecture</Link>
+        </Button>
+      </section>
+    )
+  }
   return (
     <section className="bg-card border-border space-y-3 rounded-xl border p-6">
       <h2 className="font-medium">Not processed yet</h2>
@@ -208,12 +225,20 @@ function DraftPanel({ lecture }: { lecture: LectureResponse }) {
   )
 }
 
+/** This user lecture's concept count once its map exists (null while unknown / not needed). */
+function useLectureConceptCount(lecture: LectureResponse | undefined): number | null {
+  const needed =
+    lecture !== undefined &&
+    lecture.source !== 'library' &&
+    (lecture.status === 'map_ready' || lecture.status === 'ready')
+  const map = useCourseMap(needed ? lecture.courseId : undefined)
+  if (!needed || !map.data) return null
+  return map.data.nodes.filter((n) => n.lectureIds.includes(lecture.id)).length
+}
+
 /** F2.9: say so when a lecture yields few or no concepts, rather than padding the map. */
-function ConceptCountNote({ lecture }: { lecture: LectureResponse }) {
-  const map = useCourseMap(lecture.courseId)
-  if (!map.data) return null
-  const count = map.data.nodes.filter((n) => n.lectureIds.includes(lecture.id)).length
-  if (count >= 3) return null
+function ConceptCountNote({ count }: { count: number | null }) {
+  if (count === null || count >= 3) return null
   const text =
     count === 0
       ? 'We didn’t find teachable concepts in this lecture (it may be an intro or admin session), so nothing was added to the map.'
@@ -232,7 +257,8 @@ function TranscriptPanel({ lecture }: { lecture: LectureResponse }) {
     if (!segments?.length) return
     const t = Number(new URLSearchParams(window.location.search).get('t'))
     if (!Number.isFinite(t) || t <= 0) return
-    const hit = segments.find((s) => s.startMs <= t && t < s.endMs)
+    // Last segment starting at or before t (covers gaps between cues and t = duration).
+    const hit = segments.findLast((s) => s.startMs <= t)
     if (hit) document.getElementById(`s${hit.idx}`)?.scrollIntoView({ block: 'center' })
   }, [segments])
 
@@ -278,8 +304,16 @@ function TranscriptPanel({ lecture }: { lecture: LectureResponse }) {
   )
 }
 
-function LectureActions({ lecture }: { lecture: LectureResponse }) {
-  const mapReady = lecture.status === 'map_ready' || lecture.status === 'ready'
+function LectureActions({
+  lecture,
+  conceptCount,
+}: {
+  lecture: LectureResponse
+  conceptCount: number | null
+}) {
+  // A lecture with no concepts has no map section and no questions (F2.9 empty state instead).
+  const empty = conceptCount === 0
+  const mapReady = (lecture.status === 'map_ready' || lecture.status === 'ready') && !empty
   return (
     <>
       {lecture.source === 'library' && lecture.status === 'ready' && (
@@ -298,7 +332,7 @@ function LectureActions({ lecture }: { lecture: LectureResponse }) {
           </Link>
         </Button>
       )}
-      {lecture.status === 'ready' && (
+      {lecture.status === 'ready' && !empty && (
         <Button asChild variant="outline">
           <Link href={`/lectures/${lecture.id}/diagnostic` as Route}>
             <ClipboardCheck aria-hidden />
@@ -313,6 +347,7 @@ function LectureActions({ lecture }: { lecture: LectureResponse }) {
 /** /lectures/[id]: status, step-by-step processing (2 s polling), errors + retry, transcript. */
 export function LectureView({ lectureId }: { lectureId: string }) {
   const lecture = useLecture(lectureId)
+  const conceptCount = useLectureConceptCount(lecture.data)
 
   if (lecture.isPending) {
     return (
@@ -354,14 +389,16 @@ export function LectureView({ lectureId }: { lectureId: string }) {
             <MarkerCounts lost={data.markerCounts.lost} important={data.markerCounts.important} />
           </span>
         }
-        actions={<LectureActions lecture={data} />}
+        actions={<LectureActions lecture={data} conceptCount={conceptCount} />}
       />
 
       <div className="space-y-6">
         {processing && <ProcessingPanel lecture={data} />}
         {data.status === 'failed' && <FailedPanel lecture={data} />}
-        {userLecture && data.status === 'draft' && <DraftPanel lecture={data} />}
-        {userLecture && data.status === 'ready' && <ConceptCountNote lecture={data} />}
+        {userLecture && (data.status === 'draft' || data.status === 'uploading') && (
+          <DraftPanel lecture={data} />
+        )}
+        {userLecture && data.status === 'ready' && <ConceptCountNote count={conceptCount} />}
         {!data.hasTimestamps && data.status !== 'draft' && (
           <p className="text-muted-foreground text-sm">
             This transcript has no timestamps, so the map and diagnostic work but markers are off.

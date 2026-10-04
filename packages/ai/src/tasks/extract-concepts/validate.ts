@@ -12,7 +12,9 @@ export function validateExtraction(
   input: ExtractConceptsInput,
 ): string[] {
   const known = segmentSet(input.segments)
-  const min = Math.max(MIN_CONCEPTS, input.targetCount - COUNT_SLACK)
+  // F2.9: a short lecture may teach only one or two concepts; don't force the model to pad.
+  const min =
+    input.targetCount <= MIN_CONCEPTS ? 1 : Math.max(MIN_CONCEPTS, input.targetCount - COUNT_SLACK)
   const max = Math.min(MAX_CONCEPTS, input.targetCount + COUNT_SLACK)
   const keys = out.concepts.map((c) => c.canonicalKey)
   const allKeys = new Set([...keys, ...input.existingConcepts.map((c) => c.canonicalKey)])

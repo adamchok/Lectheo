@@ -1,6 +1,7 @@
 import type { PipelineStep } from '@lectheo/contracts'
 import { sleep } from 'workflow'
 import {
+  abandonStt,
   alignMarkers,
   beginPipeline,
   draftItems,
@@ -43,6 +44,7 @@ export async function processLecture(lectureId: string): Promise<'ready' | 'fail
       let polls = 1
       while ((await pollTranscription(lectureId)) !== 'completed') {
         if (polls >= MAX_POLLS) {
+          await abandonStt(lectureId)
           await failProcessing(lectureId, current, STT_TIMEOUT)
           return 'failed'
         }
@@ -70,7 +72,11 @@ export async function processLecture(lectureId: string): Promise<'ready' | 'fail
     await finishLecture(lectureId)
     return 'ready'
   } catch {
-    await failProcessing(lectureId, current)
+    try {
+      await failProcessing(lectureId, current)
+    } catch {
+      // failProcessing already logs; a lecture left in `processing` is released by the next claim.
+    }
     return 'failed'
   }
 }

@@ -1,8 +1,11 @@
 import {
+  and,
   asc,
   conceptEdges,
   conceptOccurrences,
+  concepts,
   courses,
+  sql,
   eq,
   lectures,
   profiles,
@@ -71,9 +74,25 @@ export function capToTier(segments: readonly Segment[], tier: Tier): Segment[] {
 }
 
 /**
+ * Deletes the course's concepts that no lecture mentions any more, unless someone has practised
+ * them (deleting a concept cascades to its items and attempts; Data Model invariant 6).
+ */
+export async function dropOrphanConcepts(db: DbLike, courseId: string): Promise<void> {
+  await db.delete(concepts).where(
+    and(
+      eq(concepts.courseId, courseId),
+      sql`not exists (select 1 from concept_occurrences o where o.concept_id = "concepts"."id")`,
+      sql`not exists (select 1 from attempts a where a.concept_id = "concepts"."id")`,
+      sql`not exists (select 1 from items i join attempts a on a.item_id = i.id
+          where i.concept_id = "concepts"."id")`,
+    ),
+  )
+}
+
+/**
  * Replaces the lecture's transcript (a re-parse or a new transcription). Grounding of this
- * lecture's concepts cites the old indexes, so its occurrences and edges go too; concepts and
- * items stay (attempts reference items).
+ * lecture's concepts cites the old indexes, so its occurrences and edges go too, and concepts no
+ * lecture mentions any more are dropped; items stay (attempts reference them).
  */
 export async function replaceSegments(
   db: DbLike,
@@ -104,6 +123,11 @@ export async function replaceSegments(
         ...(meta.sttConfidence === undefined ? {} : { sttConfidence: meta.sttConfidence }),
       })
       .where(eq(lectures.id, lectureId))
+    const [row] = await tx
+      .select({ courseId: lectures.courseId })
+      .from(lectures)
+      .where(eq(lectures.id, lectureId))
+    if (row) await dropOrphanConcepts(tx as unknown as DbLike, row.courseId)
   })
 }
 

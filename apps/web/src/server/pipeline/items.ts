@@ -32,7 +32,7 @@ import {
 } from '@lectheo/db'
 import { aiContext } from '../ai-hooks'
 import type { DbLike } from '../db'
-import { loadSegments } from './segments'
+import { loadLecture, loadSegments } from './segments'
 import { mergeStepOutput, runStep, stepOutput } from './state'
 
 /*
@@ -46,6 +46,8 @@ import { mergeStepOutput, runStep, stepOutput } from './state'
 const MCQ_PER_CONCEPT = 2
 const PRACTICE_CONCEPTS = 3
 const SPOT_FLAW_PER_PRACTICE_CONCEPT = 2
+/** Every concept gets one spot-the-flaw scenario (F4c is the main activity, Arch §4.3). */
+const SPOT_FLAW_PER_CONCEPT = 1
 const DRAFT_BATCH_CONCEPTS = 4
 /** The verifier's output budget is 4k tokens; 4 items per call stays well inside it. */
 const VERIFY_BATCH_ITEMS = 4
@@ -71,6 +73,31 @@ const chunk = <T>(list: readonly T[], size: number): T[][] =>
   Array.from({ length: Math.ceil(list.length / size) }, (_, i) =>
     list.slice(i * size, (i + 1) * size),
   )
+
+/** Parallel model calls per step, to stay under the gateway's rate limits. */
+const MAX_PARALLEL_CALLS = 4
+/** The diagnostic's follow-up rule needs two verified MCQs on a concept. */
+const MIN_VERIFIED_MCQS = 2
+
+/** Promise.all with at most `limit` calls in flight; results keep the input order. */
+async function mapLimit<T, R>(list: readonly T[], limit: number, fn: (x: T) => Promise<R>) {
+  const results: R[] = new Array(list.length)
+  let next = 0
+  const worker = async () => {
+    while (next < list.length) {
+      const i = next++
+      results[i] = await fn(list[i] as T)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, list.length) }, worker))
+  return results
+}
+
+/** AI context billed to the lecture's owner (llm_calls.user_id), pipeline quota rules. */
+async function pipelineAi(db: DbLike, lectureId: string) {
+  const { ownerId } = await loadLecture(db, lectureId)
+  return aiContext({ userId: ownerId, lectureId, intake: true, skipQuota: true, db })
+}
 
 const promptSegments = async (db: DbLike, lectureId: string): Promise<PromptSegment[]> =>
   (await loadSegments(db, lectureId)).map(({ idx, text }) => ({ idx, text }))
@@ -124,7 +151,7 @@ async function draftBatch(
         transfer: 0,
       })),
     },
-    aiContext({ lectureId, intake: true, skipQuota: true, db }),
+    await pipelineAi(db, lectureId),
   )
   return { records: toItemRecords(output), model }
 }
@@ -194,15 +221,16 @@ export async function draftItemsStep(
       .map((concept, rank) => ({
         concept,
         mcq: MCQ_PER_CONCEPT,
-        spotFlaw: rank < PRACTICE_CONCEPTS ? SPOT_FLAW_PER_PRACTICE_CONCEPT : 0,
+        spotFlaw: rank < PRACTICE_CONCEPTS ? SPOT_FLAW_PER_PRACTICE_CONCEPT : SPOT_FLAW_PER_CONCEPT,
       }))
       .filter((r) => !drafted.has(r.concept.id))
     if (pending.length === 0) return { concepts: all.length, items: 0 }
     const segments = await promptSegments(db, lectureId)
-    const counts = await Promise.all(
-      chunk(pending, DRAFT_BATCH_CONCEPTS).map(async (batch) =>
+    const counts = await mapLimit(
+      chunk(pending, DRAFT_BATCH_CONCEPTS),
+      MAX_PARALLEL_CALLS,
+      async (batch) =>
         insertDrafts(db, lectureId, batch, await draftBatch(db, lectureId, segments, batch)),
-      ),
     )
     return { concepts: all.length, items: counts.reduce((a, b) => a + b, 0) }
   })
@@ -242,7 +270,7 @@ async function verifyBatch(
     const { output, model } = await runTask(
       verifyItemsTask,
       { segments, items: blind },
-      aiContext({ lectureId, intake: true, skipQuota: true, db }),
+      await pipelineAi(db, lectureId),
     )
     const byRef = new Map(output.results.map((r) => [r.ref, r]))
     await Promise.all(
@@ -281,8 +309,8 @@ async function verifyDrafts(db: DbLike, lectureId: string, segments: PromptSegme
     .innerJoin(itemSecrets, eq(itemSecrets.itemId, items.id))
     .where(and(eq(items.lectureId, lectureId), eq(items.status, 'draft')))
     .orderBy(asc(items.id))
-  await Promise.all(
-    chunk(drafts, VERIFY_BATCH_ITEMS).map((batch) => verifyBatch(db, lectureId, segments, batch)),
+  await mapLimit(chunk(drafts, VERIFY_BATCH_ITEMS), MAX_PARALLEL_CALLS, (batch) =>
+    verifyBatch(db, lectureId, segments, batch),
   )
 }
 
@@ -301,19 +329,39 @@ async function redraftRejected(db: DbLike, lectureId: string, segments: PromptSe
     return request.mcq + request.spotFlaw > 0 ? [request] : []
   })
   const batches = chunk(requests, DRAFT_BATCH_CONCEPTS)
-  const drafts = await Promise.all(
-    batches.map((batch) =>
-      draftBatch(db, lectureId, segments, batch).catch((err: unknown) => {
-        if (err instanceof FatalTaskError) return null
-        throw err
-      }),
-    ),
+  const drafts = await mapLimit(batches, MAX_PARALLEL_CALLS, (batch) =>
+    draftBatch(db, lectureId, segments, batch).catch((err: unknown) => {
+      if (err instanceof FatalTaskError) return null
+      throw err
+    }),
   )
   for (const [i, batch] of batches.entries()) {
     const draft = drafts[i]
     if (draft) await insertDrafts(db, lectureId, batch, draft)
   }
   return requests.length
+}
+
+/** Logs concepts left with fewer verified MCQs than the diagnostic's follow-up needs. */
+async function warnThinConcepts(db: DbLike, lectureId: string): Promise<void> {
+  const verified = await db
+    .select({ conceptId: items.conceptId, n: count() })
+    .from(items)
+    .where(
+      and(
+        eq(items.lectureId, lectureId),
+        eq(items.kind, 'diagnostic_mcq'),
+        eq(items.status, 'verified'),
+      ),
+    )
+    .groupBy(items.conceptId)
+  const counts = new Map(verified.map((v) => [v.conceptId, v.n]))
+  const thin = (await lectureConcepts(db, lectureId))
+    .filter((c) => (counts.get(c.id) ?? 0) < MIN_VERIFIED_MCQS)
+    .map((c) => c.canonicalKey)
+  if (thin.length > 0) {
+    console.warn(JSON.stringify({ event: 'few_verified_mcqs', lectureId, concepts: thin }))
+  }
 }
 
 /**
@@ -341,6 +389,7 @@ export async function verifyItemsStep(
       .where(and(eq(items.lectureId, lectureId), inArray(items.status, ['verified', 'rejected'])))
       .groupBy(items.status)
     const of = (s: string) => totals.find((t) => t.status === s)?.n ?? 0
+    await warnThinConcepts(db, lectureId)
     return { verified: of('verified'), rejected: of('rejected') }
   })
 }

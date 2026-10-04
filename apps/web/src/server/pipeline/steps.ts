@@ -1,4 +1,6 @@
 import type { PipelineStep } from '@lectheo/contracts'
+import { eq, lectures } from '@lectheo/db'
+import { getWorkflowMetadata } from 'workflow'
 import { appDb } from '../db'
 import { sttClient } from '../stt/assemblyai'
 import { alignMarkersStep, extractConceptsStep, layoutMapStep, validateGraphStep } from './graph'
@@ -13,6 +15,7 @@ import {
   type StepFailure,
 } from './state'
 import {
+  abandonTranscription,
   fetchTranscriptStep,
   parseTranscriptStep,
   pollTranscriptionStep,
@@ -26,6 +29,30 @@ import {
  * lecture id and return small JSON; the database is the record. Outside a workflow each one is a
  * plain async call (tests drive them that way).
  */
+
+/** This step's workflow run id, or null outside a workflow (tests, direct calls). */
+function currentRunId(): string | null {
+  try {
+    return getWorkflowMetadata().workflowRunId
+  } catch {
+    return null
+  }
+}
+
+/**
+ * True when a later claim (?from= while map_ready) started another run for this lecture: the old
+ * run stops writing so the two never draft, verify or finish the same lecture together.
+ */
+async function superseded(lectureId: string): Promise<boolean> {
+  const runId = currentRunId()
+  if (!runId) return false
+  const [row] = await appDb()
+    .select({ runId: lectures.workflowRunId })
+    .from(lectures)
+    .where(eq(lectures.id, lectureId))
+    .limit(1)
+  return row?.runId != null && row.runId !== runId
+}
 
 export async function beginPipeline(lectureId: string): Promise<SourceKind> {
   'use step'
@@ -74,21 +101,25 @@ export async function alignMarkers(lectureId: string): Promise<void> {
 
 export async function mapReady(lectureId: string): Promise<void> {
   'use step'
+  if (await superseded(lectureId)) return
   await markMapReady(appDb(), lectureId)
 }
 
 export async function draftItems(lectureId: string): Promise<void> {
   'use step'
+  if (await superseded(lectureId)) return
   await draftItemsStep(appDb(), lectureId)
 }
 
 export async function verifyItems(lectureId: string): Promise<void> {
   'use step'
+  if (await superseded(lectureId)) return
   await verifyItemsStep(appDb(), lectureId)
 }
 
 export async function finishLecture(lectureId: string): Promise<void> {
   'use step'
+  if (await superseded(lectureId)) return
   await markReady(appDb(), lectureId)
 }
 
@@ -98,5 +129,17 @@ export async function failProcessing(
   failure?: StepFailure,
 ): Promise<void> {
   'use step'
-  await failLecture(appDb(), lectureId, step, failure)
+  if (await superseded(lectureId)) return
+  try {
+    await failLecture(appDb(), lectureId, step, failure)
+  } catch (err) {
+    // Never fail the run over this: a stuck `processing` lecture is released by the next claim.
+    const reason = err instanceof Error ? err.message : String(err)
+    console.error(JSON.stringify({ event: 'fail_lecture_failed', lectureId, step, reason }))
+  }
+}
+
+export async function abandonStt(lectureId: string): Promise<void> {
+  'use step'
+  await abandonTranscription(appDb(), lectureId, sttClient())
 }

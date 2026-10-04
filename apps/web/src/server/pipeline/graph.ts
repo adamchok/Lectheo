@@ -37,7 +37,15 @@ interface CourseGraph {
   edges: CourseEdge[]
 }
 
-async function loadCourseGraph(db: DbLike, courseId: string): Promise<CourseGraph> {
+/**
+ * The course's concepts and edges. `exceptLecture` leaves out that lecture's own edges: a re-run
+ * recomputes them, so the old ones must not count towards the DAG check.
+ */
+async function loadCourseGraph(
+  db: DbLike,
+  courseId: string,
+  exceptLecture?: string,
+): Promise<CourseGraph> {
   const [conceptRows, edges] = await Promise.all([
     db
       .select({ id: concepts.id, canonicalKey: concepts.canonicalKey, name: concepts.name })
@@ -51,7 +59,14 @@ async function loadCourseGraph(db: DbLike, courseId: string): Promise<CourseGrap
         relation: conceptEdges.relation,
       })
       .from(conceptEdges)
-      .where(eq(conceptEdges.courseId, courseId)),
+      .where(
+        and(
+          eq(conceptEdges.courseId, courseId),
+          exceptLecture
+            ? sql`${conceptEdges.lectureId} is distinct from ${exceptLecture}`
+            : undefined,
+        ),
+      ),
   ])
   return { concepts: conceptRows, edges }
 }
@@ -76,7 +91,7 @@ export async function extractConceptsStep(db: DbLike, lectureId: string): Promis
     if (segments.length === 0) {
       throw new PipelineError('no_transcript', 'This lecture has no transcript yet.')
     }
-    const course = await loadCourseGraph(db, lecture.courseId)
+    const course = await loadCourseGraph(db, lecture.courseId, lectureId)
     const task = {
       ...extractConceptsTask,
       validate: (out: ExtractConceptsOutput, input: ExtractInput) => [
@@ -92,7 +107,7 @@ export async function extractConceptsStep(db: DbLike, lectureId: string): Promis
         existingConcepts: course.concepts.map(({ canonicalKey, name }) => ({ canonicalKey, name })),
         targetCount: scaleForMinutes(lectureMinutes(lecture, segments)).nodes,
       },
-      aiContext({ lectureId, intake: true, skipQuota: true, db }),
+      aiContext({ userId: lecture.ownerId, lectureId, intake: true, skipQuota: true, db }),
     )
     return { extraction: output, model }
   })
@@ -198,7 +213,7 @@ export async function validateGraphStep(
     }
     const lecture = await loadLecture(db, lectureId)
     const segments = await loadSegments(db, lectureId)
-    const course = await loadCourseGraph(db, lecture.courseId)
+    const course = await loadCourseGraph(db, lecture.courseId, lectureId)
     const plan = planGraph(extraction, course.concepts)
     const errors = graphErrors(plan, new Set(segments.map((s) => s.idx)), course.edges)
     if (errors.length > 0) {
@@ -224,10 +239,17 @@ export async function layoutMapStep(db: DbLike, lectureId: string): Promise<{ no
       to: e.toId,
       relation: e.relation,
     }))
+    const hash = layoutHash(nodes, edges)
+    const [course] = await db
+      .select({ layoutHash: courses.layoutHash })
+      .from(courses)
+      .where(eq(courses.id, lecture.courseId))
+    // Same concepts and edges as the stored layout (e.g. a re-run that added nothing): keep it.
+    if (course?.layoutHash === hash) return { nodes: nodes.length }
     const layout = await computeLayout(nodes, edges)
     await db
       .update(courses)
-      .set({ layout, layoutHash: layoutHash(nodes, edges) })
+      .set({ layout, layoutHash: hash })
       .where(eq(courses.id, lecture.courseId))
     return { nodes: nodes.length }
   })

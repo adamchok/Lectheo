@@ -155,6 +155,26 @@ describe('AssemblyAI client', () => {
     expect(segments.map((s) => s.text).join(' ')).toContain('malloc returns heap memory.')
   })
 
+  it('keeps waiting through a transient poll error, but not an auth error', async () => {
+    await f.exec(`UPDATE lectures SET stt_job_id = 'job-1'`)
+    const api = fakeApi({
+      'GET /transcript/job-1': [{ status: 503 }, { status: 429 }, { status: 401 }],
+    })
+    expect(await pollTranscriptionStep(f.db, f.lectureId, api.client)).toBe('pending')
+    expect(await pollTranscriptionStep(f.db, f.lectureId, api.client)).toBe('pending')
+    await expect(pollTranscriptionStep(f.db, f.lectureId, api.client)).rejects.toThrow(/401/)
+  })
+
+  it('deletes the remote job when transcription fails', async () => {
+    await f.exec(`UPDATE lectures SET stt_job_id = 'job-1'`)
+    const api = fakeApi({
+      'GET /transcript/job-1': [{ body: { status: 'error', error: 'bad audio' } }],
+      'DELETE /transcript/job-1': [{ body: {} }],
+    })
+    await expect(pollTranscriptionStep(f.db, f.lectureId, api.client)).rejects.toThrow()
+    expect(api.calls).toContain('DELETE /transcript/job-1')
+  })
+
   it('treats an already-deleted remote transcript as deleted', async () => {
     const api = fakeApi({ 'DELETE /transcript/gone': [{ status: 404 }] })
     await expect(api.client.remove('gone')).resolves.toBeUndefined()
