@@ -13,3 +13,6 @@ supabase/.temp/
 supabase/.branches/
 eval-out/
 .DS_Store
+
+# Claude Code local state (worktrees, local settings)
+.claude/

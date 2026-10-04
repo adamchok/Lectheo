@@ -1,12 +1,14 @@
 'use client'
 
-import { MessagesSquare, SearchCheck, Sparkles } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import { useActivity } from '@/client/queries'
+import { SpotFlawView } from '@/components/activity/spot-flaw/spot-flaw-view'
 import { ErrorState } from '@/components/error-state'
 import { FeaturePlaceholder } from '@/components/feature-placeholder'
 import { PageHeader } from '@/components/page-header'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ACTIVITY_LABELS } from '@/lib/labels'
+import { TeachBackView } from './teach-back/teach-back-view'
 
 /** /activities/[id]: Spot the flaw / Teach-back / Transfer / Stump (F4). */
 export function ActivityView({ activityId }: { activityId: string }) {
@@ -23,7 +25,11 @@ export function ActivityView({ activityId }: { activityId: string }) {
   }
   if (activity.isError) {
     return (
-      <ErrorState title="Couldn't load this activity" error={activity.error} onRetry={() => activity.refetch()} />
+      <ErrorState
+        title="Couldn't load this activity"
+        error={activity.error}
+        onRetry={() => activity.refetch()}
+      />
     )
   }
 
@@ -37,26 +43,9 @@ export function ActivityView({ activityId }: { activityId: string }) {
       />
       <div className="mx-auto max-w-3xl">
         {data.type === 'spot_flaw' ? (
-          // TODO(feature-spot-the-flaw): scenario sentences (selectable), author Q&A (≤ 6,
-          // POST …/messages JSON), 2-step hints, verdict + flawed sentence + correction submit,
-          // Socratic retry, final explanation + rubric with <SourceRef>s, <MasteryBadge> change.
-          <FeaturePlaceholder
-            feature="feature-spot-the-flaw"
-            icon={SearchCheck}
-            title="Spot the flaw"
-            description="Read a short explanation and decide whether it holds up."
-            className="min-h-80"
-          />
+          <SpotFlawView activity={data} />
         ) : data.type === 'teach_back' ? (
-          // TODO(feature-teach-back): useChat stream with the confused friend (≤ 6 turns),
-          // submit {} → criteria + guiding question, one retry, <MasteryBadge> change.
-          <FeaturePlaceholder
-            feature="feature-teach-back"
-            icon={MessagesSquare}
-            title="Teach-back"
-            description="Explain the idea to a curious first-year."
-            className="min-h-80"
-          />
+          <TeachBackView activity={data} />
         ) : (
           // TODO(feature-transfer / feature-stump): Should-priority activity types.
           <FeaturePlaceholder

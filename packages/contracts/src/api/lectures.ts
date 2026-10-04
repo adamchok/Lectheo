@@ -23,6 +23,8 @@ export const LectureMedia = z.object({
   endMs: Ms.nullable().optional(),
   localFileName: z.string().nullable().optional(),
   durationMs: Ms.nullable(),
+  /** Library only: official MP3 on the same timeline, used when the embed is blocked. */
+  fallbackAudioUrl: z.string().nullable().optional(),
 })
 
 export const LectureResponse = z.object({

@@ -9,6 +9,8 @@ import { activities, attempts, eq, itemSecrets, llmCalls, messages } from '@lect
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DbLike } from '../db'
 import { createActivity, getActivity, postMessage, takeHint } from './service'
+import { friendReplyTask } from '@lectheo/ai'
+import { exchangesOf, friendReplyInput, questionOf, retryHintFor } from './teach-back'
 import { submitActivity } from './submit'
 import { ALICE, IDS, newId, SECRET_KEYS, seedFixture } from './test-fixture'
 
@@ -49,24 +51,25 @@ describe('spot_flaw', () => {
 
   it('try 1 partial → awaiting_retry → try 2 closes → a 3rd submit is 409', async () => {
     const { id } = await startFlawed()
-    const wrongPlace = { verdict: 'flawed', flawSentenceIdx: 0, correction: 'Lookup is O(n).' }
-    const try1 = await submitActivity(ALICE, id, wrongPlace, db)
+    // Right sentence, no correction yet → 4/6 partial without a judge call.
+    const noFix = { verdict: 'flawed', flawSentenceIdx: 2 }
+    const try1 = await submitActivity(ALICE, id, noFix, db)
 
     expect(try1).toMatchObject({ tryNo: 1, final: false, outcome: 'partial', score: 4 })
-    expect(try1).toMatchObject({ canRetry: true, checks: { verdict: true, location: false } })
+    expect(try1).toMatchObject({ canRetry: true, checks: { verdict: true, location: true } })
     expect(try1.explanation).toBeUndefined()
     expect(try1.rubric).toBeUndefined()
     expect(try1.sources[0]).toMatchObject({ lectureId: IDS.lecture, idx: 1 })
     expect(try1.mastery).toMatchObject({ conceptId: IDS.concept, state: 'amber' })
     expectNoSecrets(try1)
-    expect(await judgeCalls()).toBe(1)
+    expect(await judgeCalls()).toBe(0)
     const [mid] = await db.select().from(activities).where(eq(activities.id, id))
     expect(mid?.status).toBe('awaiting_retry')
 
     // Same body again (client retry) → the stored attempt, no second judge call.
-    const replay = await submitActivity(ALICE, id, wrongPlace, db)
+    const replay = await submitActivity(ALICE, id, noFix, db)
     expect(replay.attemptId).toBe(try1.attemptId)
-    expect(await judgeCalls()).toBe(1)
+    expect(await judgeCalls()).toBe(0)
 
     const right = { verdict: 'flawed', flawSentenceIdx: 2, correction: 'Collisions can happen.' }
     const try2 = await submitActivity(ALICE, id, right, db)
@@ -142,7 +145,7 @@ describe('teach_back', () => {
     expect(created).toMatchObject({
       type: 'teach_back',
       persona: { key: 'first_year', name: 'Sam, a curious first-year' },
-      opener: 'Wait, so what *is* hash tables?',
+      opener: expect.stringContaining('I missed the lecture on hash tables'),
       turnBudget: 6,
     })
     expectNoSecrets(created)
@@ -182,6 +185,9 @@ describe('teach_back', () => {
       maxScore: 4,
     })
     expect(try1.criteria.map((c) => c.label)).toEqual(['Key point 1', 'Key point 2'])
+    // F5.1: question, then a hint that counts the gaps without naming them (F5.3).
+    expect(try1.feedback.guidingQuestion).toBeTruthy()
+    expect(try1.feedback.hint).toContain('1 key point out of 2')
     expect(try1.checks).toBeNull()
     expect(try1.rubric).toBeUndefined()
     expectNoSecrets(try1)
@@ -199,6 +205,58 @@ describe('teach_back', () => {
     expect(final.rubric?.map((r) => r.description)).toContain(
       'Collisions are handled by chaining or probing.',
     )
-    expect(final.explanation).toContain('Key points')
+    expect(final.explanation).toBe(
+      'A hash table stores key/value pairs in buckets chosen by a hash function.',
+    )
+  })
+})
+
+describe('teach_back helpers', () => {
+  it('the friend prompt never contains the concept key points (ADR-009)', () => {
+    const concept = {
+      name: 'hash tables',
+      summary: 'A hash table stores key/value pairs in buckets chosen by a hash function.',
+      keyPoints: [
+        { id: 'k1', text: 'Keys map to buckets via a hash function.' },
+        { id: 'k2', text: 'Collisions are handled by chaining or probing.' },
+      ],
+    }
+    const history = [{ role: 'student', text: 'It puts keys in buckets.' }] as const
+    const json = JSON.stringify(
+      friendReplyTask.buildPrompt(
+        friendReplyInput(concept, { turnsUsed: 6, turnBudget: 6 }, history),
+      ),
+    )
+    for (const k of concept.keyPoints) expect(json).not.toContain(k.text)
+  })
+
+  it('strips the persona style down to its question sentences', () => {
+    expect(questionOf('Oh nice, that makes sense! But why a hash? And then what?')).toBe(
+      'But why a hash? And then what?',
+    )
+    expect(questionOf('Thanks, I get it now.')).toBe('Thanks, I get it now.')
+  })
+
+  it('pairs each student answer with the friend question before it', () => {
+    const turns = [
+      { role: 'persona', text: 'Hmm. What is a bucket?' },
+      { role: 'student', text: 'A slot in an array.' },
+      { role: 'student', text: 'Each key maps to one.' },
+    ] as const
+    expect(exchangesOf(turns)).toEqual([
+      { question: 'What is a bucket?', answer: 'A slot in an array.' },
+      { question: '', answer: 'Each key maps to one.' },
+    ])
+  })
+
+  it('hint counts open key points, null when all are covered', () => {
+    expect(
+      retryHintFor([
+        { score: 2, max: 2 },
+        { score: 0, max: 2 },
+        { score: 1, max: 2 },
+      ]),
+    ).toContain('2 key points out of 3')
+    expect(retryHintFor([{ score: 2, max: 2 }])).toBeNull()
   })
 })
