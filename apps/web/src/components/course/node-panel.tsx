@@ -16,7 +16,7 @@ import { ACTIVITY_LABELS, RELATION_LABELS } from '@/lib/labels'
 /** Practice entry points, each hidden until its activity flow ships (Spec §3). */
 const PRACTICE: readonly { type: ActivityType; label: string; enabled: boolean }[] = [
   { type: 'spot_flaw', label: ACTIVITY_LABELS.spot_flaw, enabled: FEATURES.practiceSpotFlaw },
-  { type: 'teach_back', label: 'Teach it back', enabled: FEATURES.practiceTeachBack },
+  { type: 'teach_back', label: ACTIVITY_LABELS.teach_back, enabled: FEATURES.practiceTeachBack },
 ]
 
 function Section({ title, children }: { title: string; children: ReactNode }) {

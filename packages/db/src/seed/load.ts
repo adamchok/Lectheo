@@ -1,3 +1,4 @@
+import { computeLayout, layoutHash } from '@lectheo/domain/layout'
 import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core'
 import * as s from '../schema'
 import { buildLibraryRows } from './library'
@@ -18,11 +19,27 @@ export interface SeedCounts {
  * Inserts the CS50x library fixture (course, lectures, segments, concepts, occurrences, edges,
  * items, item secrets) in one transaction. Idempotent: every insert is ON CONFLICT DO NOTHING
  * and every id is stable, so re-running changes nothing. Returns the fixture row counts.
+ * The course's concept-map layout is computed here and upserted (refreshed on re-seed): library
+ * content is never written at runtime (Data Model §6 invariant 7).
  */
 export async function seedLibrary(db: SeedDb): Promise<SeedCounts> {
   const rows = buildLibraryRows()
+  const graph = {
+    concepts: rows.concepts.map((c) => ({ id: c.id! })),
+    edges: rows.edges.map((e) => ({
+      id: e.id!,
+      from: e.fromConceptId,
+      to: e.toConceptId,
+      relation: e.relation,
+    })),
+  }
+  const layout = await computeLayout(graph.concepts, graph.edges)
+  const hash = layoutHash(graph.concepts, graph.edges)
   await db.transaction(async (tx) => {
-    await tx.insert(s.courses).values(rows.course).onConflictDoNothing()
+    await tx
+      .insert(s.courses)
+      .values({ ...rows.course, layout, layoutHash: hash })
+      .onConflictDoUpdate({ target: s.courses.id, set: { layout, layoutHash: hash } })
     await tx.insert(s.lectures).values(rows.lectures).onConflictDoNothing()
     await tx.insert(s.transcriptSegments).values(rows.segments).onConflictDoNothing()
     await tx.insert(s.concepts).values(rows.concepts).onConflictDoNothing()

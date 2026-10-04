@@ -1,6 +1,7 @@
 'use client'
 
 import type { MapNode } from '@lectheo/contracts'
+import { NODE_HEIGHT, NODE_WIDTH } from '@lectheo/domain'
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
 import { MarkerCounts } from '@/components/marker-counts'
 import { MasteryBadge } from '@/components/mastery-badge'
@@ -10,17 +11,15 @@ import { cn } from '@/lib/utils'
 
 export type ConceptFlowNode = Node<{ concept: MapNode }, 'concept'>
 
-/** Must match NODE_WIDTH / NODE_HEIGHT in server/concepts/layout.ts (ELK spacing). */
-export const NODE_WIDTH = 224
-export const NODE_HEIGHT = 84
-
 const hiddenHandle = '!size-1 !min-w-0 !border-0 !bg-transparent'
 const SIDES = [
   ['left', Position.Left],
   ['right', Position.Right],
+  ['top', Position.Top],
+  ['bottom', Position.Bottom],
 ] as const
 
-/** Edges attach left or right depending on which node comes first (see concept-map.tsx). */
+/** Edges attach left/right across layers, top/bottom within one (see concept-map.tsx). */
 function Handles() {
   return SIDES.flatMap(([id, position]) =>
     (['target', 'source'] as const).map((type) => (

@@ -14,8 +14,8 @@ import {
   sql,
 } from '@lectheo/db'
 import type { MasteryResult } from '@lectheo/domain'
+import { computeLayout, layoutHash, type Layout } from '@lectheo/domain/layout'
 import type { Actor } from '../auth'
-import { computeLayout, layoutHash, type Layout } from '../concepts/layout'
 import { appDb, type DbLike } from '../db'
 import { loadMasteryForUser } from '../mastery'
 import { loadCourseForRead, type Course } from '../ownership'
@@ -24,7 +24,7 @@ import { toAttribution } from './summary'
 /*
  * GET /courses/{id}/map (API Spec §4). 6 queries in 3 round trips: the ownership check; then
  * lectures, concepts⋈occurrences, edges and markers⟕marker_concepts in parallel; then attempts
- * (plus one courses.layout write when the graph changed since the stored layout).
+ * (plus one courses.layout write for a personal course whose graph changed since its layout).
  * 🔒 concepts.key_points is never selected.
  */
 
@@ -129,9 +129,11 @@ const countKind = (moments: readonly Moment[], kind: Moment['kind']) =>
   moments.filter((m) => m.kind === kind).length
 
 /**
- * courses.layout, recomputed and stored when missing or the graph changed (layout_hash differs).
- * Guarded update so concurrent readers of a shared library course write it once. A layout failure
- * never fails the map: it falls back to the stale layout (the canvas grids unplaced nodes).
+ * courses.layout. Library courses use the seed's layout as-is: library content is never written at
+ * runtime (Data Model §6 invariant 7). Personal courses recompute and store it when missing or the
+ * graph changed (layout_hash differs), with a guarded update so concurrent reads write it once. A
+ * layout failure never fails the map: it falls back to the stale layout (the canvas grids unplaced
+ * nodes).
  */
 async function ensureLayout(
   db: DbLike,
@@ -139,6 +141,7 @@ async function ensureLayout(
   conceptIds: string[],
   edges: Awaited<ReturnType<typeof loadEdges>>,
 ): Promise<Layout> {
+  if (course.kind === 'library') return course.layout ?? {}
   const concepts = conceptIds.map((id) => ({ id }))
   const hash = layoutHash(concepts, edges)
   if (course.layout && course.layoutHash === hash) return course.layout

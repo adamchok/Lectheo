@@ -94,8 +94,9 @@ describe('GET /courses/{id}/map', () => {
     expect(c2?.moments).toEqual([
       { id: expect.any(String), lectureId: ID.L1, kind: 'lost', tMs: 1000 },
     ])
-    // The fixture's hash-less layout is stale, so every node gets a fresh ELK position.
-    expect(map.nodes.every((n) => n.position !== null)).toBe(true)
+    // Library layout comes from the seed and is never recomputed at runtime.
+    expect(map.nodes.find((n) => n.id === ID.C1)?.position).toEqual({ x: 10, y: 20 })
+    expect(c2?.position).toBeNull()
     expect(map.edges).toEqual([{ id: ID.E1, from: ID.C3, to: ID.C1, relation: 'depends_on' }])
     expect(map.unlinkedMarkers).toEqual([
       { id: unlinked, lectureId: ID.L2, kind: 'important', tMs: 1000 },

@@ -10,15 +10,10 @@ import {
   type Edge,
   type NodeTypes,
 } from '@xyflow/react'
+import { NODE_HEIGHT, NODE_WIDTH } from '@lectheo/domain'
 import { useMemo, type KeyboardEvent } from 'react'
 import { RELATION_LABELS } from '@/lib/labels'
-import {
-  ConceptNode,
-  conceptAriaLabel,
-  NODE_HEIGHT,
-  NODE_WIDTH,
-  type ConceptFlowNode,
-} from './concept-node'
+import { ConceptNode, conceptAriaLabel, type ConceptFlowNode } from './concept-node'
 
 const nodeTypes: NodeTypes = { concept: ConceptNode }
 
@@ -69,25 +64,34 @@ function edgeStyle(relation: MapEdge['relation']): Pick<Edge, 'style' | 'markerE
   }
 }
 
+/** Across layers (different x) edges join right → left sides; within a layer, bottom → top. */
+export function edgeHandles(from: Point, to: Point): Pick<Edge, 'sourceHandle' | 'targetHandle'> {
+  if (from.x === to.x) {
+    const fromBelow = from.y > to.y
+    return {
+      sourceHandle: fromBelow ? 'top' : 'bottom',
+      targetHandle: fromBelow ? 'bottom' : 'top',
+    }
+  }
+  const fromAfter = from.x > to.x
+  return { sourceHandle: fromAfter ? 'left' : 'right', targetHandle: fromAfter ? 'right' : 'left' }
+}
+
 /** Edges read "<from> <relation> <to>", arrow at `to`; prerequisites are solid and bold (F2.5). */
 function toFlowEdges(edges: readonly MapEdge[], positions: Map<string, Point>): Edge[] {
   return edges
     .filter((e) => positions.has(e.from) && positions.has(e.to))
-    .map((e) => {
-      const fromAfter = positions.get(e.from)!.x > positions.get(e.to)!.x
-      return {
-        id: e.id,
-        source: e.from,
-        target: e.to,
-        sourceHandle: fromAfter ? 'left' : 'right',
-        targetHandle: fromAfter ? 'right' : 'left',
-        label: RELATION_LABELS[e.relation],
-        labelStyle: { fontSize: 11, fill: 'var(--muted-foreground)' },
-        labelBgStyle: { fill: 'var(--card)' },
-        labelBgPadding: [4, 2] as [number, number],
-        ...edgeStyle(e.relation),
-      }
-    })
+    .map((e) => ({
+      id: e.id,
+      source: e.from,
+      target: e.to,
+      ...edgeHandles(positions.get(e.from)!, positions.get(e.to)!),
+      label: RELATION_LABELS[e.relation],
+      labelStyle: { fontSize: 11, fill: 'var(--muted-foreground)' },
+      labelBgStyle: { fill: 'var(--card)' },
+      labelBgPadding: [4, 2] as [number, number],
+      ...edgeStyle(e.relation),
+    }))
 }
 
 export interface ConceptMapProps {

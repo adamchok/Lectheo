@@ -2,11 +2,13 @@ import type { Relation } from '@lectheo/contracts'
 import { createHash } from 'node:crypto'
 import ELK from 'elkjs/lib/elk.bundled.js'
 import type { ElkExtendedEdge } from 'elkjs/lib/elk-api'
+import { NODE_HEIGHT, NODE_WIDTH } from './map-node'
 
 /*
  * Concept-map layout (Architecture §4.3 layoutMap). ELK layered, left → right, prerequisites
  * before the concepts that build on them (RIGHT suits the wide map canvas better than DOWN). Stored on courses.layout keyed by concept id, together
- * with layoutHash so the map service (and the pipeline) only recompute when the graph changes.
+ * with layoutHash. Server/seed only (`@lectheo/domain/layout`): elkjs + node:crypto stay out of the
+ * client bundle; the node size lives in the client-safe ./map-node.
  */
 
 export type Layout = Record<string, { x: number; y: number }>
@@ -20,10 +22,6 @@ export interface LayoutEdge {
   to: string
   relation: Relation
 }
-
-/** Node box the canvas renders; ELK spaces nodes using it. */
-export const NODE_WIDTH = 224
-export const NODE_HEIGHT = 84
 
 /**
  * Which way each relation points in the hierarchy ("from <relation> to"): `up` puts `to` before

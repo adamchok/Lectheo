@@ -4,7 +4,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { ConceptMap } from './concept-map'
+import { ConceptMap, edgeHandles } from './concept-map'
 import { LectureTimeline } from './lecture-timeline'
 
 declare global {
@@ -71,6 +71,23 @@ describe('LectureTimeline', () => {
     expect(links[0]?.getAttribute('href')).toBe(`/lectures/${L1}?t=61000#transcript`)
     expect(links[0]?.getAttribute('aria-label')).toMatch(/^Lost at /)
     expect(links[1]?.getAttribute('aria-label')).toMatch(/^Important at .*, unlinked$/)
+  })
+})
+
+describe('edgeHandles', () => {
+  it('joins layers side to side and nodes in one layer top to bottom', () => {
+    expect(edgeHandles({ x: 300, y: 0 }, { x: 0, y: 0 })).toEqual({
+      sourceHandle: 'left',
+      targetHandle: 'right',
+    })
+    expect(edgeHandles({ x: 0, y: 200 }, { x: 0, y: 0 })).toEqual({
+      sourceHandle: 'top',
+      targetHandle: 'bottom',
+    })
+    expect(edgeHandles({ x: 0, y: 0 }, { x: 0, y: 200 })).toEqual({
+      sourceHandle: 'bottom',
+      targetHandle: 'top',
+    })
   })
 })
 
