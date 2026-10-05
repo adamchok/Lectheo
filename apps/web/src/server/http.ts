@@ -152,8 +152,14 @@ export function errorResponse(err: unknown, requestId: string): Response {
   })
 }
 
+const MAX_ERROR_LOG_CHARS = 500
+
 function describe(err: unknown): string {
-  return err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+  if (!(err instanceof Error)) return String(err).slice(0, MAX_ERROR_LOG_CHARS)
+  // drizzle's DrizzleQueryError message embeds the SQL and its params (student answers,
+  // transcripts, answer keys): log the driver error it wraps instead.
+  const inner = err.cause instanceof Error ? err.cause : err
+  return `${err.name}: ${inner.message}`.slice(0, MAX_ERROR_LOG_CHARS)
 }
 
 function logRequest(line: Record<string, unknown>): void {
