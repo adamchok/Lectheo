@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useRef, type ReactNode } from 'react'
 import { isApiClientError } from '@/client/api'
-import { useCourses, useMe } from '@/client/queries'
+import { useCourses, useMe, useSignOut } from '@/client/queries'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { AccountMenu } from './account-menu'
@@ -38,10 +38,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   const me = useMe()
   const navItems = useNavItems()
 
+  const { mutate: endSession } = useSignOut()
   const unauthenticated = isApiClientError(me.error) && me.error.status === 401
   useEffect(() => {
-    if (unauthenticated) router.replace('/')
-  }, [unauthenticated, router])
+    if (!unauthenticated) return
+    // A live session without a profile (a purged sample) is 401 here but signed in to the proxy,
+    // which would send `/` straight back: clear the session cookies first, then leave.
+    endSession(undefined, { onSettled: () => router.replace('/') })
+  }, [unauthenticated, endSession, router])
 
   // A client-side navigation unmounts the link that was clicked and drops focus to <body>; start
   // the next keyboard step at <main> instead (WCAG 2.4.3). Pages that focus something themselves
