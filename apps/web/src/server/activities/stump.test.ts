@@ -211,6 +211,18 @@ describe('stump: submit', () => {
     expect((await masteryFor(db, ALICE.userId, { id: IDS.concept })).state).toBe('gray')
   })
 
+  it("an identical-body replay returns that try's referee sources, not the concept's", async () => {
+    // Concept grounding is key-point segments 0 and 2; the referee cites only segment 2.
+    ai.referee = () => ({ segmentIdxs: [2] })
+    const { id } = await start()
+    const first = await submitActivity(ALICE, id, NOT_A_QUESTION, db)
+    expect(first.sources.map((s) => s.idx)).toEqual([2])
+
+    const replay = await submitActivity(ALICE, id, NOT_A_QUESTION, db)
+    expect(replay.attemptId).toBe(first.attemptId)
+    expect(replay.sources).toEqual(first.sources)
+  })
+
   it('stops at the llm_tasks quota mid-flow without storing an attempt', async () => {
     const { id } = await start()
     // 59 of 60 used: the referee runs, the answerer call is over quota.
