@@ -1,4 +1,4 @@
-import { profiles } from '@lectheo/db'
+import { concepts, eq } from '@lectheo/db'
 import { LIBRARY_COURSE_ID, SEED_STUDENT_ID, conceptId, lectureId, seedAll } from '@lectheo/db/seed'
 import { createTestDb } from '@lectheo/db/testing'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
@@ -23,9 +23,7 @@ let db: DbLike
 
 beforeAll(async () => {
   db = (await createTestDb()) as unknown as DbLike
-  await seedAll(db as never)
-  // seedAll writes the seed profile; the actor only needs to exist.
-  await db.insert(profiles).values({ id: SEED_STUDENT_ID, kind: 'seed' }).onConflictDoNothing()
+  await seedAll(db as never) // includes the seed student's profile
 })
 
 describe('sample account demo data', () => {
@@ -39,12 +37,17 @@ describe('sample account demo data', () => {
     expect(pointers?.transferAvailable).toBe(true)
   })
 
-  it('Pointers has an unseen spot-the-flaw and transfer item; L5 is ready to watch', async () => {
+  it('Pointers is ready for all four activity types; L5 is ready to watch', async () => {
     for (const kind of ['spot_flaw', 'transfer'] as const) {
       const ready = await conceptsWithUnseenItem(db, SAMPLE.userId, [POINTERS], kind)
       expect(ready.has(POINTERS), kind).toBe(true)
     }
-    // Teach-back and stump grade against the concept's key points (always present in the seed).
+    // Teach-back and stump need no bank item: both grade against the concept's key points.
+    const [pointers] = await db
+      .select({ keyPoints: concepts.keyPoints })
+      .from(concepts)
+      .where(eq(concepts.id, POINTERS))
+    expect(pointers?.keyPoints.length).toBeGreaterThanOrEqual(3)
     expect(await getNextStep(SAMPLE, LIBRARY_COURSE_ID, db)).toMatchObject({
       kind: 'watch',
       lectureId: lectureId('l5'),

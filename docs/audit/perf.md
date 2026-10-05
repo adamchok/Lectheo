@@ -63,7 +63,7 @@ workspace packages belong to other lanes. Handoffs, by expected win:
 
 | Win | Change | File |
 |---|---|---|
-| ≈ 60–90 kB on every route | Add `"sideEffects": false` to `packages/contracts/package.json`, then re-measure. If zod schemas still don't shake, import client schemas from per-file subpaths (`@lectheo/contracts/api/session`) instead of the barrel | `packages/contracts/package.json` |
+| Some of the 103 kB on every route | Add `"sideEffects": false` to `packages/contracts/package.json` (safe: contracts are schema-only), then re-measure. It prunes unused contract modules, not zod itself, so expect well under the full chunk. Fallback: per-file subpath imports (`@lectheo/contracts/api/session`), which first need `exports` entries, because only `"."` is mapped today | `packages/contracts/package.json` |
 | 62 kB on landing | Load supabase-js on click: `const { signInWithGoogle } = await import('@/client/supabase')` inside `handleGoogle`, dropping the static import | `components/sign-in/sign-in-actions.tsx:10`, `:126` |
 | 56 kB on spot-flaw / transfer / stump | `const TeachBackView = dynamic(() => import('./teach-back/teach-back-view').then((m) => m.TeachBackView))` from `next/dynamic` | `components/activity/activity-view.tsx:12` |
 | LCP on dashboard / map / activity | Prefetch the page query on the server and hydrate (React Query `HydrationBoundary`), so the LCP text is in the HTML | `app/(app)/**/page.tsx` |

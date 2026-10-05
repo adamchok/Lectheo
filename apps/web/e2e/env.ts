@@ -15,7 +15,8 @@ const TURNSTILE_TEST_SECRET_KEY = '1x0000000000000000000000000000000AA'
  * real Turnstile test widget stays covered there.
  */
 export const E2E_OFFLINE = process.env.E2E_OFFLINE === '1'
-const OFFLINE_PRELOAD = fileURLToPath(new URL('./offline/preload.mjs', import.meta.url))
+// A file:// URL, quoted: a raw Windows path (D:\…) reads as a URL scheme to --import.
+const OFFLINE_PRELOAD = new URL('./offline/preload.mjs', import.meta.url).href
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1'])
 const CACHE_KEY = 'LECTHEO_E2E_ENV'
@@ -81,7 +82,9 @@ export function e2eEnv(): E2eEnv {
     AI_GATEWAY_API_KEY: '',
     ASSEMBLYAI_API_KEY: '',
     VERCEL_OIDC_TOKEN: '',
-    ...(E2E_OFFLINE && { NODE_OPTIONS: `--import ${OFFLINE_PRELOAD}` }),
+    ...(E2E_OFFLINE && {
+      NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import "${OFFLINE_PRELOAD}"`.trim(),
+    }),
   }
   process.env[CACHE_KEY] = JSON.stringify(env)
   return env
