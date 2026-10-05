@@ -17,7 +17,8 @@ test('spot the flaw: map link, license notice and the rubric after reload', asyn
   await expect(page).toHaveURL(/\/activities\//)
   await expect(page.getByText(/CS50x 2026 by Harvard University/)).toBeVisible()
 
-  // Try 1, and try 2 if the first wasn't final: closes the activity either way.
+  // Try 1, and a different try 2 if the first wasn't final (an identical body would replay
+  // try 1): closes the activity either way.
   await page.getByRole('radio', { name: 'Correct' }).check({ force: true })
   await page.getByRole('button', { name: 'Submit' }).click()
   const retry = page.getByRole('button', { name: 'Retry' })
@@ -25,7 +26,9 @@ test('spot the flaw: map link, license notice and the rubric after reload', asyn
   await expect(retry.or(graded)).toBeVisible()
   if (await retry.isVisible()) {
     await retry.click()
-    await page.getByRole('radio', { name: 'Correct' }).check({ force: true })
+    await page.getByRole('radio', { name: 'Flawed' }).check({ force: true })
+    await page.getByRole('radio', { name: 'Sentence 1' }).check({ force: true })
+    await page.getByRole('textbox', { name: /what should it say instead/i }).fill('It is wrong.')
     await page.getByRole('button', { name: 'Submit' }).click()
   }
   await expect(graded).toBeVisible()
