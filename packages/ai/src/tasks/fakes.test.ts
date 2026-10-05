@@ -132,6 +132,16 @@ describe('task fakes are schema-valid and pass their own semantic validation', (
     expect(transfer.criteria).toHaveLength(2)
   })
 
+  it('gradedCriteria clamps each score to [0, max]', () => {
+    const grade = {
+      criteria: [
+        { id: 'c1', score: 5, rationale: '' },
+        { id: 'c2', score: -1, rationale: '' },
+      ],
+    }
+    expect(gradedCriteria(grade, RUBRIC.criteria).map((c) => c.score)).toEqual([2, 0])
+  })
+
   it('stump-referee (both passes) and leak-escalation', async () => {
     const base = {
       conceptName: 'Pointers',
