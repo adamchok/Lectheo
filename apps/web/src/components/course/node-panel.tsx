@@ -79,6 +79,22 @@ function MomentRow({ moment, lectureTitle }: { moment: Moment; lectureTitle?: st
   )
 }
 
+/** Where the lecture teaches the concept (F2.4): "▶ 12:41 · excerpt", most salient first. */
+export function TaughtAt({ sources }: { sources: MapNode['sources'] }) {
+  if (sources.length === 0) return null
+  return (
+    <Section title="Where it's taught">
+      <ul className="space-y-0.5">
+        {sources.map((s) => (
+          <li key={`${s.lectureId}-${s.idx}`}>
+            <SourceRef source={s} />
+          </li>
+        ))}
+      </ul>
+    </Section>
+  )
+}
+
 export interface NodePanelProps {
   concept: MapNode
   map: CourseMapResponse
@@ -161,6 +177,8 @@ export function NodePanel({ concept, map, onClose }: NodePanelProps) {
           </ul>
         </Section>
       )}
+
+      <TaughtAt sources={concept.sources} />
 
       {links.length > 0 && (
         <Section title="Links">
