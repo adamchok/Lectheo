@@ -3,6 +3,7 @@
 import type { MasterySummary, Outcome, SubmitResponse } from '@lectheo/contracts'
 import { ArrowRight, Lightbulb, MessageCircleQuestion } from 'lucide-react'
 import Link from 'next/link'
+import { useFocusOnMount } from '@/client/focus'
 import { MasteryBadge } from '@/components/mastery-badge'
 import { MASTERY_META } from '@/components/mastery-meta'
 import { SourceRef } from '@/components/source-ref'
@@ -54,13 +55,20 @@ function Sources({ sources }: { sources: SubmitResponse['sources'] }) {
 /** Try 1 (not final): per-key-point coverage, guiding question, then the hint (F5.1). */
 export function TryFeedback({ result }: { result: SubmitResponse }) {
   const { guidingQuestion, hint } = result.feedback
+  // Shown above the chat after "I'm done explaining": move focus here so it's not missed.
+  const heading = useFocusOnMount<HTMLHeadingElement>()
   return (
     <section
       aria-labelledby="try-feedback-title"
       className="bg-card border-border space-y-5 rounded-2xl border p-5 sm:p-6"
     >
       <div className="space-y-1">
-        <h2 id="try-feedback-title" className="font-serif text-xl font-medium">
+        <h2
+          ref={heading}
+          id="try-feedback-title"
+          tabIndex={-1}
+          className="font-serif text-xl font-medium outline-none"
+        >
           How your explanation landed
         </h2>
         <p className="text-muted-foreground text-sm">
@@ -113,13 +121,20 @@ export function FinalReveal({
   // teach-back.ts finalReveal: explanation is the concept summary; key points come as the rubric.
   const summary = result.explanation
   const changed = before && before.state !== result.mastery.state
+  // The chat form unmounts on the final try: focus the verdict instead of <body>.
+  const heading = useFocusOnMount<HTMLHeadingElement>()
   return (
     <section
       aria-labelledby="final-title"
       className="bg-card border-border space-y-6 rounded-2xl border p-5 sm:p-6"
     >
       <div className="space-y-1">
-        <h2 id="final-title" className="font-serif text-2xl font-medium">
+        <h2
+          ref={heading}
+          id="final-title"
+          tabIndex={-1}
+          className="font-serif text-2xl font-medium outline-none"
+        >
           {HEADLINES[result.outcome]}
         </h2>
         <p className="text-muted-foreground text-sm">

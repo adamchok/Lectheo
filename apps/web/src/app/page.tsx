@@ -46,7 +46,7 @@ export default function SignInPage() {
       </header>
 
       <main id="main" tabIndex={-1} className="flex-1 outline-none">
-        <section className="mx-auto grid w-full max-w-6xl items-center gap-14 px-4 pt-8 pb-16 sm:px-6 lg:grid-cols-[1.1fr_1fr] lg:gap-20 lg:pt-16 lg:pb-24">
+        <section className="mx-auto grid w-full max-w-6xl grid-cols-1 items-center overflow-x-clip gap-14 px-4 pt-8 pb-16 sm:px-6 lg:grid-cols-[1.1fr_1fr] lg:gap-20 lg:pt-16 lg:pb-24">
           <div className="max-w-xl space-y-8">
             <div className="space-y-5">
               <p className="text-primary text-xs font-semibold tracking-[0.1em] uppercase">

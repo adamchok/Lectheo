@@ -2,7 +2,7 @@
 
 import type { ActivityResponse, SubmitResponse } from '@lectheo/contracts'
 import { useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { errorMessage } from '@/components/error-state'
 import { Separator } from '@/components/ui/separator'
@@ -90,6 +90,16 @@ export function SpotFlawView({ activity }: { activity: ActivityResponse }) {
       throw error
     })
 
+  // Submit unmounts the form and Retry unmounts the result: move focus to whichever replaced it.
+  const resultRef = useRef<HTMLElement>(null)
+  const prevShowForm = useRef(showForm)
+  useEffect(() => {
+    if (prevShowForm.current === showForm) return
+    prevShowForm.current = showForm
+    if (showForm) document.getElementById('answer-title')?.focus()
+    else resultRef.current?.focus()
+  }, [showForm])
+
   const shownExplanation =
     finalResult?.explanation !== undefined
       ? { explanation: finalResult.explanation, sources: finalResult.sources }
@@ -146,7 +156,13 @@ export function SpotFlawView({ activity }: { activity: ActivityResponse }) {
         />
       ) : (
         lastTry && (
-          <section aria-label="Result" aria-live="polite" className="space-y-5">
+          // Focused on mount (above), which announces it; aria-live here would read it twice.
+          <section
+            ref={resultRef}
+            tabIndex={-1}
+            aria-label="Result"
+            className="space-y-5 outline-none"
+          >
             <TryScore tryNo={lastTry.tryNo} outcome={lastTry.outcome} result={lastResult} />
             {!closed && lastTry.feedback.guidingQuestion && (
               <GuidingQuestion question={lastTry.feedback.guidingQuestion} />

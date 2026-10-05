@@ -11,6 +11,7 @@ import type { Route } from 'next'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { isApiClientError } from '@/client/api'
+import { useFocusOnMount } from '@/client/focus'
 import { isBareShortcut } from '@/client/keyboard'
 import {
   useDiagnosticAnswer,
@@ -252,10 +253,18 @@ function QuestionCard({ sessionId, question, isLast, onAnswered, onNext }: Quest
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [options, feedback])
 
+  // "Next question" unmounts with the previous card: focus the new question, not <body>.
+  const heading = useFocusOnMount<HTMLHeadingElement>()
   const levelLabel = CONFIDENCE_OPTIONS.find((o) => o.value === level)?.label
   return (
     <section className="bg-card space-y-6 rounded-xl border p-6 shadow-sm" aria-label="Question">
-      <h2 className="text-lg leading-snug font-semibold text-balance">{question.stem}</h2>
+      <h2
+        ref={heading}
+        tabIndex={-1}
+        className="text-lg leading-snug font-semibold text-balance outline-none"
+      >
+        {question.stem}
+      </h2>
 
       {options ? (
         <>
@@ -309,6 +318,8 @@ interface OptionListProps {
 }
 
 function OptionList({ options, chosen, correctOptionId, disabled, onPick }: OptionListProps) {
+  // Options replace the confidence picker the user just used: keep focus in the question.
+  const first = useFocusOnMount<HTMLButtonElement>()
   return (
     <ul className="space-y-2" aria-label="Answer options">
       {options.map((option, i) => {
@@ -317,6 +328,7 @@ function OptionList({ options, chosen, correctOptionId, disabled, onPick }: Opti
         return (
           <li key={option.id}>
             <button
+              ref={i === 0 ? first : undefined}
               type="button"
               onClick={() => onPick(option.id)}
               disabled={disabled}
@@ -397,6 +409,12 @@ interface ResultsProps {
 /** Results ordered confident mistakes → wrong → unsure-right → right (F3.6). */
 function DiagnosticResults({ sessionId, answers, note }: ResultsProps) {
   const results = useDiagnosticResults(sessionId)
+  // "See results" unmounted with the last question: land on the results heading.
+  const heading = useRef<HTMLHeadingElement>(null)
+  const loaded = results.data !== undefined
+  useEffect(() => {
+    if (loaded) heading.current?.focus()
+  }, [loaded])
   if (results.isError) {
     return (
       <ErrorState
@@ -415,7 +433,9 @@ function DiagnosticResults({ sessionId, answers, note }: ResultsProps) {
   const mistakes = `${summary.confidentMistakes} confident ${summary.confidentMistakes === 1 ? 'mistake' : 'mistakes'}`
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold">Your results</h2>
+      <h2 ref={heading} tabIndex={-1} className="text-xl font-semibold outline-none">
+        Your results
+      </h2>
       {shownNote && <Note>{shownNote}</Note>}
       {headline && (
         <ConfidentMistakeCard finding={headline} answer={answers.get(headline.itemId)} />

@@ -117,9 +117,20 @@ function WatchSession({ lecture }: { lecture: LectureResponse }) {
   )
   useMarkerHotkeys(mark, { enabled: canMark })
 
+  // "Done watching" unmounts itself: move focus to what comes next, not <body>. Not when the
+  // video just ends, since the user may be elsewhere on the page.
+  const nextStep = useRef<HTMLDivElement>(null)
+  const focusNextStep = useRef(false)
+  useEffect(() => {
+    if (!done || !focusNextStep.current) return
+    focusNextStep.current = false
+    nextStep.current?.focus()
+  }, [done])
+
   const finish = () => {
     player.current?.pause()
     flush()
+    focusNextStep.current = true
     setDone(true)
   }
 
@@ -158,9 +169,8 @@ function WatchSession({ lecture }: { lecture: LectureResponse }) {
               <Star aria-hidden className="text-marker-important fill-current" />
               Important <KeyHint>I</KeyHint>
             </Button>
-            <span aria-live="polite" className="contents">
-              <MarkerCounts lost={counts.lost} important={counts.important} showZero />
-            </span>
+            {/* Not a live region: the "Marked: …" toast already announces each marker. */}
+            <MarkerCounts lost={counts.lost} important={counts.important} showZero />
             {!done && (
               <Button variant="ghost" className="ml-auto" onClick={finish}>
                 <CircleCheck aria-hidden />
@@ -173,14 +183,17 @@ function WatchSession({ lecture }: { lecture: LectureResponse }) {
               This lecture has no timestamps, so markers are turned off.
             </p>
           )}
-          {done &&
-            (lecture.status === 'ready' ? (
-              <DiagnosticCta lectureId={lecture.id} lost={counts.lost} />
-            ) : lecture.status === 'processing' || lecture.status === 'map_ready' ? (
-              <MapBuildingNote lectureId={lecture.id} />
-            ) : (
-              <BuildMapCta lectureId={lecture.id} lost={counts.lost} />
-            ))}
+          {done && (
+            <div ref={nextStep} tabIndex={-1} className="rounded-xl outline-none">
+              {lecture.status === 'ready' ? (
+                <DiagnosticCta lectureId={lecture.id} lost={counts.lost} />
+              ) : lecture.status === 'processing' || lecture.status === 'map_ready' ? (
+                <MapBuildingNote lectureId={lecture.id} />
+              ) : (
+                <BuildMapCta lectureId={lecture.id} lost={counts.lost} />
+              )}
+            </div>
+          )}
         </div>
         <TranscriptPanel lectureId={lecture.id} nowMs={nowMs} onSeek={ready ? seek : null} />
       </div>
@@ -228,7 +241,8 @@ function TranscriptPanel({
     const el = list.current
     const item = el?.querySelector<HTMLElement>(`[data-idx="${activeIdx}"]`)
     if (!el || !item) return
-    el.scrollTo({ top: item.offsetTop - el.clientHeight / 3, behavior: 'smooth' })
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    el.scrollTo({ top: item.offsetTop - el.clientHeight / 3, behavior: reduce ? 'auto' : 'smooth' })
   }, [activeIdx])
 
   return (

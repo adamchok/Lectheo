@@ -46,7 +46,7 @@ export function AnswerForm({
 
   return (
     <form onSubmit={submit} className="space-y-5" aria-labelledby="answer-title">
-      <h3 id="answer-title" className="font-medium">
+      <h3 id="answer-title" tabIndex={-1} className="font-medium outline-none">
         {tryNo === 1 ? 'Your answer' : 'Your second try'}
       </h3>
 
@@ -131,6 +131,7 @@ export function AnswerForm({
           {pending ? 'Checking…' : 'Submit'}
         </Button>
         {blocker && <p className="text-muted-foreground text-sm">{blocker}</p>}
+        {pending && <p className="text-muted-foreground text-sm">Grading takes a few seconds.</p>}
       </div>
     </form>
   )

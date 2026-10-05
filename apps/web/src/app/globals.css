@@ -195,6 +195,14 @@
   }
 }
 
+/* React Flow's attribution is #999 on its own gray (4.3:1); use theme tokens for AA. */
+.react-flow .react-flow__attribution {
+  background: var(--card);
+}
+.react-flow .react-flow__attribution a {
+  color: var(--muted-foreground);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,

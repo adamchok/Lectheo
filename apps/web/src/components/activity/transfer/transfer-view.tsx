@@ -179,6 +179,9 @@ export function TransferView({ activity }: { activity: ActivityResponse }) {
             <span className="text-muted-foreground text-xs tabular-nums">
               {answer.length}/{ANSWER_MAX}
             </span>
+            {submit.isPending && (
+              <span className="text-muted-foreground text-sm">Grading takes a few seconds.</span>
+            )}
           </div>
         </form>
       ) : (

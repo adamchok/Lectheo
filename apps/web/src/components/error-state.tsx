@@ -1,6 +1,7 @@
 'use client'
 
 import { RotateCw, TriangleAlert } from 'lucide-react'
+import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { isApiClientError } from '@/client/api'
 import { Button } from '@/components/ui/button'
@@ -45,6 +46,16 @@ export function ErrorState({
   className,
 }: ErrorStateProps) {
   const requestId = isApiClientError(error) ? error.requestId : undefined
+  // A missing (or someone else's) resource won't load on retry: offer a way out instead.
+  const notFound = isApiClientError(error) && error.code === 'not_found'
+  const retry = notFound ? undefined : onRetry
+  const shownAction =
+    action ??
+    (notFound && (
+      <Button asChild variant="outline" size="sm">
+        <Link href="/dashboard">Back to dashboard</Link>
+      </Button>
+    ))
   return (
     <div
       role="alert"
@@ -67,15 +78,15 @@ export function ErrorState({
           </p>
         )}
       </div>
-      {(onRetry || action) && (
+      {(retry || shownAction) && (
         <div className="flex gap-2 pt-1">
-          {onRetry && (
-            <Button variant="outline" size="sm" onClick={onRetry}>
+          {retry && (
+            <Button variant="outline" size="sm" onClick={retry}>
               <RotateCw aria-hidden />
               Try again
             </Button>
           )}
-          {action}
+          {shownAction}
         </div>
       )}
     </div>
