@@ -87,7 +87,10 @@ export const HintResponse = z.object({
   hint: z.string(),
   hintsUsed: z.number().int(),
   hintsLeft: z.number().int(),
+  /** Where the lecture covers it (F5.2): the activity's item, else concept, grounding. */
+  sources: z.array(SourceRef),
 })
+export type HintResponse = z.infer<typeof HintResponse>
 
 export const SubmitSpotFlaw = z.object({
   verdict: z.enum(['flawed', 'correct']),

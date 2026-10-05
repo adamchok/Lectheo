@@ -133,6 +133,8 @@ describe('spot_flaw', () => {
     expect(HintResponse.parse(hint)).toEqual(hint)
     expect(ActivityResponse.parse(view)).toEqual(view)
     expect(hint.hint).toBe('Think about what a hash function guarantees.')
+    // F5.2: the hint links to where the lecture covers it (the item's segments).
+    expect(hint.sources.map((r) => r.idx)).toEqual([1, 2])
   })
 })
 

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { dropProfile, signInSample } from './fixtures'
 
 /*
  * Sample sign-in when Cloudflare Turnstile can't load (blocked network, ad blocker). The widget's
@@ -26,4 +27,26 @@ test('a security check that never loads times out with the same error', async ({
   // Hold the request open: the script neither loads nor errors.
   await page.route(TURNSTILE, () => new Promise<void>(() => {}))
   await expectCheckFailed(page)
+})
+
+test('a signed-in visitor on the landing page goes to the dashboard (F0.2)', async ({ page }) => {
+  await signInSample(page)
+  await page.goto('/')
+  await expect(page).toHaveURL(/\/dashboard$/)
+})
+
+test('a session whose sample profile was purged is signed out, not looped (F0.2, F0.6)', async ({
+  page,
+}) => {
+  await signInSample(page)
+  const me = (await (await page.request.get('/api/v1/me')).json()) as { id: string }
+  await dropProfile(me.id)
+
+  await page.goto('/')
+  await expect(page.getByRole('button', { name: /explore with a sample account/i })).toBeVisible()
+  await expect(page).toHaveURL(/\/$/)
+  expect((await page.request.get('/api/v1/me')).status()).toBe(401)
+  // The session cookie is gone: the proxy no longer sends `/` to the dashboard.
+  await page.reload()
+  await expect(page).toHaveURL(/\/$/)
 })

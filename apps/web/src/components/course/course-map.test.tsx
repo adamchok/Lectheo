@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ConceptMap, edgeHandles } from './concept-map'
 import { LectureTimeline } from './lecture-timeline'
+import { TaughtAt } from './node-panel'
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean | undefined
@@ -23,6 +24,7 @@ function node(id: string, name: string, extra: Partial<MapNode> = {}): MapNode {
     mastery: { state: 'gray', confidentMistake: false, reasons: [] },
     markers: { lost: 0, important: 0 },
     moments: [],
+    sources: [],
     position: { x: 0, y: 0 },
     ...extra,
   }
@@ -71,6 +73,16 @@ describe('LectureTimeline', () => {
     expect(links[0]?.getAttribute('href')).toBe(`/lectures/${L1}?t=61000#transcript`)
     expect(links[0]?.getAttribute('aria-label')).toMatch(/^Lost at /)
     expect(links[1]?.getAttribute('aria-label')).toMatch(/^Important at .*, unlinked$/)
+  })
+})
+
+describe('TaughtAt', () => {
+  it('links each source moment with its excerpt (F2.4)', () => {
+    const source = { lectureId: L1, idx: 3, startMs: 61_000, excerpt: 'arrays are contiguous' }
+    act(() => root.render(<TaughtAt sources={[source]} />))
+    const link = container.querySelector('a')
+    expect(link?.getAttribute('href')).toBe(`/lectures/${L1}?t=61000#transcript`)
+    expect(link?.textContent).toContain('arrays are contiguous')
   })
 })
 

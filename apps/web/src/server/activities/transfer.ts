@@ -15,6 +15,7 @@ import { eq, itemSecrets } from '@lectheo/db'
 import { rubricOutcome } from '@lectheo/domain'
 import { requireUnseenItem } from './items'
 import { itemSources } from './sources'
+import { retryHintFor } from './teach-back'
 import type { ActivityContext, ActivityTypeHandler, ItemRow } from './types'
 
 /*
@@ -171,7 +172,12 @@ export const transferHandler: ActivityTypeHandler<'transfer'> = {
       checks: null,
       criteria,
       ...scored,
-      feedback: { guidingQuestion: question, hint: null },
+      // F5.1 hint after the question: a count of open criteria, never their content (F5.3). Like
+      // teach-back's, it doesn't mark the attempt assisted (only the hint ladder and "Show me" do).
+      feedback: {
+        guidingQuestion: question,
+        hint: final ? null : retryHintFor(criteria, 'Your answer still misses'),
+      },
       rationale: judge.output.rationale,
       misconceptions: judge.output.misconceptions,
       judgeModel: judge.model,

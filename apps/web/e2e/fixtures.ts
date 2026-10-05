@@ -77,3 +77,8 @@ export async function flawKeyOf(activityId: string): Promise<FlawKey> {
   if (!key) throw new Error(`no flaw key for activity ${activityId}`)
   return key
 }
+
+/** Removes a profile row (rows cascade) while its auth session lives on, like a purged sample. */
+export async function dropProfile(userId: string): Promise<void> {
+  await getDb(e2eEnv().POSTGRES_URL).execute(sql`delete from profiles where id = ${userId}`)
+}

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { Attribution, ClientId, Id, Ms } from '../common'
+import { Attribution, ClientId, Id, Ms, SourceRef } from '../common'
 import {
   ActivityType,
   CourseKind,
@@ -53,6 +53,8 @@ export const MapNode = z.object({
   markers: z.object({ lost: z.number().int(), important: z.number().int() }),
   /** This user's markers linked to the concept (node panel: "▶ 12:41" links). */
   moments: z.array(z.object({ id: Id, lectureId: Id, kind: MarkerKind, tMs: Ms })),
+  /** Where the lecture teaches it (F2.4): timestamp + excerpt, most salient first, at most 3. */
+  sources: z.array(SourceRef),
   position: z.object({ x: z.number(), y: z.number() }).nullable(),
   /** A verified transfer item this user hasn't seen exists (F4b entry point). */
   transferAvailable: z.boolean().optional(),

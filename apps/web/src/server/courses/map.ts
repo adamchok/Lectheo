@@ -1,4 +1,4 @@
-import type { CourseMapResponse, MapNode } from '@lectheo/contracts'
+import type { CourseMapResponse, MapNode, SourceRef } from '@lectheo/contracts'
 import {
   and,
   asc,
@@ -6,16 +6,19 @@ import {
   conceptOccurrences,
   concepts,
   courses,
+  desc,
   eq,
   isNull,
   lectures,
   markerConcepts,
   markers,
   sql,
+  transcriptSegments,
 } from '@lectheo/db'
 import type { MasteryResult } from '@lectheo/domain'
 import { computeLayout, layoutHash, type Layout } from '@lectheo/domain/layout'
 import { conceptsWithUnseenItem } from '../activities/items'
+import { excerpt } from '../activities/sources'
 import type { Actor } from '../auth'
 import { appDb, type DbLike } from '../db'
 import { FEATURES } from '../features'
@@ -24,8 +27,9 @@ import { loadCourseForRead, type Course } from '../ownership'
 import { toAttribution } from './summary'
 
 /*
- * GET /courses/{id}/map (API Spec §4). 6 queries in 3 round trips: the ownership check; then
- * lectures, concepts⋈occurrences, edges and markers⟕marker_concepts in parallel; then attempts
+ * GET /courses/{id}/map (API Spec §4). 7 queries in 3 round trips: the ownership check; then
+ * lectures, concepts⋈occurrences, edges, markers⟕marker_concepts and occurrences⋈segments in
+ * parallel; then attempts
  * (plus one courses.layout write for a personal course whose graph changed since its layout).
  * 🔒 concepts.key_points is never selected.
  */
@@ -98,6 +102,52 @@ const loadMarkers = (db: DbLike, courseId: string, userId: string) =>
     )
     .orderBy(asc(markers.lectureId), asc(markers.tMs))
 
+/** Per-node cap on source moments (F2.4), like activity feedback's (activities/sources.ts). */
+const NODE_SOURCES = 3
+
+/**
+ * Every transcript segment an occurrence cites, for all of the course's concepts in one query (no
+ * per-node lookups), most salient occurrence first. ponytail: rows past the cap are dropped in
+ * JS; a window function can cap in SQL if a course ever cites thousands of segments.
+ */
+const loadSources = (db: DbLike, courseId: string) =>
+  db
+    .select({
+      conceptId: conceptOccurrences.conceptId,
+      lectureId: transcriptSegments.lectureId,
+      idx: transcriptSegments.idx,
+      startMs: transcriptSegments.startMs,
+      text: transcriptSegments.text,
+      editedText: transcriptSegments.editedText,
+    })
+    .from(conceptOccurrences)
+    .innerJoin(concepts, eq(concepts.id, conceptOccurrences.conceptId))
+    .innerJoin(lectures, eq(lectures.id, conceptOccurrences.lectureId))
+    .innerJoin(
+      transcriptSegments,
+      and(
+        eq(transcriptSegments.lectureId, conceptOccurrences.lectureId),
+        sql`${transcriptSegments.idx} = ANY(${conceptOccurrences.segmentIdxs})`,
+      ),
+    )
+    .where(eq(concepts.courseId, courseId))
+    .orderBy(desc(conceptOccurrences.salience), asc(lectures.seq), asc(transcriptSegments.idx))
+
+type SourceRow = Awaited<ReturnType<typeof loadSources>>[number]
+
+function sourcesByConcept(rows: SourceRow[]): Map<string, SourceRef[]> {
+  const byConcept = new Map<string, SourceRef[]>()
+  for (const { conceptId, lectureId, idx, startMs, text, editedText } of rows) {
+    const refs = byConcept.get(conceptId) ?? []
+    if (refs.length >= NODE_SOURCES) continue
+    byConcept.set(conceptId, [
+      ...refs,
+      { lectureId, idx, startMs, excerpt: excerpt(editedText ?? text) },
+    ])
+  }
+  return byConcept
+}
+
 interface ConceptNode {
   id: string
   name: string
@@ -169,15 +219,17 @@ export async function getCourseMap(
   db: DbLike = appDb(),
 ): Promise<CourseMapResponse> {
   const course: Course = await loadCourseForRead(actor, courseId, db)
-  const [lectureRows, conceptRows, edges, markerRows] = await Promise.all([
+  const [lectureRows, conceptRows, edges, markerRows, sourceRows] = await Promise.all([
     loadLectures(db, course.id),
     loadConcepts(db, course.id),
     loadEdges(db, course.id),
     loadMarkers(db, course.id, actor.userId),
+    loadSources(db, course.id),
   ])
   const grouped = groupConcepts(conceptRows)
   const mastery = await loadMasteryForUser(db, actor.userId, [...grouped.keys()])
   const moments = momentsByConcept(markerRows)
+  const sources = sourcesByConcept(sourceRows)
   const layout = await ensureLayout(db, course, [...grouped.keys()], edges)
   const transfer = FEATURES.transfer
     ? await conceptsWithUnseenItem(db, actor.userId, [...grouped.keys()], 'transfer')
@@ -192,6 +244,7 @@ export async function getCourseMap(
       mastery: { state: m.state, confidentMistake: m.confidentMistake, reasons: [...m.reasons] },
       markers: { lost: countKind(own, 'lost'), important: countKind(own, 'important') },
       moments: own,
+      sources: sources.get(c.id) ?? [],
       position: pos ? { x: pos.x, y: pos.y } : null,
       transferAvailable: transfer.has(c.id),
     }

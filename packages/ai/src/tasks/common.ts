@@ -88,7 +88,13 @@ export function gradedCriteria(
   rubric: readonly { id: string; label: string; max: number }[],
 ): { id: string; label: string; score: number; max: number }[] {
   const scores = new Map(grade.criteria.map((c) => [c.id, c.score]))
-  return rubric.map((r) => ({ id: r.id, label: r.label, score: scores.get(r.id) ?? 0, max: r.max }))
+  // A judge can score past a criterion's max (or below 0); clamp so a displayed score stays sane.
+  return rubric.map((r) => ({
+    id: r.id,
+    label: r.label,
+    score: Math.min(Math.max(scores.get(r.id) ?? 0, 0), r.max),
+    max: r.max,
+  }))
 }
 
 export const JUDGE_RULES = [

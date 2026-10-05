@@ -141,6 +141,8 @@ describe('transfer', () => {
     expect(try1).toMatchObject({ maxScore: 4, canRetry: true, checks: null })
     expect(try1.criteria.map((c) => c.label)).toEqual(['Criterion 1', 'Criterion 2'])
     expect(try1.feedback.guidingQuestion).toBeTruthy()
+    // F5.1: a hint after the question, counting open criteria without naming them (F5.3).
+    expect(try1.feedback.hint).toMatch(/^Your answer still misses 1 key point out of 2\./)
     expect(try1.explanation).toBeUndefined()
     expect(try1.rubric).toBeUndefined()
     expect(try1.sources[0]).toMatchObject({ lectureId: IDS.lecture, idx: 2 })

@@ -3,7 +3,8 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 /*
  * Next 16 proxy (replaces middleware.ts): refreshes the Supabase session cookie on every matched
- * request (standard @supabase/ssr pattern) and sends signed-out visitors on app pages back to `/`.
+ * request (standard @supabase/ssr pattern), sends signed-out visitors on app pages back to `/` and
+ * signed-in visitors on `/` to the dashboard.
  * APIs are never redirected: their handlers answer 401 with the error envelope.
  */
 
@@ -11,6 +12,12 @@ const APP_PAGE_PREFIXES = ['/dashboard', '/courses', '/lectures', '/activities']
 
 const isAppPage = (pathname: string): boolean =>
   APP_PAGE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+
+/** Signed-out visitors on app pages go to `/`; signed-in visitors on `/` go home (F0.2). */
+function redirectTarget(signedIn: boolean, pathname: string): string | null {
+  if (signedIn) return pathname === '/' ? '/dashboard' : null
+  return isAppPage(pathname) ? '/' : null
+}
 
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -36,8 +43,9 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   const { data } = await supabase.auth.getClaims()
   const signedIn = Boolean(data?.claims?.sub)
 
-  if (!signedIn && isAppPage(request.nextUrl.pathname)) {
-    const redirect = NextResponse.redirect(new URL('/', request.url))
+  const target = redirectTarget(signedIn, request.nextUrl.pathname)
+  if (target) {
+    const redirect = NextResponse.redirect(new URL(target, request.url))
     // Keep any cookie changes (e.g. a cleared expired session).
     for (const cookie of response.cookies.getAll()) redirect.cookies.set(cookie)
     return redirect

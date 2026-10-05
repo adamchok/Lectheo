@@ -1,11 +1,15 @@
 'use client'
 
+import type { SourceRef } from '@lectheo/contracts'
 import { Lightbulb, LoaderCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Sources } from './result-panel'
 
 export interface HintLadderProps {
   /** Hint texts revealed in this session (GET /activities doesn't return earlier ones). */
   hints: readonly string[]
+  /** Lecture grounding of the hints (F5.2); the same for every hint of an activity. */
+  sources: readonly SourceRef[]
   hintsUsed: number
   hintsAvailable: number
   onTake: () => void
@@ -16,6 +20,7 @@ export interface HintLadderProps {
 /** 2-step hint ladder, general then specific (F4c.4). Any hint marks the attempt assisted. */
 export function HintLadder({
   hints,
+  sources,
   hintsUsed,
   hintsAvailable,
   onTake,
@@ -65,6 +70,7 @@ export function HintLadder({
           <li className="text-muted-foreground text-xs">This attempt is marked assisted.</li>
         </ol>
       )}
+      {hintsUsed > 0 && <Sources sources={sources} />}
     </section>
   )
 }

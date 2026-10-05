@@ -104,6 +104,28 @@ describe('GET /courses/{id}/map', () => {
     expect(map.course.kind).toBe('library')
   })
 
+  it('gives each node its source moments with excerpts, capped at 3 (F2.4)', async () => {
+    await f.exec(`
+      INSERT INTO transcript_segments (lecture_id, idx, start_ms, end_ms, text) VALUES
+        ('${ID.L1}', 0, 0, 1000, 'int and char'), ('${ID.L1}', 1, 61000, 62000, 'a while loop'),
+        ('${ID.L1}', 2, 120000, 121000, 'two'), ('${ID.L1}', 3, 180000, 181000, 'three'),
+        ('${ID.L2}', 0, 5000, 6000, 'loop over an array');
+      UPDATE concept_occurrences SET segment_idxs = '{0,1,2,3}' WHERE concept_id = '${ID.C1}';
+      UPDATE concept_occurrences SET salience = 2
+        WHERE concept_id = '${ID.C2}' AND lecture_id = '${ID.L2}';
+    `)
+    const map = await getCourseMap(ACTOR_A, ID.LIB, f.db)
+    const sourcesOf = (id: string) => map.nodes.find((n) => n.id === id)?.sources
+    // Most salient occurrence first, across lectures.
+    expect(sourcesOf(ID.C2)).toEqual([
+      { lectureId: ID.L2, idx: 0, startMs: 5000, excerpt: 'loop over an array' },
+      { lectureId: ID.L1, idx: 1, startMs: 61000, excerpt: 'a while loop' },
+    ])
+    expect(sourcesOf(ID.C1)?.map((s) => s.idx)).toEqual([0, 1, 2])
+    // No segment row for an occurrence (L2 idx 1): no source.
+    expect(sourcesOf(ID.C3)).toEqual([])
+  })
+
   it('never contains 🔒 key points', async () => {
     const json = JSON.stringify(await getCourseMap(ACTOR_A, ID.LIB, f.db))
     expect(json).not.toContain('keyPoints')
