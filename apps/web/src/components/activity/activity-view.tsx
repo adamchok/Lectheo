@@ -1,16 +1,23 @@
 'use client'
 
 import { Sparkles } from 'lucide-react'
+import dynamic from 'next/dynamic'
 import { useActivity } from '@/client/queries'
 import { SpotFlawView } from '@/components/activity/spot-flaw/spot-flaw-view'
 import { ErrorState } from '@/components/error-state'
 import { FeaturePlaceholder } from '@/components/feature-placeholder'
+import { LicenseNotice } from '@/components/license-notice'
 import { PageHeader } from '@/components/page-header'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ACTIVITY_LABELS } from '@/lib/labels'
 import { StumpView } from './stump/stump-view'
-import { TeachBackView } from './teach-back/teach-back-view'
 import { TransferView } from './transfer/transfer-view'
+
+// The AI SDK chat client (~56 kB) is only needed by teach-back: keep it off the other activities.
+const TeachBackView = dynamic(
+  () => import('./teach-back/teach-back-view').then((m) => m.TeachBackView),
+  { loading: () => <Skeleton aria-label="Loading" className="h-64 w-full rounded-2xl" /> },
+)
 
 /** /activities/[id]: Spot the flaw / Teach-back / Transfer / Stump (F4). */
 export function ActivityView({ activityId }: { activityId: string }) {
@@ -60,6 +67,7 @@ export function ActivityView({ activityId }: { activityId: string }) {
             className="min-h-80"
           />
         )}
+        {data.courseKind === 'library' && <LicenseNotice className="mt-10" />}
       </div>
     </>
   )

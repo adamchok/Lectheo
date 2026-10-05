@@ -7,19 +7,22 @@ import { useRouter } from 'next/navigation'
 import Script from 'next/script'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { apiFetch, isApiClientError } from '@/client/api'
-import { signInWithGoogle } from '@/client/supabase'
 import { Button } from '@/components/ui/button'
 import { safeRedirect } from '@/lib/safe-redirect'
 import { TURNSTILE_SCRIPT_SRC } from './turnstile'
 
 type SampleState = 'idle' | 'verifying' | 'starting'
 
+/** How long a click waits for the Turnstile script before giving up (blocked or very slow). */
+const SCRIPT_TIMEOUT_MS = 10_000
+const CHECK_FAILED =
+  "The security check didn't load. Check your connection or ad blocker, then refresh and try again."
+
 function sampleErrorCopy(error: unknown): string {
   if (isApiClientError(error)) {
     if (error.status === 429)
       return 'Lots of people are exploring right now. Please wait a minute and try again.'
-    if (error.status === 400)
-      return "We couldn't confirm you're not a bot. Please try again."
+    if (error.status === 400) return "We couldn't confirm you're not a bot. Please try again."
     if (error.code === 'network_error') return error.message
   }
   return "We couldn't start a sample account just now. Please try again."
@@ -93,7 +96,7 @@ export function SignInActions() {
       theme: 'auto',
       callback: (token) => void startSession(token),
       'error-callback': () => {
-        setError("The security check didn't load. Please refresh and try again.")
+        setError(CHECK_FAILED)
         setSampleState('idle')
       },
       'expired-callback': () => turnstile.reset(widgetIdRef.current),
@@ -108,10 +111,27 @@ export function SignInActions() {
     }
   }, [scriptReady, siteKey, startSession])
 
+  // The widget's error-callback only fires once the script has loaded. A blocked or hung script
+  // would leave "Checking your browser…" spinning, so a waiting click fails on its own.
+  const scriptTimer = useRef<number | undefined>(undefined)
+  const [scriptFailed, setScriptFailed] = useState(false)
+  const failPendingCheck = useCallback(() => {
+    window.clearTimeout(scriptTimer.current)
+    if (!pendingRef.current) return
+    pendingRef.current = false
+    setError(CHECK_FAILED)
+    setSampleState('idle')
+  }, [])
+  useEffect(() => () => window.clearTimeout(scriptTimer.current), [])
+
   const handleSample = () => {
     setError(null)
     if (!siteKey) {
       setError('Sample accounts are unavailable right now. Please try again later.')
+      return
+    }
+    if (scriptFailed) {
+      setError(CHECK_FAILED)
       return
     }
     setSampleState('verifying')
@@ -120,6 +140,8 @@ export function SignInActions() {
       window.turnstile.execute(container)
     } else {
       pendingRef.current = true
+      window.clearTimeout(scriptTimer.current)
+      scriptTimer.current = window.setTimeout(failPendingCheck, SCRIPT_TIMEOUT_MS)
     }
   }
 
@@ -127,6 +149,8 @@ export function SignInActions() {
     setError(null)
     setGooglePending(true)
     try {
+      // Loaded on click: the Supabase client (~62 kB) isn't needed to render the landing page.
+      const { signInWithGoogle } = await import('@/client/supabase')
       await signInWithGoogle()
     } catch {
       setError("Google sign-in isn't available right now. Try the sample account instead.")
@@ -143,10 +167,19 @@ export function SignInActions() {
           src={TURNSTILE_SCRIPT_SRC}
           strategy="afterInteractive"
           onReady={() => setScriptReady(true)}
+          onError={() => {
+            setScriptFailed(true)
+            failPendingCheck()
+          }}
         />
       )}
       <div className="flex flex-col gap-3 sm:flex-row">
-        <Button size="lg" className="h-11 px-5 text-[0.9375rem]" onClick={handleSample} disabled={busy}>
+        <Button
+          size="lg"
+          className="h-11 px-5 text-[0.9375rem]"
+          onClick={handleSample}
+          disabled={busy}
+        >
           {sampleState === 'idle' ? (
             <>
               Explore with a sample account

@@ -237,7 +237,11 @@ export function StumpView({ activity }: { activity: ActivityResponse }) {
       )}
 
       {results.length > 0 && <Sources sources={results.at(-1)?.sources ?? []} />}
-      <MasteryChange start={startState} results={results.map((r) => r.mastery)} />
+      <MasteryChange
+        start={startState}
+        results={results.map((r) => r.mastery)}
+        courseId={activity.courseId}
+      />
     </div>
   )
 }

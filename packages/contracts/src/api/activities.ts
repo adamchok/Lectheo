@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { ClientId, Id, MasterySummary, SourceRef } from '../common'
-import { ActivityStatus, ActivityType, Outcome } from '../enums'
+import { ActivityStatus, ActivityType, CourseKind, Outcome } from '../enums'
 import { StumpResult } from '../payloads'
 
 export const CreateActivityRequest = z.object({
@@ -49,6 +49,9 @@ export const ActivityResponse = z.object({
   id: Id,
   type: ActivityType,
   concept: ConceptRef,
+  /** The concept's course: the "See it on the map" link and the library license notice (F7.4). */
+  courseId: Id,
+  courseKind: CourseKind,
   status: ActivityStatus,
   turnsUsed: z.number().int(),
   turnBudget: z.number().int(),

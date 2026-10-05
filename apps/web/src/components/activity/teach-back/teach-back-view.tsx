@@ -183,7 +183,12 @@ export function TeachBackView({ activity }: { activity: ActivityResponse }) {
   return (
     <div className="space-y-6">
       {shownFinal ? (
-        <FinalReveal result={shownFinal} before={before} />
+        <FinalReveal
+          result={shownFinal}
+          before={before}
+          courseId={activity.courseId}
+          autoFocus={final !== null}
+        />
       ) : closed ? (
         <Skeleton aria-label="Loading your result" className="h-64 w-full rounded-2xl" />
       ) : tryOne ? (
@@ -238,7 +243,10 @@ export function TeachBackView({ activity }: { activity: ActivityResponse }) {
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={onKeyDown}
                 maxLength={MAX_MESSAGE_CHARS}
-                disabled={!canSend}
+                // Not disabled while Sam replies (send() waits for canSend): disabling the
+                // focused field drops keyboard focus to <body> after every message.
+                readOnly={!canSend}
+                aria-disabled={!canSend}
                 placeholder={
                   turnsLeft > 0
                     ? `Explain it to ${PERSONA} in your own words…`
@@ -258,9 +266,11 @@ export function TeachBackView({ activity }: { activity: ActivityResponse }) {
             {notice && <Notice>{notice}</Notice>}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-muted-foreground text-xs">
-                {awaitingRetry && !hasNewExplanation
-                  ? `Explain a bit more to ${PERSONA} before your second try.`
-                  : 'Enter to send · Shift+Enter for a new line'}
+                {submit.isPending
+                  ? 'Grading takes a few seconds.'
+                  : awaitingRetry && !hasNewExplanation
+                    ? `Explain a bit more to ${PERSONA} before your second try.`
+                    : 'Enter to send · Shift+Enter for a new line'}
               </p>
               <Button type="button" variant="outline" onClick={done} disabled={!canSubmit}>
                 {submit.isPending ? (

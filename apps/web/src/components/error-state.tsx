@@ -1,8 +1,10 @@
 'use client'
 
 import { RotateCw, TriangleAlert } from 'lucide-react'
+import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { isApiClientError } from '@/client/api'
+import { quotaMessage } from '@/client/format'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -26,6 +28,8 @@ export function errorMessage(error: unknown): string {
         return 'Your session has ended. Please sign in again.'
       case 'not_found':
         return "This page doesn't exist, or you don't have access to it."
+      case 'quota_exceeded':
+        return quotaMessage(error.details)
       case 'ai_paused':
       case 'intake_paused':
         return error.message || 'New AI work is paused for now. Prepared practice still works.'
@@ -45,6 +49,16 @@ export function ErrorState({
   className,
 }: ErrorStateProps) {
   const requestId = isApiClientError(error) ? error.requestId : undefined
+  // A missing (or someone else's) resource won't load on retry: offer a way out instead.
+  const notFound = isApiClientError(error) && error.code === 'not_found'
+  const retry = notFound ? undefined : onRetry
+  const shownAction =
+    action ??
+    (notFound && (
+      <Button asChild variant="outline" size="sm">
+        <Link href="/dashboard">Back to dashboard</Link>
+      </Button>
+    ))
   return (
     <div
       role="alert"
@@ -67,15 +81,15 @@ export function ErrorState({
           </p>
         )}
       </div>
-      {(onRetry || action) && (
+      {(retry || shownAction) && (
         <div className="flex gap-2 pt-1">
-          {onRetry && (
-            <Button variant="outline" size="sm" onClick={onRetry}>
+          {retry && (
+            <Button variant="outline" size="sm" onClick={retry}>
               <RotateCw aria-hidden />
               Try again
             </Button>
           )}
-          {action}
+          {shownAction}
         </div>
       )}
     </div>

@@ -3,11 +3,14 @@
 import type { MasterySummary, Outcome, SubmitResponse } from '@lectheo/contracts'
 import { ArrowRight, Lightbulb, MessageCircleQuestion } from 'lucide-react'
 import Link from 'next/link'
+import { useEffect, useRef } from 'react'
+import { useFocusOnMount } from '@/client/focus'
 import { MasteryBadge } from '@/components/mastery-badge'
 import { MASTERY_META } from '@/components/mastery-meta'
 import { SourceRef } from '@/components/source-ref'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { MapLink } from '../spot-flaw/result-panel'
 
 type Criterion = SubmitResponse['criteria'][number]
 
@@ -54,13 +57,20 @@ function Sources({ sources }: { sources: SubmitResponse['sources'] }) {
 /** Try 1 (not final): per-key-point coverage, guiding question, then the hint (F5.1). */
 export function TryFeedback({ result }: { result: SubmitResponse }) {
   const { guidingQuestion, hint } = result.feedback
+  // Shown above the chat after "I'm done explaining": move focus here so it's not missed.
+  const heading = useFocusOnMount<HTMLHeadingElement>()
   return (
     <section
       aria-labelledby="try-feedback-title"
       className="bg-card border-border space-y-5 rounded-2xl border p-5 sm:p-6"
     >
       <div className="space-y-1">
-        <h2 id="try-feedback-title" className="font-serif text-xl font-medium">
+        <h2
+          ref={heading}
+          id="try-feedback-title"
+          tabIndex={-1}
+          className="font-serif text-xl font-medium outline-none"
+        >
           How your explanation landed
         </h2>
         <p className="text-muted-foreground text-sm">
@@ -104,22 +114,41 @@ const HEADLINES: Readonly<Record<Outcome, string>> = {
 export function FinalReveal({
   result,
   before,
+  courseId,
+  autoFocus = false,
 }: {
+  /** Links back to the concept map, where the node now shows this state. */
+  courseId?: string
   result: SubmitResponse
   /** Mastery after try 1, when known, to show the change. */
   before?: MasterySummary
+  /**
+   * Set when this session's submit produced the verdict (the chat form just unmounted). Not on
+   * a reopened activity, where focus belongs at the top of the page.
+   */
+  autoFocus?: boolean
 }) {
   const coverage = new Map(result.criteria.map((c) => [c.id, c]))
   // teach-back.ts finalReveal: explanation is the concept summary; key points come as the rubric.
   const summary = result.explanation
   const changed = before && before.state !== result.mastery.state
+  const heading = useRef<HTMLHeadingElement>(null)
+  const shouldFocus = useRef(autoFocus)
+  useEffect(() => {
+    if (shouldFocus.current) heading.current?.focus()
+  }, [])
   return (
     <section
       aria-labelledby="final-title"
       className="bg-card border-border space-y-6 rounded-2xl border p-5 sm:p-6"
     >
       <div className="space-y-1">
-        <h2 id="final-title" className="font-serif text-2xl font-medium">
+        <h2
+          ref={heading}
+          id="final-title"
+          tabIndex={-1}
+          className="font-serif text-2xl font-medium outline-none"
+        >
           {HEADLINES[result.outcome]}
         </h2>
         <p className="text-muted-foreground text-sm">
@@ -168,12 +197,15 @@ export function FinalReveal({
             confidentMistake={result.mastery.confidentMistake}
           />
         </div>
-        <Button asChild>
-          <Link href="/dashboard">
-            Back to dashboard
-            <ArrowRight aria-hidden />
-          </Link>
-        </Button>
+        <div className="flex flex-wrap items-center gap-4">
+          {courseId && <MapLink courseId={courseId} />}
+          <Button asChild>
+            <Link href="/dashboard">
+              Back to dashboard
+              <ArrowRight aria-hidden />
+            </Link>
+          </Button>
+        </div>
       </div>
     </section>
   )

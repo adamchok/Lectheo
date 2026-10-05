@@ -24,11 +24,15 @@ const VIEW_KEY = 'lectheo.courseView'
 /** Below this many concepts the map gets an explanatory note (F2.9). */
 const SMALL_MAP = 3
 
+/** Phones start on the list: a fitted map of 15+ nodes is unreadable at 375px. */
+const defaultView = (): View => (window.matchMedia('(min-width: 768px)').matches ? 'map' : 'list')
+
 function storedView(): View {
   try {
-    return window.localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'map'
+    const stored = window.localStorage.getItem(VIEW_KEY)
+    return stored === 'list' || stored === 'map' ? stored : defaultView()
   } catch {
-    return 'map'
+    return defaultView()
   }
 }
 

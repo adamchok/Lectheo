@@ -3,7 +3,7 @@
 import type { Route } from 'next'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { isApiClientError } from '@/client/api'
 import { useCourses, useMe } from '@/client/queries'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -43,6 +43,17 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (unauthenticated) router.replace('/')
   }, [unauthenticated, router])
 
+  // A client-side navigation unmounts the link that was clicked and drops focus to <body>; start
+  // the next keyboard step at <main> instead (WCAG 2.4.3). Pages that focus something themselves
+  // run their effects first, so this only fills the gap.
+  const main = useRef<HTMLElement>(null)
+  const lastPath = useRef(pathname)
+  useEffect(() => {
+    if (pathname === lastPath.current) return
+    lastPath.current = pathname
+    if (document.activeElement === document.body) main.current?.focus({ preventScroll: true })
+  }, [pathname])
+
   return (
     <div className="flex min-h-dvh flex-col">
       <SkipLink />
@@ -81,6 +92,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
       <main
+        ref={main}
         id="main"
         tabIndex={-1}
         className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 outline-none sm:px-6 lg:py-10"

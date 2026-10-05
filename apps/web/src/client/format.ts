@@ -22,6 +22,31 @@ export function formatTimestampLong(ms: number): string {
   return parts.join(' ')
 }
 
+/** Daily quota metrics (contracts USAGE_METRICS) in the words the student sees (F8.3). */
+const QUOTA_LABELS: Readonly<Record<string, string>> = {
+  activities: 'practice activities',
+  llm_tasks: 'AI requests',
+  lectures: 'lecture uploads',
+  reprocess: 'map rebuilds',
+}
+
+/**
+ * Copy for a 429 `quota_exceeded` from its details `{ metric, limit, resetAt }`: the limit in
+ * words and when it resets, in the viewer's time zone unless one is given.
+ */
+export function quotaMessage(
+  details: Record<string, unknown> | undefined,
+  timeZone?: string,
+): string {
+  const label = typeof details?.metric === 'string' ? QUOTA_LABELS[details.metric] : undefined
+  const limit = typeof details?.limit === 'number' ? `${details.limit} ` : ''
+  const head = label ? `You've used today's ${limit}${label}.` : "You've reached today's limit."
+  const resetAt = typeof details?.resetAt === 'string' ? new Date(details.resetAt) : null
+  if (!resetAt || Number.isNaN(resetAt.getTime())) return `${head} Please try again tomorrow.`
+  const time = resetAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone })
+  return `${head} The limit resets at ${time}.`
+}
+
 export function pluralize(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`
 }

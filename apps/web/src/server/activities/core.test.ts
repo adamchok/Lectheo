@@ -148,6 +148,12 @@ describe('GET /activities/{id}', () => {
     expect(JSON.stringify(view)).not.toContain('BLOCKED DRAFT')
     expect(view.scenario?.sentences.length).toBeGreaterThanOrEqual(3)
   })
+
+  it("names the concept's course and its kind (map link, library license notice)", async () => {
+    const { id } = await createActivity(ALICE, spotFlaw(), db)
+    const view = await getActivity(ALICE, id, db)
+    expect(view).toMatchObject({ courseId: IDS.course, courseKind: 'library' })
+  })
 })
 
 describe('hints and explanation', () => {

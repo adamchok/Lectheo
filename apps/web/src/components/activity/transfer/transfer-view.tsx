@@ -100,10 +100,13 @@ export function TransferView({ activity }: { activity: ActivityResponse }) {
     e.preventDefault()
     // Set before the call: the cached GET updates (and the result renders) before onSuccess here.
     focusTo.current = 'result'
+    // These callbacks run after the hook's refetch, when Retry may already be on screen and
+    // clicked: only a submit from the retry form may close that form again.
+    const fromRetryForm = retrying
     submit.mutate(answer, {
       onSuccess: (res) => {
         setResults((prev) => [...prev, res])
-        setRetrying(false)
+        if (fromRetryForm) setRetrying(false)
       },
       onError: (error) => {
         focusTo.current = null
@@ -179,6 +182,9 @@ export function TransferView({ activity }: { activity: ActivityResponse }) {
             <span className="text-muted-foreground text-xs tabular-nums">
               {answer.length}/{ANSWER_MAX}
             </span>
+            {submit.isPending && (
+              <span className="text-muted-foreground text-sm">Grading takes a few seconds.</span>
+            )}
           </div>
         </form>
       ) : (
@@ -206,7 +212,11 @@ export function TransferView({ activity }: { activity: ActivityResponse }) {
       {shownExplanation && <ModelSolution explanation={shownExplanation} />}
       {!shownExplanation && lastResult && <Sources sources={lastResult.sources} />}
       {rubric && <RubricList rubric={rubric} />}
-      <MasteryChange start={startState} results={results.map((r) => r.mastery)} />
+      <MasteryChange
+        start={startState}
+        results={results.map((r) => r.mastery)}
+        courseId={activity.courseId}
+      />
     </div>
   )
 }

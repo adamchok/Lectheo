@@ -2,7 +2,7 @@
 
 import type { ActivityResponse, SubmitResponse } from '@lectheo/contracts'
 import { useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { errorMessage } from '@/components/error-state'
 import { Separator } from '@/components/ui/separator'
@@ -27,6 +27,9 @@ import { ScenarioList } from './scenario-list'
 // add it to ActivityResponse and drop this if the ladder length ever varies.
 const HINTS_AVAILABLE = 2
 
+/** POST …/explanation: the rubric comes along once the activity is closed (reopen). */
+type Revealed = ExplanationData & { rubric?: SubmitResponse['rubric'] }
+
 const failed = (title: string) => (error: unknown) =>
   toast.error(title, { description: errorMessage(error) })
 
@@ -41,7 +44,8 @@ export function SpotFlawView({ activity }: { activity: ActivityResponse }) {
   const [answer, setAnswer] = useState<Answer>(EMPTY_ANSWER)
   const [results, setResults] = useState<SubmitResponse[]>([])
   const [hints, setHints] = useState<string[]>([])
-  const [explanation, setExplanation] = useState<ExplanationData | null>(null)
+  // The explanation response carries the rubric once the activity is closed (reopen).
+  const [explanation, setExplanation] = useState<Revealed | null>(null)
   const [retrying, setRetrying] = useState(false)
 
   const ask = useAskAuthor(id)
@@ -66,14 +70,18 @@ export function SpotFlawView({ activity }: { activity: ActivityResponse }) {
     if (needsReveal && revealIdle) reveal(undefined, { onSuccess: setExplanation })
   }, [needsReveal, revealIdle, reveal])
 
-  const onSubmit = () =>
+  const onSubmit = () => {
+    // These callbacks run after the hook's refetch, when Retry may already be on screen and
+    // clicked: only a submit from the retry form may close that form again.
+    const fromRetryForm = retrying
     submit.mutate(answer, {
       onSuccess: (res) => {
         setResults((prev) => [...prev, res])
-        setRetrying(false)
+        if (fromRetryForm) setRetrying(false)
       },
       onError: failed("Couldn't check your answer"),
     })
+  }
   const onHint = () =>
     takeHint.mutate(undefined, {
       onSuccess: (res) => setHints((prev) => [...prev, res.hint]),
@@ -90,6 +98,17 @@ export function SpotFlawView({ activity }: { activity: ActivityResponse }) {
       throw error
     })
 
+  // Submit unmounts the form and Retry unmounts the result: move focus to whichever replaced it.
+  const resultRef = useRef<HTMLElement>(null)
+  const prevShowForm = useRef(showForm)
+  useEffect(() => {
+    if (prevShowForm.current === showForm) return
+    prevShowForm.current = showForm
+    if (showForm) document.getElementById('answer-title')?.focus()
+    else resultRef.current?.focus()
+  }, [showForm])
+
+  const rubric = finalResult?.rubric ?? explanation?.rubric
   const shownExplanation =
     finalResult?.explanation !== undefined
       ? { explanation: finalResult.explanation, sources: finalResult.sources }
@@ -146,7 +165,13 @@ export function SpotFlawView({ activity }: { activity: ActivityResponse }) {
         />
       ) : (
         lastTry && (
-          <section aria-label="Result" aria-live="polite" className="space-y-5">
+          // Focused on mount (above), which announces it; aria-live here would read it twice.
+          <section
+            ref={resultRef}
+            tabIndex={-1}
+            aria-label="Result"
+            className="space-y-5 outline-none"
+          >
             <TryScore tryNo={lastTry.tryNo} outcome={lastTry.outcome} result={lastResult} />
             {!closed && lastTry.feedback.guidingQuestion && (
               <GuidingQuestion question={lastTry.feedback.guidingQuestion} />
@@ -165,8 +190,12 @@ export function SpotFlawView({ activity }: { activity: ActivityResponse }) {
 
       {shownExplanation && <Explanation explanation={shownExplanation} />}
       {!shownExplanation && lastResult && <Sources sources={lastResult.sources} />}
-      {finalResult?.rubric && <RubricList rubric={finalResult.rubric} />}
-      <MasteryChange start={startState} results={results.map((r) => r.mastery)} />
+      {rubric && <RubricList rubric={rubric} />}
+      <MasteryChange
+        start={startState}
+        results={results.map((r) => r.mastery)}
+        courseId={activity.courseId}
+      />
     </div>
   )
 }
