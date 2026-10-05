@@ -90,7 +90,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             {me.data ? (
               <AccountMenu me={me.data} />
             ) : (
-              <Skeleton className="h-8 w-32 rounded-full" aria-label="Loading account" />
+              <Skeleton className="h-8 w-32 rounded-full" label="Loading account" />
             )}
           </div>
         </div>

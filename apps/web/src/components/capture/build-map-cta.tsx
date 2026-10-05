@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowRight, Map as MapIcon } from 'lucide-react'
+import { ArrowRight, Network } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -22,7 +22,7 @@ export function BuildMapCta({ lectureId, lost }: { lectureId: string; lost: numb
           </p>
         </div>
         <Button disabled={buildMap.pending} onClick={() => void buildMap.start(lectureId)}>
-          <MapIcon aria-hidden />
+          <Network aria-hidden />
           {buildMap.pending ? 'Starting…' : 'Build my map'}
         </Button>
       </CardContent>

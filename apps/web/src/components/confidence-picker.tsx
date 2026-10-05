@@ -81,7 +81,7 @@ export function ConfidencePicker({
               htmlFor={itemId}
               className={cn(
                 'border-border bg-card hover:border-primary/50 flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors',
-                'has-[:focus-visible]:ring-ring/60 has-[:focus-visible]:ring-2',
+                'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-background',
                 selected && 'border-primary bg-accent',
                 disabled && 'cursor-not-allowed opacity-60',
               )}

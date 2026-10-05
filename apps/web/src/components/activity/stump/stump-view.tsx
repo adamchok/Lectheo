@@ -2,7 +2,7 @@
 
 import type { ActivityResponse, StumpTry, SubmitResponse } from '@lectheo/contracts'
 import { STUMP_LABELS, STUMP_MAX_TRIES } from '@lectheo/domain'
-import { BookOpen, CircleCheck, CircleX, GraduationCap, LoaderCircle, Trophy } from 'lucide-react'
+import { BookOpen, Check, CircleX, GraduationCap, Trophy } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { parseMasteryState } from '../spot-flaw/logic'
 import { MasteryChange, Sources } from '../spot-flaw/result-panel'
 import { type StumpDraft, useSubmitStump } from './api'
+import { Spinner } from '@/components/ui/spinner'
 
 /* Limits mirror SubmitStump in @lectheo/contracts (API Spec §7). */
 const QUESTION = { min: 10, max: 1000 }
@@ -94,7 +95,7 @@ function StumpForm({ draft, onChange, onSubmit, pending, revising }: StumpFormPr
       />
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" size="lg" disabled={Boolean(blocker) || pending}>
-          {pending && <LoaderCircle aria-hidden className="motion-safe:animate-spin" />}
+          {pending && <Spinner />}
           {pending ? 'Refereeing…' : revising ? 'Resubmit' : 'Submit to the referee'}
         </Button>
         {blocker && <p className="text-muted-foreground text-sm">{blocker}</p>}
@@ -138,7 +139,7 @@ function Detail({ label, children }: { label: string; children: string | null })
 function Accepted({ stump }: { stump: StumpTry }) {
   const lecture = stump.groundedIn === 'lecture'
   const GroundIcon = lecture ? BookOpen : GraduationCap
-  const Icon = stump.aiStumped ? Trophy : CircleCheck
+  const Icon = stump.aiStumped ? Trophy : Check
   return (
     <div className="space-y-5">
       <p className="bg-mastery-green-bg text-mastery-green inline-flex items-center gap-2 rounded-full px-3 py-1 font-medium">

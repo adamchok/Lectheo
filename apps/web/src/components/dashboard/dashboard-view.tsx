@@ -1,6 +1,6 @@
 'use client'
 
-import { Map as MapIcon, Plus, LibraryBig } from 'lucide-react'
+import { BookOpen, Network, Plus } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
 import { useCourses, useMe } from '@/client/queries'
@@ -78,7 +78,7 @@ export function DashboardView() {
       <>
         {header}
         <EmptyState
-          icon={LibraryBig}
+          icon={BookOpen}
           title="No courses yet"
           description="Your courses and the CS50 lecture library will appear here."
         />
@@ -102,7 +102,7 @@ export function DashboardView() {
               </div>
               <Button asChild variant="outline" size="sm">
                 <Link href={`/courses/${primary.id}` as Route}>
-                  <MapIcon aria-hidden />
+                  <Network aria-hidden />
                   Concept map
                 </Link>
               </Button>

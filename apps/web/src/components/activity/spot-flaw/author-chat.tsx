@@ -1,11 +1,12 @@
 'use client'
 
 import type { ActivityResponse } from '@lectheo/contracts'
-import { LoaderCircle, SendHorizontal } from 'lucide-react'
+import { SendHorizontal } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { Spinner } from '@/components/ui/spinner'
 
 export interface AuthorChatProps {
   messages: ActivityResponse['messages']
@@ -85,7 +86,7 @@ export function AuthorChat({
         {sent && <ChatBubble role="student" text={sent} />}
         {pending && (
           <li className="text-muted-foreground flex items-center gap-2 text-sm">
-            <LoaderCircle aria-hidden className="size-4 motion-safe:animate-spin" />
+            <Spinner />
             The author is thinking…
           </li>
         )}

@@ -11,9 +11,8 @@ import {
   ArrowRight,
   Check,
   Eye,
-  LoaderCircle,
   MessageCircleQuestion,
-  RotateCcw,
+  RotateCw,
   X,
 } from 'lucide-react'
 import type { Route } from 'next'
@@ -24,6 +23,7 @@ import { SourceRef } from '@/components/source-ref'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { masteryTrail, OUTCOME_LABELS, scoreRows } from './logic'
+import { Spinner } from '@/components/ui/spinner'
 
 /** POST …/explanation body, or the explanation part of a final submit. */
 export interface ExplanationData {
@@ -140,13 +140,13 @@ export function RetryActions({
   return (
     <div className="flex flex-wrap items-center gap-3">
       <Button size="lg" onClick={onRetry}>
-        <RotateCcw aria-hidden />
+        <RotateCw aria-hidden />
         Retry
       </Button>
       {!explanationShown && (
         <Button variant="ghost" onClick={onShowMe} disabled={showMePending}>
           {showMePending ? (
-            <LoaderCircle aria-hidden className="motion-safe:animate-spin" />
+            <Spinner />
           ) : (
             <Eye aria-hidden />
           )}

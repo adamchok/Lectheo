@@ -2,10 +2,11 @@
 @import 'tw-animate-css';
 
 /*
- * Lectheo design tokens.
+ * Lectheo design tokens — source of truth: docs/Lectheo Design System.md §2 (keep in step).
  * - Light theme is "paper": warm neutrals, ink-blue accent.
  * - Dark theme applies via the `.dark` class (next-themes, system default) and,
- *   before hydration / without JS, via prefers-color-scheme.
+ *   before hydration / without JS, via prefers-color-scheme (the `theme-dark` variant below
+ *   writes both from one block so the fallback can't drift).
  * - Mastery and marker colours always ship with an icon + text label (Spec F6.1).
  *   `-fg` on `-bg` pairs are ≥ 4.5:1 (AA text); `-solid` fills are ≥ 3:1 against
  *   the page background (AA non-text).
@@ -13,7 +14,20 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Token-only variant: the `.dark` class, or the OS preference when no theme class is set. */
+@custom-variant theme-dark {
+  &:where(.dark) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:not(.light):not(.dark) {
+      @slot;
+    }
+  }
+}
+
 :root {
+  color-scheme: light;
   --radius: 0.625rem;
 
   --background: #fbfaf7;
@@ -31,10 +45,17 @@
   --accent: #eceff9;
   --accent-foreground: #1c2a6b;
   --destructive: #b42318;
+  --destructive-foreground: #ffffff;
   --border: #e4e1da;
-  --input: #d6d3cb;
+  --input: #8a8780;
   --ring: #2b4acb;
   --sunken: #f5f3ee;
+
+  /* Sidebar aliases: resolve per theme because .dark sits on this same element. */
+  --sidebar: var(--sunken);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-active: var(--accent);
+  --sidebar-active-foreground: var(--accent-foreground);
 
   /* Mastery states (F6) */
   --mastery-gray-fg: #52525b;
@@ -55,51 +76,38 @@
   --marker-lost-bg: #fbe9f2;
   --marker-important-fg: #0b6b78;
   --marker-important-bg: #e1f3f5;
-}
 
-.dark {
-  --background: #121317;
-  --foreground: #e8e8ec;
-  --card: #1a1b20;
-  --card-foreground: #e8e8ec;
-  --popover: #1d1e24;
-  --popover-foreground: #e8e8ec;
-  --primary: #8ea2ff;
-  --primary-foreground: #0d1230;
-  --secondary: #23242a;
-  --secondary-foreground: #e8e8ec;
-  --muted: #202127;
-  --muted-foreground: #a3a5ae;
-  --accent: #222a4a;
-  --accent-foreground: #d5dcff;
-  --destructive: #ff8a7d;
-  --border: #2c2d34;
-  --input: #3a3c45;
-  --ring: #8ea2ff;
-  --sunken: #16171c;
+  /* Shadow */
+  --shadow-xs: 0 1px 2px 0 #1c1d220d;
+  --shadow-popover: 0 8px 24px -8px #1c1d2229, 0 2px 6px -2px #1c1d221a;
+  --shadow-frame: 0 24px 48px -24px #1c1d2233, 0 0 0 1px #e4e1da;
 
-  --mastery-gray-fg: #b4b4bc;
-  --mastery-gray-bg: #26272d;
-  --mastery-gray-solid: #7c7c86;
-  --mastery-red-fg: #ff9b8f;
-  --mastery-red-bg: #3a1d1b;
-  --mastery-red-solid: #f0625a;
-  --mastery-amber-fg: #f5c063;
-  --mastery-amber-bg: #33280f;
-  --mastery-amber-solid: #d99a2b;
-  --mastery-green-fg: #7fd49b;
-  --mastery-green-bg: #15301f;
-  --mastery-green-solid: #45b06a;
+  /* Layout */
+  --topbar-height: 56px;
+  --sidebar-width: 240px;
+  --sidebar-rail: 56px;
+  --content-max: 1280px;
+  --reading-max: 680px;
+  --panel-width: 352px;
+  --target-min: 24px;
 
-  --marker-lost-fg: #f59ac6;
-  --marker-lost-bg: #3a1a2b;
-  --marker-important-fg: #6fd3df;
-  --marker-important-bg: #12313a;
-}
+  /* Z-index */
+  --z-sticky: 40;
+  --z-overlay: 50;
+  --z-toast: 60;
 
-/* No-JS / pre-hydration fallback: follow the OS unless a theme class is set. */
-@media (prefers-color-scheme: dark) {
-  :root:not(.light):not(.dark) {
+  /* Motion (mirrored in src/lib/motion.ts) */
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --duration-slow: 260ms;
+  --duration-emphasis: 400ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  @variant theme-dark {
+    color-scheme: dark;
+
     --background: #121317;
     --foreground: #e8e8ec;
     --card: #1a1b20;
@@ -115,10 +123,33 @@
     --accent: #222a4a;
     --accent-foreground: #d5dcff;
     --destructive: #ff8a7d;
+    --destructive-foreground: #2a0a06;
     --border: #2c2d34;
-    --input: #3a3c45;
+    --input: #6b6e78;
     --ring: #8ea2ff;
     --sunken: #16171c;
+
+    --mastery-gray-fg: #b4b4bc;
+    --mastery-gray-bg: #26272d;
+    --mastery-gray-solid: #7c7c86;
+    --mastery-red-fg: #ff9b8f;
+    --mastery-red-bg: #3a1d1b;
+    --mastery-red-solid: #f0625a;
+    --mastery-amber-fg: #f5c063;
+    --mastery-amber-bg: #33280f;
+    --mastery-amber-solid: #d99a2b;
+    --mastery-green-fg: #7fd49b;
+    --mastery-green-bg: #15301f;
+    --mastery-green-solid: #45b06a;
+
+    --marker-lost-fg: #f59ac6;
+    --marker-lost-bg: #3a1a2b;
+    --marker-important-fg: #6fd3df;
+    --marker-important-bg: #12313a;
+
+    --shadow-xs: 0 1px 2px 0 #00000066;
+    --shadow-popover: 0 8px 24px -8px #00000099, 0 0 0 1px #2c2d34;
+    --shadow-frame: 0 24px 48px -24px #000000b3, 0 0 0 1px #2c2d34;
   }
 }
 
@@ -147,10 +178,15 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-sunken: var(--sunken);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-active: var(--sidebar-active);
+  --color-sidebar-active-foreground: var(--sidebar-active-foreground);
 
   --color-mastery-gray: var(--mastery-gray-fg);
   --color-mastery-gray-bg: var(--mastery-gray-bg);
@@ -169,6 +205,137 @@
   --color-marker-lost-bg: var(--marker-lost-bg);
   --color-marker-important: var(--marker-important-fg);
   --color-marker-important-bg: var(--marker-important-bg);
+
+  /* shadow-xs · shadow-popover · shadow-frame (per-theme values above) */
+  --shadow-xs: var(--shadow-xs);
+  --shadow-popover: var(--shadow-popover);
+  --shadow-frame: var(--shadow-frame);
+
+  /* h-topbar · w-sidebar · w-sidebar-rail · w-panel · min-h-target · max-w-content · max-w-reading */
+  --spacing-topbar: var(--topbar-height);
+  --spacing-sidebar: var(--sidebar-width);
+  --spacing-sidebar-rail: var(--sidebar-rail);
+  --spacing-panel: var(--panel-width);
+  --spacing-target: var(--target-min);
+  --container-content: var(--content-max);
+  --container-reading: var(--reading-max);
+
+  /* z-sticky · z-overlay · z-toast */
+  --z-index-sticky: var(--z-sticky);
+  --z-index-overlay: var(--z-overlay);
+  --z-index-toast: var(--z-toast);
+
+  /* duration-fast|base|slow|emphasis · ease-out|in|standard */
+  --transition-duration-fast: var(--duration-fast);
+  --transition-duration-base: var(--duration-base);
+  --transition-duration-slow: var(--duration-slow);
+  --transition-duration-emphasis: var(--duration-emphasis);
+  --ease-out: var(--ease-out);
+  --ease-in: var(--ease-in);
+  --ease-standard: var(--ease-standard);
+}
+
+/* Type scale (Design System §2 Type). Family + size/line + weight + tracking in one class. */
+@utility text-display-xl {
+  font-family: var(--font-serif);
+  font-size: 40px;
+  line-height: 44px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  @variant sm {
+    font-size: 56px;
+    line-height: 60px;
+  }
+}
+@utility text-display-lg {
+  font-family: var(--font-serif);
+  font-size: 30px;
+  line-height: 36px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  @variant sm {
+    font-size: 40px;
+    line-height: 46px;
+  }
+}
+@utility text-display-md {
+  font-family: var(--font-serif);
+  font-size: 30px;
+  line-height: 36px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+@utility text-title-lg {
+  font-family: var(--font-serif);
+  font-size: 24px;
+  line-height: 30px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+@utility text-title-md {
+  font-family: var(--font-serif);
+  font-size: 19px;
+  line-height: 26px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+@utility text-body-lg {
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 28px;
+  font-weight: 400;
+}
+@utility text-body {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 24px;
+  font-weight: 400;
+}
+@utility text-body-sm {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+}
+@utility text-heading {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 600;
+}
+@utility text-label {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+}
+@utility text-caption {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+}
+@utility text-overline {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+@utility text-mono {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+@utility text-mono-sm {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
 @layer base {
@@ -178,6 +345,7 @@
   html {
     -webkit-text-size-adjust: 100%;
     text-rendering: optimizeLegibility;
+    scroll-padding-top: 72px;
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;

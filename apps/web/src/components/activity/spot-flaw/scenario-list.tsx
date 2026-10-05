@@ -34,8 +34,8 @@ export function ScenarioList({
               disabled={disabled}
               onClick={() => onSelect(idx)}
               className={cn(
-                'border-border bg-card flex w-full gap-3 rounded-lg border p-3 text-left transition-colors outline-none',
-                'focus-visible:ring-ring/50 focus-visible:ring-[3px] enabled:hover:border-foreground/30',
+                'border-border bg-card flex w-full gap-3 rounded-lg border p-3 text-left transition-colors outline-hidden',
+                'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background enabled:hover:border-foreground/30',
                 active && 'border-primary bg-primary/5 enabled:hover:border-primary',
               )}
             >

@@ -1,7 +1,7 @@
 'use client'
 
 import type { LectureResponse, MarkerKind } from '@lectheo/contracts'
-import { ArrowRight, CircleCheck, Flag, Star } from 'lucide-react'
+import { ArrowRight, Check, Flag, Star } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -173,7 +173,7 @@ function WatchSession({ lecture }: { lecture: LectureResponse }) {
             <MarkerCounts lost={counts.lost} important={counts.important} showZero />
             {!done && (
               <Button variant="ghost" className="ml-auto" onClick={finish}>
-                <CircleCheck aria-hidden />
+                <Check aria-hidden />
                 Done watching
               </Button>
             )}

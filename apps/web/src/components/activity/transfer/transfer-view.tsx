@@ -1,7 +1,7 @@
 'use client'
 
 import type { ActivityResponse, SubmitResponse } from '@lectheo/contracts'
-import { Lightbulb, LoaderCircle } from 'lucide-react'
+import { Lightbulb } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { toast } from 'sonner'
@@ -21,6 +21,7 @@ import {
   TryScore,
 } from '../spot-flaw/result-panel'
 import { ANSWER_MAX, useSubmitTransfer } from './api'
+import { Spinner } from '@/components/ui/spinner'
 
 /** POST …/explanation: the rubric comes along once the activity is closed (reopen). */
 type Revealed = ExplanationData & { rubric?: SubmitResponse['rubric'] }
@@ -176,7 +177,7 @@ export function TransferView({ activity }: { activity: ActivityResponse }) {
           <div className="flex flex-wrap items-center gap-3">
             <Button type="submit" size="lg" disabled={!answer.trim() || submit.isPending}>
               {submit.isPending && (
-                <LoaderCircle aria-hidden className="motion-safe:animate-spin" />
+                <Spinner />
               )}
               {submit.isPending ? 'Checking…' : 'Submit'}
             </Button>

@@ -1,7 +1,7 @@
 'use client'
 
 import { RedirectResponse } from '@lectheo/contracts'
-import { ArrowRight, LoaderCircle } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import type { Route } from 'next'
 import { useRouter } from 'next/navigation'
 import Script from 'next/script'
@@ -10,6 +10,7 @@ import { apiFetch, isApiClientError } from '@/client/api'
 import { Button } from '@/components/ui/button'
 import { safeRedirect } from '@/lib/safe-redirect'
 import { TURNSTILE_SCRIPT_SRC } from './turnstile'
+import { Spinner } from '@/components/ui/spinner'
 
 type SampleState = 'idle' | 'verifying' | 'starting'
 
@@ -187,7 +188,7 @@ export function SignInActions() {
             </>
           ) : (
             <>
-              <LoaderCircle aria-hidden className="motion-safe:animate-spin" />
+              <Spinner />
               {sampleState === 'verifying' ? 'Checking your browser…' : 'Preparing your sample…'}
             </>
           )}
@@ -200,7 +201,7 @@ export function SignInActions() {
           disabled={busy}
         >
           {googlePending ? (
-            <LoaderCircle aria-hidden className="motion-safe:animate-spin" />
+            <Spinner />
           ) : (
             <GoogleIcon />
           )}

@@ -1,7 +1,9 @@
 'use client'
 
 import type { MasteryState } from '@lectheo/contracts'
+import { AnimatePresence, m } from 'motion/react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { duration, ease } from '@/lib/motion'
 import { cn } from '@/lib/utils'
 import { MASTERY_META } from './mastery-meta'
 
@@ -34,11 +36,10 @@ export function MasteryBadge({
         size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-2.5 py-1 text-[0.8125rem]',
         meta.badgeClass,
         hasReasons && 'cursor-help',
-        className,
       )}
       tabIndex={hasReasons ? 0 : undefined}
     >
-      <Icon aria-hidden className={size === 'sm' ? 'size-3.5' : 'size-4'} strokeWidth={2.25} />
+      <Icon aria-hidden className={size === 'sm' ? 'size-3.5' : 'size-4'} />
       <span>{meta.label}</span>
       {confidentMistake && (
         <>
@@ -51,18 +52,32 @@ export function MasteryBadge({
     </span>
   )
 
-  if (!hasReasons) return badge
-
+  // Signature moment (Design System §3 Motion): a state change cross-fades over duration-emphasis.
+  // `initial={false}` keeps the first render static.
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>{badge}</TooltipTrigger>
-      <TooltipContent className="max-w-xs">
-        <ul className="space-y-0.5">
-          {reasons!.map((reason) => (
-            <li key={reason}>{reason}</li>
-          ))}
-        </ul>
-      </TooltipContent>
-    </Tooltip>
+    <AnimatePresence mode="wait" initial={false}>
+      <m.span
+        key={`${state}:${confidentMistake}`}
+        className={cn('inline-flex shrink-0', className)}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1, transition: { duration: duration.emphasis * 0.6, ease: ease.out } }}
+        exit={{ opacity: 0, transition: { duration: duration.emphasis * 0.4, ease: ease.in } }}
+      >
+        {hasReasons ? (
+          <Tooltip>
+            <TooltipTrigger asChild>{badge}</TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              <ul className="space-y-0.5">
+                {reasons!.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          badge
+        )}
+      </m.span>
+    </AnimatePresence>
   )
 }

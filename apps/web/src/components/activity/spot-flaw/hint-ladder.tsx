@@ -1,9 +1,10 @@
 'use client'
 
 import type { SourceRef } from '@lectheo/contracts'
-import { Lightbulb, LoaderCircle } from 'lucide-react'
+import { Lightbulb } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sources } from './result-panel'
+import { Spinner } from '@/components/ui/spinner'
 
 export interface HintLadderProps {
   /** Hint texts revealed in this session (GET /activities doesn't return earlier ones). */
@@ -42,7 +43,7 @@ export function HintLadder({
           onClick={onTake}
           disabled={disabled || pending || left === 0}
         >
-          {pending && <LoaderCircle aria-hidden className="motion-safe:animate-spin" />}
+          {pending && <Spinner />}
           {left === 0 ? 'No hints left' : `Get hint ${hintsUsed + 1} of ${hintsAvailable}`}
         </Button>
       </div>

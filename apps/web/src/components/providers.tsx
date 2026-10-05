@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ThemeProvider } from 'next-themes'
 import { useState, type ReactNode } from 'react'
 import { isApiClientError } from '@/client/api'
+import { MotionProvider } from '@/components/motion-provider'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 
@@ -31,10 +32,12 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
       <QueryClientProvider client={queryClient}>
-        <TooltipProvider delayDuration={250}>
-          {children}
-          <Toaster position="bottom-right" closeButton />
-        </TooltipProvider>
+        <MotionProvider>
+          <TooltipProvider delayDuration={250}>
+            {children}
+            <Toaster position="bottom-right" closeButton />
+          </TooltipProvider>
+        </MotionProvider>
       </QueryClientProvider>
     </ThemeProvider>
   )

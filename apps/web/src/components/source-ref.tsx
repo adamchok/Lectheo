@@ -31,7 +31,7 @@ export function SourceRef({ source, onSeek, compact = false, className }: Source
 
   const content = (
     <>
-      <Play aria-hidden className="text-primary size-3 shrink-0 translate-y-px fill-current" />
+      <Play aria-hidden className="text-primary size-3.5 shrink-0 translate-y-px fill-current" />
       <span className="text-primary font-mono text-[0.8125rem] font-medium tabular-nums">
         {formatTimestamp(source.startMs)}
       </span>

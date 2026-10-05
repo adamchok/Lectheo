@@ -34,7 +34,7 @@ export function PageHeader({ title, description, eyebrow, actions, back, classNa
               {eyebrow}
             </p>
           )}
-          <h1 className="font-serif text-3xl leading-tight font-medium tracking-[-0.01em] text-balance">
+          <h1 className="text-title-lg text-balance">
             {title}
           </h1>
           {description && (

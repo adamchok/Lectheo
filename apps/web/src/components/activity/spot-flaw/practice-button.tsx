@@ -1,9 +1,10 @@
 'use client'
 
 import type { MasteryState } from '@lectheo/contracts'
-import { LoaderCircle, SearchCheck } from 'lucide-react'
+import { SearchCheck } from 'lucide-react'
 import { useStartPractice } from '@/client/practice'
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 
 export interface PracticeButtonProps {
   conceptId: string
@@ -25,7 +26,7 @@ export function PracticeButton({ conceptId, conceptName, mastery }: PracticeButt
       aria-label={`Practice ${conceptName}: spot the flaw`}
     >
       {isPending ? (
-        <LoaderCircle aria-hidden className="motion-safe:animate-spin" />
+        <Spinner />
       ) : (
         <SearchCheck aria-hidden />
       )}

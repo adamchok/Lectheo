@@ -51,7 +51,7 @@ export function MasteryBar({ counts, showLegend = true, className }: MasteryBarP
               const { icon: Icon, label, textClass } = MASTERY_META[state]
               return (
                 <li key={state} className="inline-flex items-center gap-1">
-                  <Icon className={cn('size-3.5', textClass)} strokeWidth={2.25} />
+                  <Icon className={cn('size-3.5', textClass)} />
                   <span className="text-foreground font-medium tabular-nums">{counts[state]}</span>
                   <span>{label}</span>
                 </li>
