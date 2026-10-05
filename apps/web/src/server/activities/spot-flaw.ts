@@ -313,10 +313,14 @@ export const spotFlawHandler: ActivityTypeHandler<'spot_flaw'> = {
             ctx.ai,
           )
         : null
+    // Labels stay generic: rubric labels hint at the fix, revealed only by finalReveal (F5.3).
     const criteria: Criterion[] = !key.hasFlaw
       ? []
       : judge
-        ? gradedCriteria(judge.output, rubric.criteria)
+        ? gradedCriteria(judge.output, rubric.criteria).map((c, i) => ({
+            ...c,
+            label: `Criterion ${i + 1}`,
+          }))
         : [GENERIC_CORRECTION]
     const scored = scoreSpotFlaw(checks, checks.needsJudge ? scaleToCorrection(criteria) : null)
     const judgeQuestion = judge?.output.guidingQuestion

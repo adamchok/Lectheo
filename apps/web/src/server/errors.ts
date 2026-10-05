@@ -35,3 +35,31 @@ export class ApiError extends Error {
 export const notFound = (): ApiError => new ApiError('not_found')
 export const invalidState = (message?: string, details?: Record<string, unknown>): ApiError =>
   new ApiError('invalid_state', message, details)
+
+const MAX_ERROR_LOG_CHARS = 500
+
+/**
+ * drizzle's DrizzleQueryError embeds the SQL and its params (student answers, transcripts, answer
+ * keys) in its message. Its `name` stays "Error", so match drizzle's fixed message prefix.
+ */
+const isQueryError = (err: unknown): boolean =>
+  err instanceof Error && err.message.startsWith('Failed query:')
+
+/**
+ * A loggable description of an unexpected error that never carries SQL params: a failed query is
+ * described by the driver error it wraps. Driver messages can still quote one value (e.g. postgres
+ * `invalid input syntax for type uuid: "…"`); the length cap bounds it.
+ */
+export function safeErrorMessage(err: unknown): string {
+  if (!(err instanceof Error)) return String(err).slice(0, MAX_ERROR_LOG_CHARS)
+  const message = !isQueryError(err)
+    ? err.message
+    : err.cause instanceof Error
+      ? err.cause.message
+      : 'query failed'
+  return `${err.name}: ${message}`.slice(0, MAX_ERROR_LOG_CHARS)
+}
+
+/** `err`, or a param-free copy of a failed query (for errors re-thrown to a runtime that logs). */
+export const withoutQueryParams = (err: unknown): unknown =>
+  isQueryError(err) ? new Error(safeErrorMessage(err)) : err

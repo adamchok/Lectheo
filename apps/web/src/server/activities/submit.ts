@@ -93,7 +93,9 @@ async function replayOrConflict(
   if (canonical(stored.response) !== canonical(body)) {
     throw invalidState('This try was already submitted.', { tryNo: stored.tryNo })
   }
-  const sources = await activitySources(ctx.db, ctx.concept, ctx.item)
+  // Attempts stored before grading.sources existed fall back to the activity's default grounding.
+  const sources =
+    stored.grading.sources ?? (await activitySources(ctx.db, ctx.concept, ctx.item))
   return buildSubmitResponse(ctx, handler, stored, { sources, hint: null })
 }
 
@@ -181,6 +183,7 @@ export async function submitActivity(
         ...(grading.misconceptions ? { misconceptions: [...grading.misconceptions] } : {}),
         guidingQuestion: grading.feedback.guidingQuestion,
         ...(grading.stump ? { stump: grading.stump } : {}),
+        sources: [...grading.sources],
       },
       score: grading.score,
       maxScore: grading.maxScore,
