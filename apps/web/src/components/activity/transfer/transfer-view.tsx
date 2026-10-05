@@ -1,7 +1,7 @@
 'use client'
 
 import type { ActivityResponse, SubmitResponse } from '@lectheo/contracts'
-import { LoaderCircle } from 'lucide-react'
+import { Lightbulb, LoaderCircle } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { toast } from 'sonner'
@@ -32,8 +32,9 @@ const failed = (title: string) => (error: unknown) =>
 export function resultAnnouncement(result: SubmitResponse): string {
   const head = `Try ${result.tryNo} of 2: ${OUTCOME_LABELS[result.outcome]}, ${result.score} of ${result.maxScore} points.`
   if (result.final) return `${head} The model solution and grading criteria are below.`
-  const question = result.feedback.guidingQuestion
-  return question ? `${head} Think about this: ${question}` : head
+  const { guidingQuestion: question, hint } = result.feedback
+  const asked = question ? `${head} Think about this: ${question}` : head
+  return hint ? `${asked} Hint: ${hint}` : asked
 }
 
 /** Model solution, then why (paragraphs split on blank lines; transfer.ts explanationOf). */
@@ -54,7 +55,7 @@ function ModelSolution({ explanation }: { explanation: ExplanationData }) {
 }
 
 /**
- * Transfer problem (F4b, F5): prompt → answer → score + guiding question → one retry (or "Show
+ * Transfer problem (F4b, F5): prompt → answer → score + guiding question + hint → one retry (or "Show
  * me", assisted) → model solution + rubric. Submit responses and the explanation live in component
  * state because GET /activities/{id} doesn't return them.
  */
@@ -196,6 +197,13 @@ export function TransferView({ activity }: { activity: ActivityResponse }) {
             <TryScore tryNo={lastTry.tryNo} outcome={lastTry.outcome} result={lastResult} />
             {!closed && lastTry.feedback.guidingQuestion && (
               <GuidingQuestion question={lastTry.feedback.guidingQuestion} />
+            )}
+            {/* F5.1 hint after the question: only in the submit response, not the GET. */}
+            {!closed && lastResult?.tryNo === lastTry.tryNo && lastResult.feedback.hint && (
+              <p className="text-muted-foreground flex gap-2.5 text-sm leading-relaxed">
+                <Lightbulb aria-hidden className="mt-0.5 size-4 shrink-0" />
+                <span>{lastResult.feedback.hint}</span>
+              </p>
             )}
             {!closed && (
               <RetryActions

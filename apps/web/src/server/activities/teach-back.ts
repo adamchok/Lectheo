@@ -36,13 +36,19 @@ export const openerFor = (conceptName: string): string =>
   `Hey! I missed the lecture on ${conceptName}. Can you explain it to me? Like, what is it ` +
   'and why would anyone need it?'
 
-/** F5.1 hint after the guiding question: how much is missing, never what (F5.3). */
-export function retryHintFor(criteria: readonly { score: number; max: number }[]): string | null {
+/**
+ * F5.1 hint after the guiding question: how much is missing, never what (F5.3). `lead` names who
+ * is missing it (teach-back's friend; transfer passes its own).
+ */
+export function retryHintFor(
+  criteria: readonly { score: number; max: number }[],
+  lead = 'Sam is still fuzzy on',
+): string | null {
   const open = criteria.filter((c) => c.score < c.max).length
   if (open === 0) return null
   const points = open === 1 ? '1 key point' : `${open} key points`
   return (
-    `Sam is still fuzzy on ${points} out of ${criteria.length}. Try walking through one concrete ` +
+    `${lead} ${points} out of ${criteria.length}. Try walking through one concrete ` +
     'example step by step, and say why each step happens.'
   )
 }
