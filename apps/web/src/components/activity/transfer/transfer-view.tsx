@@ -100,10 +100,13 @@ export function TransferView({ activity }: { activity: ActivityResponse }) {
     e.preventDefault()
     // Set before the call: the cached GET updates (and the result renders) before onSuccess here.
     focusTo.current = 'result'
+    // These callbacks run after the hook's refetch, when Retry may already be on screen and
+    // clicked: only a submit from the retry form may close that form again.
+    const fromRetryForm = retrying
     submit.mutate(answer, {
       onSuccess: (res) => {
         setResults((prev) => [...prev, res])
-        setRetrying(false)
+        if (fromRetryForm) setRetrying(false)
       },
       onError: (error) => {
         focusTo.current = null

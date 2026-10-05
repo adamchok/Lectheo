@@ -183,7 +183,12 @@ export function TeachBackView({ activity }: { activity: ActivityResponse }) {
   return (
     <div className="space-y-6">
       {shownFinal ? (
-        <FinalReveal result={shownFinal} before={before} courseId={activity.courseId} />
+        <FinalReveal
+          result={shownFinal}
+          before={before}
+          courseId={activity.courseId}
+          autoFocus={final !== null}
+        />
       ) : closed ? (
         <Skeleton aria-label="Loading your result" className="h-64 w-full rounded-2xl" />
       ) : tryOne ? (

@@ -1,5 +1,9 @@
 import { expect, test, type Page } from '@playwright/test'
-import { LIBRARY_COURSE_ID, lectureId, signInSample } from './fixtures'
+import { closeDb } from '@lectheo/db'
+import { flawKeyOf, LIBRARY_COURSE_ID, lectureId, signInSample } from './fixtures'
+
+// The answer-key lookup opens a DB pool; close it so the worker can exit.
+test.afterAll(closeDb)
 
 /*
  * Keyboard focus and layout checks from the pre-submission a11y pass (WCAG 2.4.3, 1.4.10).
@@ -8,7 +12,6 @@ import { LIBRARY_COURSE_ID, lectureId, signInSample } from './fixtures'
  */
 
 const L5 = lectureId('l5')
-const MAX_DIAGNOSTIC_QUESTIONS = 20
 
 async function openPractice(page: Page, name: string): Promise<void> {
   await page.goto(`/courses/${LIBRARY_COURSE_ID}`)
@@ -18,6 +21,31 @@ async function openPractice(page: Page, name: string): Promise<void> {
     .getByRole('button', { name })
     .click()
   await expect(page).toHaveURL(/\/activities\//)
+}
+
+const ACTIVITY_GET = /\/api\/v1\/activities\/[^/]+$/
+
+/**
+ * Holds the activity refetch that follows a submit for a second. Retry is already on screen
+ * (the cache is updated first) while the submit's own callbacks wait for this refetch, so a
+ * Retry click lands inside that window every time. Resolves once the refetch has landed.
+ */
+async function holdRefetchAfterSubmit(page: Page): Promise<() => Promise<void>> {
+  await page.route(
+    (url) => ACTIVITY_GET.test(url.pathname),
+    async (route) => {
+      if (route.request().method() === 'GET') await new Promise((r) => setTimeout(r, 1_000))
+      await route.continue()
+    },
+  )
+  const refetched = page.waitForResponse(
+    (r) => r.request().method() === 'GET' && ACTIVITY_GET.test(new URL(r.url()).pathname),
+  )
+  return async () => {
+    await refetched
+    await page.waitForLoadState('networkidle')
+    await page.waitForTimeout(250) // let the submit's callbacks run and render
+  }
 }
 
 test('route change and "Done watching" keep keyboard focus on the page', async ({ page }) => {
@@ -39,59 +67,115 @@ test('diagnostic by keyboard: options, next question and results take focus', as
   await page.goto(`/lectures/${L5}/diagnostic`)
 
   const question = page.getByRole('region', { name: 'Question' })
-  const results = page.getByRole('heading', { name: 'Your results' })
-  for (let i = 0; i < MAX_DIAGNOSTIC_QUESTIONS; i += 1) {
-    await expect(question.or(results)).toBeVisible()
-    if (await results.isVisible()) break
-    await expect(question.getByRole('heading', { level: 2 })).toBeFocused()
+  const stem = question.getByRole('heading', { level: 2 })
+  const options = question.getByRole('list', { name: 'Answer options' })
 
-    await page.keyboard.press('4') // "No idea"
-    const options = question.getByRole('list', { name: 'Answer options' }).getByRole('button')
-    await expect(options.first()).toBeFocused()
+  // Rating moves focus to the options list (not option A, so a stray Enter answers nothing).
+  await expect(stem).toBeFocused()
+  await page.keyboard.press('4') // "No idea"
+  await expect(options).toBeFocused()
+
+  // Resumed with confidence already recorded: the options load, focus stays on the question.
+  await page.reload()
+  await expect(options).toBeVisible()
+  await expect(stem).toBeFocused()
+
+  // "No idea" never triggers a follow-up, so the count shown up front is the whole diagnostic.
+  const total = Number(
+    (await page.getByText(/^Question 1 of \d+/).textContent())?.match(/of (\d+)/)?.[1],
+  )
+  expect(total).toBeGreaterThan(0)
+  for (let i = 0; i < total; i += 1) {
+    if (i > 0) {
+      await expect(stem).toBeFocused()
+      await page.keyboard.press('4')
+      await expect(options).toBeFocused()
+    }
+    await page.keyboard.press('Tab')
+    await expect(options.getByRole('button').first()).toBeFocused()
     await page.keyboard.press('Enter')
     const next = question.getByRole('button', {
-      name: /one more on this idea|next question|see results/i,
+      name: i === total - 1 ? 'See results' : 'Next question',
     })
     await expect(next).toBeFocused()
     await page.keyboard.press('Enter')
   }
-  await expect(results).toBeFocused()
+  await expect(page.getByRole('heading', { name: 'Your results' })).toBeFocused()
 })
 
 test('spot the flaw: submit focuses the result, retry focuses the form', async ({ page }) => {
   await signInSample(page)
   await openPractice(page, 'Spot the flaw')
 
-  await page.getByRole('radio', { name: 'Correct' }).check({ force: true })
-  await page.getByRole('button', { name: 'Submit' }).click()
-  await expect(page.getByRole('region', { name: 'Result' })).toBeFocused()
-
-  const retry = page.getByRole('button', { name: 'Retry' })
-  if (await retry.isVisible()) {
-    await retry.click()
-    await expect(page.getByRole('heading', { name: 'Your second try' })).toBeFocused()
+  // A wrong first try (from the answer key), so the Socratic retry always follows.
+  const key = await flawKeyOf(new URL(page.url()).pathname.split('/').at(-1) ?? '')
+  if (key.hasFlaw) {
+    await page.getByRole('radio', { name: 'Correct' }).check({ force: true })
+  } else {
+    await page.getByRole('radio', { name: 'Flawed' }).check({ force: true })
+    await page.getByRole('radio', { name: 'Sentence 1' }).check({ force: true })
+    await page.getByRole('textbox', { name: /what should it say instead/i }).fill('It is wrong.')
   }
+  const settled = await holdRefetchAfterSubmit(page)
+  await page.getByRole('button', { name: 'Submit' }).click()
+  const result = page.getByRole('region', { name: 'Result' })
+  await expect(result).toBeFocused()
+
+  await result.getByRole('button', { name: 'Retry' }).click()
+  await settled()
+  await expect(page.getByRole('heading', { name: 'Your second try' })).toBeFocused()
 })
 
-test('teach-back: the input keeps focus while Sam replies; feedback takes focus', async ({
+test('transfer: Retry clicked while the result refetches opens the revised answer', async ({
+  page,
+}) => {
+  await signInSample(page)
+  await openPractice(page, 'Transfer problem')
+
+  // Same answer as transfer.spec: graded "partly right" under AI_FAKE, so a retry follows.
+  await page
+    .getByRole('textbox', { name: 'Your answer' })
+    .fill('Pass the address with & and change the value through * inside the function.')
+  const settled = await holdRefetchAfterSubmit(page)
+  await page.getByRole('button', { name: 'Submit' }).click()
+  await page.getByRole('region', { name: 'Result' }).getByRole('button', { name: 'Retry' }).click()
+  await settled()
+  await expect(page.getByRole('textbox', { name: 'Your revised answer' })).toBeFocused()
+})
+
+test('teach-back: the input keeps focus while Sam replies; results take focus once', async ({
   page,
 }) => {
   await signInSample(page)
   await openPractice(page, 'Teach-back')
 
   const input = page.getByRole('textbox', { name: 'Your explanation' })
-  await input.fill('A pointer is a variable that stores the memory address of another value.')
-  await input.press('Enter')
-  await expect(page.getByRole('list', { name: 'Conversation with Sam' })).toContainText('Sam:')
-  await expect(input).toBeEnabled()
-  await expect(input).toBeFocused()
+  const samReplies = page
+    .getByRole('list', { name: 'Conversation with Sam' })
+    .getByRole('listitem')
+    .filter({ hasText: 'Sam:' })
+  const explain = async (text: string) => {
+    const before = await samReplies.count()
+    await input.fill(text)
+    await input.press('Enter')
+    await expect(samReplies).toHaveCount(before + 1)
+    await expect(input).toBeEnabled()
+    await expect(input).toBeFocused()
+  }
 
+  await explain('A pointer is a variable that stores the memory address of another value.')
   await page.getByRole('button', { name: "I'm done explaining" }).click()
-  await expect(
-    page.getByRole('heading', {
-      name: /how your explanation landed|you taught it|getting there|not quite yet/i,
-    }),
-  ).toBeFocused()
+  await expect(page.getByRole('heading', { name: 'How your explanation landed' })).toBeFocused()
+
+  await explain('Dereferencing with * follows the address to read or change the value there.')
+  await page.getByRole('button', { name: 'Submit my second try' }).click()
+  const verdict = page.getByRole('heading', { name: /you taught it|getting there|not quite yet/i })
+  await expect(verdict).toBeFocused()
+
+  // Reopened later: the verdict shows, but focus starts at the top of the page as usual.
+  await page.reload()
+  await expect(verdict).toBeVisible()
+  await expect(verdict).not.toBeFocused()
 })
 
 test('a missing lecture offers a way back instead of a retry', async ({ page }) => {

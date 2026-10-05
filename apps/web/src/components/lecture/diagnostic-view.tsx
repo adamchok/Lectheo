@@ -222,8 +222,11 @@ function QuestionCard({ sessionId, question, isLast, onAnswered, onNext }: Quest
     sendConfidence({ itemId: question.id, level: question.confidence })
   }, [sendConfidence, question])
 
+  // Only a rating made here moves focus to the options; a resumed question keeps it on the stem.
+  const [ratedHere, setRatedHere] = useState(false)
   const handleRate = (next: ConfidenceLevel) => {
     if (confidence.isPending || options) return
+    setRatedHere(true)
     setLevel(next)
     sendConfidence({ itemId: question.id, level: next })
   }
@@ -275,6 +278,7 @@ function QuestionCard({ sessionId, question, isLast, onAnswered, onNext }: Quest
             correctOptionId={feedback?.correctOptionId}
             disabled={answer.isPending || Boolean(feedback)}
             onPick={handlePick}
+            focusOnMount={ratedHere}
           />
           {answer.isPending && (
             <p className="text-muted-foreground flex items-center gap-2 text-sm">
@@ -315,20 +319,32 @@ interface OptionListProps {
   correctOptionId?: string
   disabled: boolean
   onPick: (optionId: string) => void
+  /** Options replaced the confidence picker the user just used: keep focus in the question. */
+  focusOnMount: boolean
 }
 
-function OptionList({ options, chosen, correctOptionId, disabled, onPick }: OptionListProps) {
-  // Options replace the confidence picker the user just used: keep focus in the question.
-  const first = useFocusOnMount<HTMLButtonElement>()
+function OptionList({
+  options,
+  chosen,
+  correctOptionId,
+  disabled,
+  onPick,
+  focusOnMount,
+}: OptionListProps) {
+  // The list, not option A: a stray Enter must not submit an answer.
+  const list = useRef<HTMLUListElement>(null)
+  const shouldFocus = useRef(focusOnMount)
+  useEffect(() => {
+    if (shouldFocus.current) list.current?.focus()
+  }, [])
   return (
-    <ul className="space-y-2" aria-label="Answer options">
+    <ul ref={list} tabIndex={-1} className="space-y-2 outline-none" aria-label="Answer options">
       {options.map((option, i) => {
         const isCorrect = correctOptionId === option.id
         const isWrongPick = correctOptionId !== undefined && chosen === option.id && !isCorrect
         return (
           <li key={option.id}>
             <button
-              ref={i === 0 ? first : undefined}
               type="button"
               onClick={() => onPick(option.id)}
               disabled={disabled}

@@ -3,6 +3,7 @@
 import type { MasterySummary, Outcome, SubmitResponse } from '@lectheo/contracts'
 import { ArrowRight, Lightbulb, MessageCircleQuestion } from 'lucide-react'
 import Link from 'next/link'
+import { useEffect, useRef } from 'react'
 import { useFocusOnMount } from '@/client/focus'
 import { MasteryBadge } from '@/components/mastery-badge'
 import { MASTERY_META } from '@/components/mastery-meta'
@@ -114,19 +115,28 @@ export function FinalReveal({
   result,
   before,
   courseId,
+  autoFocus = false,
 }: {
   /** Links back to the concept map, where the node now shows this state. */
   courseId?: string
   result: SubmitResponse
   /** Mastery after try 1, when known, to show the change. */
   before?: MasterySummary
+  /**
+   * Set when this session's submit produced the verdict (the chat form just unmounted). Not on
+   * a reopened activity, where focus belongs at the top of the page.
+   */
+  autoFocus?: boolean
 }) {
   const coverage = new Map(result.criteria.map((c) => [c.id, c]))
   // teach-back.ts finalReveal: explanation is the concept summary; key points come as the rubric.
   const summary = result.explanation
   const changed = before && before.state !== result.mastery.state
-  // The chat form unmounts on the final try: focus the verdict instead of <body>.
-  const heading = useFocusOnMount<HTMLHeadingElement>()
+  const heading = useRef<HTMLHeadingElement>(null)
+  const shouldFocus = useRef(autoFocus)
+  useEffect(() => {
+    if (shouldFocus.current) heading.current?.focus()
+  }, [])
   return (
     <section
       aria-labelledby="final-title"

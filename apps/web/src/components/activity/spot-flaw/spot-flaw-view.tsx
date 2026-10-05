@@ -70,14 +70,18 @@ export function SpotFlawView({ activity }: { activity: ActivityResponse }) {
     if (needsReveal && revealIdle) reveal(undefined, { onSuccess: setExplanation })
   }, [needsReveal, revealIdle, reveal])
 
-  const onSubmit = () =>
+  const onSubmit = () => {
+    // These callbacks run after the hook's refetch, when Retry may already be on screen and
+    // clicked: only a submit from the retry form may close that form again.
+    const fromRetryForm = retrying
     submit.mutate(answer, {
       onSuccess: (res) => {
         setResults((prev) => [...prev, res])
-        setRetrying(false)
+        if (fromRetryForm) setRetrying(false)
       },
       onError: failed("Couldn't check your answer"),
     })
+  }
   const onHint = () =>
     takeHint.mutate(undefined, {
       onSuccess: (res) => setHints((prev) => [...prev, res.hint]),
