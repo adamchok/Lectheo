@@ -1,6 +1,6 @@
 'use client'
 
-import { RotateCw, TriangleAlert } from 'lucide-react'
+import { CircleX, RotateCw } from 'lucide-react'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { isApiClientError } from '@/client/api'
@@ -68,7 +68,7 @@ export function ErrorState({
       )}
     >
       <span className="bg-mastery-red-bg text-mastery-red flex size-10 items-center justify-center rounded-full">
-        <TriangleAlert aria-hidden className="size-5" />
+        <CircleX aria-hidden className="size-5" />
       </span>
       <div className="max-w-md space-y-1">
         <p className="font-medium">{title}</p>

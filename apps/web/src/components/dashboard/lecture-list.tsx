@@ -1,7 +1,7 @@
 'use client'
 
 import type { CourseMapResponse } from '@lectheo/contracts'
-import { ArrowRight, ListVideo } from 'lucide-react'
+import { ArrowRight, Play, TriangleAlert } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
 import { useCourseMap } from '@/client/queries'
@@ -27,7 +27,6 @@ function LectureRow({ lecture, map }: { lecture: MapLecture; map: CourseMapRespo
   const counts = countMastery(nodes.map((node) => node.mastery.state))
   const confidentMistakes = nodes.filter((node) => node.mastery.confidentMistake).length
   const action = lectureAction(lecture, map.course.kind === 'library')
-  const RedIcon = MASTERY_META.red.icon
 
   return (
     <li className="grid grid-cols-[3.5rem_1fr_auto] items-center gap-4 py-4 sm:grid-cols-[3.5rem_1fr_10rem_auto]">
@@ -51,7 +50,7 @@ function LectureRow({ lecture, map }: { lecture: MapLecture; map: CourseMapRespo
           />
           {confidentMistakes > 0 && (
             <span className="text-mastery-red inline-flex items-center gap-1 text-xs font-medium">
-              <RedIcon aria-hidden className="size-3.5" />
+              <TriangleAlert aria-hidden className="size-3.5" />
               {confidentMistakes === 1 ? '1 confident mistake' : `${confidentMistakes} confident mistakes`}
             </span>
           )}
@@ -91,7 +90,7 @@ export function LectureList({ courseId }: { courseId: string }) {
   if (lectures.length === 0) {
     return (
       <EmptyState
-        icon={ListVideo}
+        icon={Play}
         title="No lectures yet"
         description="Lectures you add to this course will show up here."
       />

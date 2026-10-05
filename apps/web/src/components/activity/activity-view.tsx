@@ -16,7 +16,7 @@ import { TransferView } from './transfer/transfer-view'
 // The AI SDK chat client (~56 kB) is only needed by teach-back: keep it off the other activities.
 const TeachBackView = dynamic(
   () => import('./teach-back/teach-back-view').then((m) => m.TeachBackView),
-  { loading: () => <Skeleton aria-label="Loading" className="h-64 w-full rounded-2xl" /> },
+  { loading: () => <Skeleton label="Loading" className="h-64 w-full rounded-2xl" /> },
 )
 
 /** /activities/[id]: Spot the flaw / Teach-back / Transfer / Stump (F4). */

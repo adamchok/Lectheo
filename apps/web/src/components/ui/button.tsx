@@ -3,20 +3,21 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 import { Slot } from "radix-ui"
 
+import { Spinner } from "@/components/ui/spinner"
+
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-all disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-disabled:opacity-50 data-pending:cursor-progress [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary/90",
         destructive:
-          "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:bg-destructive/60 dark:focus-visible:ring-destructive/40",
+          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline:
-          "border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
+          "border border-input bg-card shadow-xs hover:bg-accent hover:text-accent-foreground",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost:
-          "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
+        ghost: "hover:bg-muted hover:text-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
@@ -37,26 +38,85 @@ const buttonVariants = cva(
   }
 )
 
+const ignoreClick = (event: React.MouseEvent) => event.preventDefault()
+
+const stackItem = "col-start-1 row-start-1 inline-flex items-center gap-[inherit]"
+
+/** A leading icon is an element (not text) followed by more content, e.g. `<Play /> Watch`. */
+function swapLeadingIcon(children: React.ReactNode): React.ReactNode {
+  const items = React.Children.toArray(children)
+  const [first, ...rest] = items
+  const hasLeadingIcon =
+    rest.length > 0 && React.isValidElement(first) && typeof first.type !== "string"
+  return [<Spinner key="spinner" />, ...(hasLeadingIcon ? rest : items)]
+}
+
+/**
+ * Pending (Design System §6 Button): `aria-busy`, clicks ignored, focus stays put, and a spinner
+ * replaces the leading icon (or leads, when there is none). Trailing icons stay.
+ * - Pass `pendingLabel` ("Grading…") to swap the label: both labels share one grid cell, so the
+ *   width holds, and a polite status region announces the label. That region is a sibling of the
+ *   button, so don't use `pendingLabel` on a Button that is itself an `asChild` target.
+ * - Without `pendingLabel` the width holds only when there is a leading icon to replace.
+ * - Ignored with `asChild` (the child, usually a link, owns its content).
+ */
 function Button({
   className,
   variant = "default",
   size = "default",
   asChild = false,
+  pending: pendingProp = false,
+  pendingLabel,
+  onClick,
+  children,
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
+    pending?: boolean
+    pendingLabel?: React.ReactNode
   }) {
   const Comp = asChild ? Slot.Root : "button"
+  const pending = pendingProp && !asChild
+  const hasPendingLabel = !asChild && pendingLabel !== undefined
 
-  return (
+  let content = children
+  if (hasPendingLabel) {
+    content = (
+      <span className="grid gap-[inherit]">
+        <span className={cn(stackItem, pending && "invisible")}>{children}</span>
+        <span className={cn(stackItem, !pending && "invisible")}>
+          {swapLeadingIcon(pendingLabel)}
+        </span>
+      </span>
+    )
+  } else if (pending) {
+    content = swapLeadingIcon(children)
+  }
+
+  const button = (
     <Comp
       data-slot="button"
       data-variant={variant}
       data-size={size}
+      data-pending={pending || undefined}
+      aria-busy={pending || undefined}
+      onClick={pending ? ignoreClick : onClick}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
-    />
+    >
+      {content}
+    </Comp>
+  )
+
+  if (!hasPendingLabel) return button
+  return (
+    <>
+      {button}
+      <span role="status" className="sr-only">
+        {pending ? pendingLabel : null}
+      </span>
+    </>
   )
 }
 

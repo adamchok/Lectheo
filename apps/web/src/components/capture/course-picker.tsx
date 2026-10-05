@@ -8,7 +8,7 @@ export type CourseChoice = { kind: 'existing'; id: string } | { kind: 'new'; tit
 
 const NEW = '__new__'
 const selectClass =
-  'border-input bg-background focus-visible:ring-ring/50 h-9 w-full rounded-md border px-3 text-sm outline-none focus-visible:ring-[3px]'
+  'border-input bg-background h-9 w-full rounded-md border px-3 text-sm'
 
 export interface CoursePickerProps {
   courses: readonly CourseSummary[]

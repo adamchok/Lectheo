@@ -3,11 +3,11 @@
 import type { LectureResponse, LectureSource, PipelineStep } from '@lectheo/contracts'
 import {
   Circle,
-  CircleCheck,
+  Check,
   ClipboardCheck,
   LoaderCircle,
-  Map as MapIcon,
-  PlayCircle,
+  Network,
+  Play,
   RotateCw,
   Sparkles,
 } from 'lucide-react'
@@ -26,6 +26,7 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
+import { Spinner } from '@/components/ui/spinner'
 
 const STEP_LABELS: Readonly<Record<PipelineStep, string>> = {
   parseTranscript: 'Reading the transcript',
@@ -82,7 +83,7 @@ function StepList({ lecture }: { lecture: LectureResponse }) {
     <ol className="space-y-2 text-sm">
       {steps.map((step, i) => {
         const state = i < done ? 'done' : i === done ? 'current' : 'pending'
-        const Icon = state === 'done' ? CircleCheck : state === 'current' ? LoaderCircle : Circle
+        const Icon = state === 'done' ? Check : state === 'current' ? LoaderCircle : Circle
         return (
           <li
             key={step}
@@ -94,7 +95,7 @@ function StepList({ lecture }: { lecture: LectureResponse }) {
           >
             <Icon
               aria-hidden
-              className={cn('size-4 shrink-0', state === 'current' && 'animate-spin')}
+              className={cn('size-4 shrink-0', state === 'current' && 'motion-safe:animate-spin')}
             />
             <span>{STEP_LABELS[step]}</span>
             <span className="sr-only">{STEP_STATE_TEXT[state]}</span>
@@ -110,14 +111,14 @@ function MapLinks({ lecture }: { lecture: LectureResponse }) {
     <>
       <Button asChild variant="outline" size="sm">
         <Link href={`/courses/${lecture.courseId}` as Route}>
-          <MapIcon aria-hidden />
+          <Network aria-hidden />
           Concept map
         </Link>
       </Button>
       {lecture.hasTimestamps && (
         <Button asChild variant="outline" size="sm">
           <Link href={`/lectures/${lecture.id}/watch` as Route}>
-            <PlayCircle aria-hidden />
+            <Play aria-hidden />
             Watch
           </Link>
         </Button>
@@ -189,7 +190,7 @@ function FailedPanel({ lecture }: { lecture: LectureResponse }) {
           }
           disabled={processLecture.isPending}
         >
-          <RotateCw aria-hidden className={cn(processLecture.isPending && 'animate-spin')} />
+          {processLecture.isPending ? <Spinner /> : <RotateCw aria-hidden />}
           Retry
         </Button>
       }
@@ -323,7 +324,7 @@ function LectureActions({
       {(lecture.source === 'import' || (lecture.source === 'library' && lecture.status === 'ready')) && (
         <Button asChild>
           <Link href={`/lectures/${lecture.id}/watch` as Route}>
-            <PlayCircle aria-hidden />
+            <Play aria-hidden />
             Watch
           </Link>
         </Button>
@@ -331,7 +332,7 @@ function LectureActions({
       {mapReady && (
         <Button asChild variant="outline">
           <Link href={`/courses/${lecture.courseId}` as Route}>
-            <MapIcon aria-hidden />
+            <Network aria-hidden />
             Concept map
           </Link>
         </Button>

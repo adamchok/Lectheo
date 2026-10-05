@@ -30,7 +30,7 @@ export function FeaturePlaceholder({
         className,
       )}
     >
-      {Icon && <Icon aria-hidden className="text-muted-foreground size-6" strokeWidth={1.75} />}
+      {Icon && <Icon aria-hidden className="text-muted-foreground size-5" />}
       <div className="max-w-md space-y-1">
         <p className="font-medium">{title}</p>
         {description && <p className="text-muted-foreground text-sm text-pretty">{description}</p>}

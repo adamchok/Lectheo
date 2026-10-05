@@ -187,7 +187,7 @@ function AudioPlayer({ src, startMs, endMs, events }: PlayerProps & { src: strin
 
   return (
     <div className={`${frameClass} flex flex-col items-center justify-center gap-4 p-6 text-center`}>
-      <Headphones aria-hidden className="text-muted-foreground size-10" />
+      <Headphones aria-hidden className="text-muted-foreground size-5" />
       <p className="text-muted-foreground max-w-sm text-sm">
         The video can&apos;t play here, so here&apos;s the official lecture audio on the same
         timeline. Markers work the same way.

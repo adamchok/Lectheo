@@ -6,7 +6,7 @@ import type {
   DiagnosticResultsResponse,
   Finding,
 } from '@lectheo/contracts'
-import { ArrowRight, CircleCheck, CircleX, Loader2, Target } from 'lucide-react'
+import { ArrowRight, Check, CircleX, TriangleAlert } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
@@ -30,6 +30,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { LectureFrame } from './lecture-frame'
+import { Spinner } from '@/components/ui/spinner'
 
 /** /lectures/[id]/diagnostic — adaptive, confidence-first diagnostic (F3). */
 export function DiagnosticView({ lectureId }: { lectureId: string }) {
@@ -83,7 +84,7 @@ function Note({ children }: { children: string }) {
 function FinishedState({ lectureId, courseId }: { lectureId: string; courseId: string }) {
   return (
     <section className="bg-card space-y-4 rounded-xl border p-6 text-center shadow-sm">
-      <CircleCheck aria-hidden className="mx-auto size-8 text-emerald-600" />
+      <Check aria-hidden className="text-mastery-green mx-auto size-5" />
       <h2 className="text-xl font-semibold">You&apos;ve finished this diagnostic</h2>
       <p className="text-muted-foreground text-sm">
         You&apos;ve answered every question we have for this lecture. Keep going with practice on
@@ -282,7 +283,7 @@ function QuestionCard({ sessionId, question, isLast, onAnswered, onNext }: Quest
           />
           {answer.isPending && (
             <p className="text-muted-foreground flex items-center gap-2 text-sm">
-              <Loader2 aria-hidden className="size-4 animate-spin" /> Checking…
+              <Spinner /> Checking…
             </p>
           )}
           {answer.isError && (
@@ -341,7 +342,7 @@ function OptionList({
     <ul
       ref={list}
       tabIndex={-1}
-      className="focus-visible:ring-ring/50 space-y-2 rounded-lg outline-none focus-visible:ring-[3px]"
+      className="space-y-2 rounded-lg"
       aria-label="Answer options"
     >
       {options.map((option, i) => {
@@ -356,16 +357,16 @@ function OptionList({
               aria-pressed={chosen === option.id}
               className={cn(
                 'hover:border-primary/50 flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-colors',
-                'focus-visible:ring-ring/60 outline-none focus-visible:ring-2 disabled:cursor-default',
+                'disabled:cursor-default',
                 chosen === option.id && !correctOptionId && 'border-primary bg-accent',
-                isCorrect && 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40',
+                isCorrect && 'border-mastery-green-solid bg-mastery-green-bg',
                 isWrongPick && 'border-destructive bg-destructive/10',
               )}
             >
               <KeyHint className="mt-0.5">{LETTERS[i]}</KeyHint>
               <span className="flex-1">{option.text}</span>
               {isCorrect && (
-                <CircleCheck aria-label="Correct answer" className="size-5 text-emerald-600" />
+                <Check aria-label="Correct answer" className="text-mastery-green size-5" />
               )}
               {isWrongPick && (
                 <CircleX aria-label="Your answer" className="text-destructive size-5" />
@@ -386,7 +387,7 @@ interface FeedbackCardProps {
 
 /** Immediate feedback after each answer (F3.4): verdict, why, explanation, lecture link. */
 function FeedbackCard({ feedback, isLast, onNext }: FeedbackCardProps) {
-  const Icon = feedback.correct ? CircleCheck : CircleX
+  const Icon = feedback.correct ? Check : CircleX
   const next = feedback.followUp
     ? 'One more on this idea'
     : isLast
@@ -397,7 +398,7 @@ function FeedbackCard({ feedback, isLast, onNext }: FeedbackCardProps) {
       <p className="flex items-center gap-2 font-semibold">
         <Icon
           aria-hidden
-          className={cn('size-5', feedback.correct ? 'text-emerald-600' : 'text-destructive')}
+          className={cn('size-5', feedback.correct ? 'text-mastery-green' : 'text-destructive')}
         />
         {feedback.correct ? 'Correct' : 'Not quite'} · {FINDING_LABEL[feedback.finding]}
       </p>
@@ -513,7 +514,7 @@ function ConfidentMistakeCard({ finding, answer }: ConfidentMistakeCardProps) {
       className="border-destructive/40 bg-destructive/5 space-y-3 rounded-xl border-2 p-6"
     >
       <p className="text-destructive flex items-center gap-2 text-sm font-semibold tracking-wide uppercase">
-        <Target aria-hidden className="size-4" /> Confident mistake
+        <TriangleAlert aria-hidden className="size-4" /> Confident mistake
       </p>
       <h3 id="confident-mistake-title" className="text-2xl font-semibold">
         {finding.conceptName}
@@ -522,7 +523,7 @@ function ConfidentMistakeCard({ finding, answer }: ConfidentMistakeCardProps) {
       {finding.source && <SourceRef source={finding.source} />}
       <div className="flex flex-wrap items-center gap-3 pt-2">
         <Button size="lg" disabled={isPending} onClick={handlePractice}>
-          {isPending && <Loader2 aria-hidden className="animate-spin" />}
+          {isPending && <Spinner />}
           Practice this
           <ArrowRight aria-hidden />
         </Button>

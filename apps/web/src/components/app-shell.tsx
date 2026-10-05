@@ -77,7 +77,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   className={cn(
                     'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
                     active
-                      ? 'bg-accent text-accent-foreground'
+                      ? 'bg-accent text-accent-foreground inset-shadow-[0_-2px_0_0_var(--primary)]'
                       : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                   )}
                 >
@@ -90,7 +90,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             {me.data ? (
               <AccountMenu me={me.data} />
             ) : (
-              <Skeleton className="h-8 w-32 rounded-full" aria-label="Loading account" />
+              <Skeleton className="h-8 w-32 rounded-full" label="Loading account" />
             )}
           </div>
         </div>

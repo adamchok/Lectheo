@@ -11,19 +11,19 @@ import {
   ArrowRight,
   Check,
   Eye,
-  LoaderCircle,
   MessageCircleQuestion,
-  RotateCcw,
+  RotateCw,
   X,
 } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
 import { Fragment } from 'react'
-import { MasteryBadge } from '@/components/mastery-badge'
+import { MasteryBadgeTransition } from '@/components/mastery-badge-transition'
 import { SourceRef } from '@/components/source-ref'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { masteryTrail, OUTCOME_LABELS, scoreRows } from './logic'
+import { Spinner } from '@/components/ui/spinner'
 
 /** POST …/explanation body, or the explanation part of a final submit. */
 export interface ExplanationData {
@@ -140,13 +140,13 @@ export function RetryActions({
   return (
     <div className="flex flex-wrap items-center gap-3">
       <Button size="lg" onClick={onRetry}>
-        <RotateCcw aria-hidden />
+        <RotateCw aria-hidden />
         Retry
       </Button>
       {!explanationShown && (
         <Button variant="ghost" onClick={onShowMe} disabled={showMePending}>
           {showMePending ? (
-            <LoaderCircle aria-hidden className="motion-safe:animate-spin" />
+            <Spinner />
           ) : (
             <Eye aria-hidden />
           )}
@@ -218,7 +218,7 @@ export function MasteryChange({ start, results, courseId }: MasteryChangeProps) 
         {trail.map((state, i) => (
           <Fragment key={`${state}-${i}`}>
             {i > 0 && <ArrowRight aria-label="then" className="text-muted-foreground size-4" />}
-            <MasteryBadge
+            <MasteryBadgeTransition
               state={state}
               reasons={i === trail.length - 1 ? latest.reasons : undefined}
               confidentMistake={i === trail.length - 1 ? latest.confidentMistake : undefined}

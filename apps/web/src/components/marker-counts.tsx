@@ -18,13 +18,13 @@ export function MarkerCounts({ lost, important, showZero = false, className }: M
     <span className={cn('inline-flex flex-wrap items-center gap-1.5 text-xs', className)}>
       {showLost && (
         <span className="bg-marker-lost-bg text-marker-lost inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium">
-          <Flag aria-hidden className="size-3 fill-current" />
+          <Flag aria-hidden className="size-3.5 fill-current" />
           <span className="tabular-nums">{lost}</span> lost
         </span>
       )}
       {showImportant && (
         <span className="bg-marker-important-bg text-marker-important inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium">
-          <Star aria-hidden className="size-3 fill-current" />
+          <Star aria-hidden className="size-3.5 fill-current" />
           <span className="tabular-nums">{important}</span> important
         </span>
       )}

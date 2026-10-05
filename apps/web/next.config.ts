@@ -43,6 +43,8 @@ const nextConfig: NextConfig = {
   // Workspace packages ship TypeScript source.
   transpilePackages: ['@lectheo/contracts', '@lectheo/db', '@lectheo/domain', '@lectheo/ai'],
   typedRoutes: true,
+  // Tree-shake the `motion/react` barrel so pages only ship the pieces they import.
+  experimental: { optimizePackageImports: ['motion'] },
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }]
   },

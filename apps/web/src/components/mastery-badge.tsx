@@ -38,7 +38,7 @@ export function MasteryBadge({
       )}
       tabIndex={hasReasons ? 0 : undefined}
     >
-      <Icon aria-hidden className={size === 'sm' ? 'size-3.5' : 'size-4'} strokeWidth={2.25} />
+      <Icon aria-hidden className={size === 'sm' ? 'size-3.5' : 'size-4'} />
       <span>{meta.label}</span>
       {confidentMistake && (
         <>

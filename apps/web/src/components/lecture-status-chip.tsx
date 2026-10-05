@@ -1,10 +1,10 @@
 import type { LectureStatus } from '@lectheo/contracts'
 import {
-  CircleCheck,
+  Check,
+  CircleX,
   FilePen,
   LoaderCircle,
-  Map as MapIcon,
-  TriangleAlert,
+  Network,
   Upload,
   type LucideIcon,
 } from 'lucide-react'
@@ -23,11 +23,11 @@ const STATUS_META: Readonly<
   },
   map_ready: {
     label: 'Map ready',
-    icon: MapIcon,
+    icon: Network,
     className: 'bg-accent text-accent-foreground',
   },
-  ready: { label: 'Ready', icon: CircleCheck, className: 'bg-mastery-green-bg text-mastery-green' },
-  failed: { label: 'Failed', icon: TriangleAlert, className: 'bg-mastery-red-bg text-mastery-red' },
+  ready: { label: 'Ready', icon: Check, className: 'bg-mastery-green-bg text-mastery-green' },
+  failed: { label: 'Failed', icon: CircleX, className: 'bg-mastery-red-bg text-mastery-red' },
 }
 
 export function lectureStatusLabel(status: LectureStatus): string {

@@ -1,7 +1,7 @@
 'use client'
 
 import type { ActivityResponse, MasterySummary, SubmitResponse } from '@lectheo/contracts'
-import { CircleAlert, LoaderCircle, SendHorizontal } from 'lucide-react'
+import { CircleX, SendHorizontal } from 'lucide-react'
 import type { ChatStatus } from 'ai'
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { isApiClientError } from '@/client/api'
@@ -21,6 +21,7 @@ import {
   useTeachBackChat,
   type TeachBackMessage,
 } from './use-teach-back'
+import { Spinner } from '@/components/ui/spinner'
 
 // ponytail: one persona (F4a.2); ActivityResponse has no persona, the picker can add it.
 const PERSONA = 'Sam'
@@ -83,7 +84,7 @@ function Transcript({ messages, status }: { messages: TeachBackMessage[]; status
         ))}
         {thinking && (
           <li className="text-muted-foreground flex items-center gap-2 text-sm">
-            <LoaderCircle aria-hidden className="size-4 motion-safe:animate-spin" />
+            <Spinner />
             {PERSONA} is thinking…
           </li>
         )}
@@ -96,7 +97,7 @@ function Transcript({ messages, status }: { messages: TeachBackMessage[]; status
 function Notice({ children }: { children: string }) {
   return (
     <p role="alert" className="text-mastery-red flex items-start gap-2 text-sm">
-      <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
+      <CircleX aria-hidden className="mt-0.5 size-4 shrink-0" />
       {children}
     </p>
   )
@@ -190,7 +191,7 @@ export function TeachBackView({ activity }: { activity: ActivityResponse }) {
           autoFocus={final !== null}
         />
       ) : closed ? (
-        <Skeleton aria-label="Loading your result" className="h-64 w-full rounded-2xl" />
+        <Skeleton label="Loading your result" className="h-64 w-full rounded-2xl" />
       ) : tryOne ? (
         <TryFeedback result={tryOne} />
       ) : (
@@ -275,7 +276,7 @@ export function TeachBackView({ activity }: { activity: ActivityResponse }) {
               <Button type="button" variant="outline" onClick={done} disabled={!canSubmit}>
                 {submit.isPending ? (
                   <>
-                    <LoaderCircle aria-hidden className="motion-safe:animate-spin" />
+                    <Spinner />
                     Grading…
                   </>
                 ) : awaitingRetry ? (

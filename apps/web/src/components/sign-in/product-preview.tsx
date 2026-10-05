@@ -40,10 +40,10 @@ export function ProductPreview() {
             <div className="bg-muted absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full" />
             <div className="bg-primary/70 absolute top-1/2 left-0 h-1 w-[68%] -translate-y-1/2 rounded-full" />
             <span className="bg-marker-important-bg text-marker-important absolute top-1/2 left-[31%] flex size-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full ring-2 ring-[var(--card)]">
-              <Star className="size-3 fill-current" />
+              <Star className="size-3.5 fill-current" />
             </span>
             <span className="bg-marker-lost-bg text-marker-lost absolute top-1/2 left-[62%] flex size-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full ring-2 ring-[var(--card)]">
-              <Flag className="size-3 fill-current" />
+              <Flag className="size-3.5 fill-current" />
             </span>
           </div>
           <div className="text-muted-foreground flex justify-between font-mono text-[0.6875rem] tabular-nums">
@@ -71,7 +71,7 @@ export function ProductPreview() {
         <div className="bg-sunken border-border mt-1 border-t px-5 py-3.5 text-sm">
           <p className="font-medium">Confident mistake: hash table lookup cost</p>
           <p className="text-muted-foreground mt-1 inline-flex items-baseline gap-1.5">
-            <Play aria-hidden className="text-primary size-3 translate-y-px fill-current" />
+            <Play aria-hidden className="text-primary size-3.5 translate-y-px fill-current" />
             <span className="text-primary font-mono text-[0.8125rem] font-medium">41:12</span>
             <span aria-hidden>·</span>
             <span className="italic">“…collisions push lookup toward O(n)”</span>

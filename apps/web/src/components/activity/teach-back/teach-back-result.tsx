@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useEffect, useRef } from 'react'
 import { useFocusOnMount } from '@/client/focus'
 import { MasteryBadge } from '@/components/mastery-badge'
+import { MasteryBadgeTransition } from '@/components/mastery-badge-transition'
 import { MASTERY_META } from '@/components/mastery-meta'
 import { SourceRef } from '@/components/source-ref'
 import { Button } from '@/components/ui/button'
@@ -191,7 +192,7 @@ export function FinalReveal({
               <ArrowRight aria-label="now" className="text-muted-foreground size-4" />
             </>
           )}
-          <MasteryBadge
+          <MasteryBadgeTransition
             state={result.mastery.state}
             reasons={result.mastery.reasons}
             confidentMistake={result.mastery.confidentMistake}

@@ -1,11 +1,12 @@
 'use client'
 
-import { CircleCheck, LoaderCircle, SearchX, type LucideIcon } from 'lucide-react'
+import { CircleCheck, SearchX, type LucideIcon } from 'lucide-react'
 import type { FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { CORRECTION_MAX, pickVerdict, submitBlocker, type Answer, type Verdict } from './logic'
+import { Spinner } from '@/components/ui/spinner'
 
 export interface AnswerFormProps {
   answer: Answer
@@ -23,9 +24,9 @@ const VERDICTS: readonly { value: Verdict; label: string; icon: LucideIcon }[] =
 
 const choiceClass = (checked: boolean) =>
   cn(
-    'border-border bg-card cursor-pointer border transition-colors outline-none',
-    'hover:border-foreground/30 focus-visible:ring-ring/50 focus-visible:ring-[3px]',
-    'has-[:focus-visible]:ring-ring/50 has-[:focus-visible]:ring-[3px]',
+    'border-border bg-card cursor-pointer border transition-colors',
+    'hover:border-foreground/30',
+    'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring',
     checked && 'border-primary bg-primary/5 text-primary hover:border-primary',
   )
 
@@ -127,7 +128,7 @@ export function AnswerForm({
 
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" size="lg" disabled={Boolean(blocker) || pending}>
-          {pending && <LoaderCircle aria-hidden className="motion-safe:animate-spin" />}
+          {pending && <Spinner />}
           {pending ? 'Checking…' : 'Submit'}
         </Button>
         {blocker && <p className="text-muted-foreground text-sm">{blocker}</p>}

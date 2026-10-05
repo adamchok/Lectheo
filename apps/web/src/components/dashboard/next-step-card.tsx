@@ -1,7 +1,7 @@
 'use client'
 
 import type { NextStepResponse } from '@lectheo/contracts'
-import { ArrowRight, CircleCheckBig, ClipboardCheck, LoaderCircle, PlayCircle, Sparkles } from 'lucide-react'
+import { ArrowRight, Check, ClipboardCheck, Play, Sparkles } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
 import { useStartPractice } from '@/client/practice'
@@ -10,12 +10,13 @@ import { ErrorState } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ACTIVITY_LABELS } from '@/lib/labels'
+import { Spinner } from '@/components/ui/spinner'
 
 const ICONS = {
-  watch: PlayCircle,
+  watch: Play,
   diagnostic: ClipboardCheck,
   activity: Sparkles,
-  none: CircleCheckBig,
+  none: Check,
 } as const
 
 function NextStepAction({ step }: { step: NextStepResponse }) {
@@ -48,7 +49,7 @@ function NextStepAction({ step }: { step: NextStepResponse }) {
       <Button size="lg" onClick={start} disabled={isPending}>
         {isPending ? (
           <>
-            <LoaderCircle aria-hidden className="motion-safe:animate-spin" />
+            <Spinner />
             Preparing…
           </>
         ) : (
