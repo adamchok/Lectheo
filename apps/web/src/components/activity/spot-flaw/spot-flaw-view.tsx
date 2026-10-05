@@ -27,6 +27,9 @@ import { ScenarioList } from './scenario-list'
 // add it to ActivityResponse and drop this if the ladder length ever varies.
 const HINTS_AVAILABLE = 2
 
+/** POST …/explanation: the rubric comes along once the activity is closed (reopen). */
+type Revealed = ExplanationData & { rubric?: SubmitResponse['rubric'] }
+
 const failed = (title: string) => (error: unknown) =>
   toast.error(title, { description: errorMessage(error) })
 
@@ -41,7 +44,8 @@ export function SpotFlawView({ activity }: { activity: ActivityResponse }) {
   const [answer, setAnswer] = useState<Answer>(EMPTY_ANSWER)
   const [results, setResults] = useState<SubmitResponse[]>([])
   const [hints, setHints] = useState<string[]>([])
-  const [explanation, setExplanation] = useState<ExplanationData | null>(null)
+  // The explanation response carries the rubric once the activity is closed (reopen).
+  const [explanation, setExplanation] = useState<Revealed | null>(null)
   const [retrying, setRetrying] = useState(false)
 
   const ask = useAskAuthor(id)
@@ -100,6 +104,7 @@ export function SpotFlawView({ activity }: { activity: ActivityResponse }) {
     else resultRef.current?.focus()
   }, [showForm])
 
+  const rubric = finalResult?.rubric ?? explanation?.rubric
   const shownExplanation =
     finalResult?.explanation !== undefined
       ? { explanation: finalResult.explanation, sources: finalResult.sources }
@@ -181,8 +186,12 @@ export function SpotFlawView({ activity }: { activity: ActivityResponse }) {
 
       {shownExplanation && <Explanation explanation={shownExplanation} />}
       {!shownExplanation && lastResult && <Sources sources={lastResult.sources} />}
-      {finalResult?.rubric && <RubricList rubric={finalResult.rubric} />}
-      <MasteryChange start={startState} results={results.map((r) => r.mastery)} />
+      {rubric && <RubricList rubric={rubric} />}
+      <MasteryChange
+        start={startState}
+        results={results.map((r) => r.mastery)}
+        courseId={activity.courseId}
+      />
     </div>
   )
 }

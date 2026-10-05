@@ -8,7 +8,7 @@ import {
   type MasterySummary,
   type StumpResult,
 } from '@lectheo/contracts'
-import { activities, and, asc, attempts, eq, lt, messages, ne, sql } from '@lectheo/db'
+import { activities, and, asc, attempts, courses, eq, lt, messages, ne, sql } from '@lectheo/db'
 import { aiContext, toApiError } from '../ai-hooks'
 import type { Actor } from '../auth'
 import { appDb, type DbLike } from '../db'
@@ -127,15 +127,19 @@ export async function getActivity(
   db: DbLike = appDb(),
 ): Promise<ActivityResponse> {
   const ctx = await buildContext(db, actor, await loadOwnedActivity(db, actor, id))
-  const [visible, tries] = await Promise.all([
+  const [visible, tries, [course]] = await Promise.all([
     ctx.visibleMessages(),
     db.select().from(attempts).where(eq(attempts.activityId, id)).orderBy(asc(attempts.tryNo)),
+    db.select({ kind: courses.kind }).from(courses).where(eq(courses.id, ctx.concept.courseId)),
   ])
+  if (!course) throw notFound()
   const { activity } = ctx
   return {
     id: activity.id,
     type: activity.type,
     concept: { id: ctx.concept.id, name: ctx.concept.name },
+    courseId: ctx.concept.courseId,
+    courseKind: course.kind,
     status: activity.status,
     turnsUsed: activity.turnsUsed,
     turnBudget: activity.turnBudget,

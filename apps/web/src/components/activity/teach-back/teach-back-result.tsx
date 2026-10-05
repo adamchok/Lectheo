@@ -9,6 +9,7 @@ import { MASTERY_META } from '@/components/mastery-meta'
 import { SourceRef } from '@/components/source-ref'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { MapLink } from '../spot-flaw/result-panel'
 
 type Criterion = SubmitResponse['criteria'][number]
 
@@ -112,7 +113,10 @@ const HEADLINES: Readonly<Record<Outcome, string>> = {
 export function FinalReveal({
   result,
   before,
+  courseId,
 }: {
+  /** Links back to the concept map, where the node now shows this state. */
+  courseId?: string
   result: SubmitResponse
   /** Mastery after try 1, when known, to show the change. */
   before?: MasterySummary
@@ -183,12 +187,15 @@ export function FinalReveal({
             confidentMistake={result.mastery.confidentMistake}
           />
         </div>
-        <Button asChild>
-          <Link href="/dashboard">
-            Back to dashboard
-            <ArrowRight aria-hidden />
-          </Link>
-        </Button>
+        <div className="flex flex-wrap items-center gap-4">
+          {courseId && <MapLink courseId={courseId} />}
+          <Button asChild>
+            <Link href="/dashboard">
+              Back to dashboard
+              <ArrowRight aria-hidden />
+            </Link>
+          </Button>
+        </div>
       </div>
     </section>
   )

@@ -16,6 +16,8 @@ import {
   RotateCcw,
   X,
 } from 'lucide-react'
+import type { Route } from 'next'
+import Link from 'next/link'
 import { Fragment } from 'react'
 import { MasteryBadge } from '@/components/mastery-badge'
 import { SourceRef } from '@/components/source-ref'
@@ -182,10 +184,25 @@ export interface MasteryChangeProps {
   /** State before the activity, when the entry point passed it (?from=). */
   start: MasteryState | null
   results: readonly MasterySummary[]
+  /** Links back to the concept map, where the node now shows this state. */
+  courseId?: string
+}
+
+/** "See it on the map": the result's next step back to the course map (F6). */
+export function MapLink({ courseId }: { courseId: string }) {
+  return (
+    <Link
+      href={`/courses/${courseId}` as Route}
+      className="text-primary inline-flex items-center gap-1 rounded text-sm font-medium underline-offset-4 hover:underline"
+    >
+      See it on the map
+      <ArrowRight aria-hidden className="size-4" />
+    </Link>
+  )
 }
 
 /** Mastery before → after (F6), each step an icon + label badge; reasons for the latest. */
-export function MasteryChange({ start, results }: MasteryChangeProps) {
+export function MasteryChange({ start, results, courseId }: MasteryChangeProps) {
   const latest = results.at(-1)
   if (!latest) return null
   const trail = masteryTrail(
@@ -216,6 +233,7 @@ export function MasteryChange({ start, results }: MasteryChangeProps) {
           ))}
         </ul>
       )}
+      {courseId && <MapLink courseId={courseId} />}
     </section>
   )
 }

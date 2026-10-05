@@ -209,7 +209,11 @@ export function TransferView({ activity }: { activity: ActivityResponse }) {
       {shownExplanation && <ModelSolution explanation={shownExplanation} />}
       {!shownExplanation && lastResult && <Sources sources={lastResult.sources} />}
       {rubric && <RubricList rubric={rubric} />}
-      <MasteryChange start={startState} results={results.map((r) => r.mastery)} />
+      <MasteryChange
+        start={startState}
+        results={results.map((r) => r.mastery)}
+        courseId={activity.courseId}
+      />
     </div>
   )
 }

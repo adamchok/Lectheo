@@ -4,6 +4,7 @@ import { RotateCw, TriangleAlert } from 'lucide-react'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { isApiClientError } from '@/client/api'
+import { quotaMessage } from '@/client/format'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -27,6 +28,8 @@ export function errorMessage(error: unknown): string {
         return 'Your session has ended. Please sign in again.'
       case 'not_found':
         return "This page doesn't exist, or you don't have access to it."
+      case 'quota_exceeded':
+        return quotaMessage(error.details)
       case 'ai_paused':
       case 'intake_paused':
         return error.message || 'New AI work is paused for now. Prepared practice still works.'
