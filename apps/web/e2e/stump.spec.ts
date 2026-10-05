@@ -41,4 +41,10 @@ test('stump the AI: rejected, revised, accepted', async ({ page }) => {
   await expect(result.getByText("The AI's answer")).toBeVisible()
   await expect(result.getByText(/grounded in the lecture|standard course knowledge/i)).toBeVisible()
   await expect(question).toBeHidden()
+
+  // A finished activity reloads as finished.
+  await page.reload()
+  await expect(result.getByText(/^Accepted/)).toBeVisible()
+  await expect(result.getByText("The AI's answer")).toBeVisible()
+  await expect(question).toBeHidden()
 })

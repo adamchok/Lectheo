@@ -186,6 +186,12 @@ test('teach-back: streamed reply from Sam, judged, retry then reveal', async ({ 
   }
   await expect(final).toBeVisible()
   await expect(final.getByRole('heading', { name: 'Key points' })).toBeVisible()
+
+  // A finished activity reloads as finished: the verdict, no chat input.
+  await page.reload()
+  await expect(final).toBeVisible()
+  await expect(final.getByRole('heading', { name: 'Key points' })).toBeVisible()
+  await expect(input).toHaveCount(0)
 })
 
 test('sign out: sample data is gone', async ({ page }) => {

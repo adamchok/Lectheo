@@ -48,4 +48,11 @@ test('transfer: map → Pointers → Transfer problem → submit twice → revea
   await expect(page.getByRole('heading', { name: 'How it was graded' })).toBeVisible()
   await expect(page.getByText('From the lecture').first()).toBeVisible()
   await expect(page.getByRole('heading', { name: /your mastery of this concept/i })).toBeVisible()
+
+  // A finished activity reloads as finished: last try shown, no answer box.
+  await page.reload()
+  await expect(result.getByText(/try 2 of 2/i)).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Model solution' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'How it was graded' })).toBeVisible()
+  await expect(page.getByRole('textbox')).toHaveCount(0)
 })

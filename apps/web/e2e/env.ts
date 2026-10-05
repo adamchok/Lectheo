@@ -9,6 +9,14 @@ export const E2E_BASE_URL = `http://localhost:${E2E_PORT}`
 const TURNSTILE_TEST_SITE_KEY = '1x00000000000000000000AA'
 const TURNSTILE_TEST_SECRET_KEY = '1x0000000000000000000000000000000AA'
 
+/**
+ * E2E_OFFLINE=1: for sandboxes that can't reach Cloudflare. The server answers Turnstile siteverify
+ * locally (offline/preload.mjs) and signInSample serves a stub widget. CI leaves it unset, so the
+ * real Turnstile test widget stays covered there.
+ */
+export const E2E_OFFLINE = process.env.E2E_OFFLINE === '1'
+const OFFLINE_PRELOAD = fileURLToPath(new URL('./offline/preload.mjs', import.meta.url))
+
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1'])
 const CACHE_KEY = 'LECTHEO_E2E_ENV'
 
@@ -73,6 +81,7 @@ export function e2eEnv(): E2eEnv {
     AI_GATEWAY_API_KEY: '',
     ASSEMBLYAI_API_KEY: '',
     VERCEL_OIDC_TOKEN: '',
+    ...(E2E_OFFLINE && { NODE_OPTIONS: `--import ${OFFLINE_PRELOAD}` }),
   }
   process.env[CACHE_KEY] = JSON.stringify(env)
   return env

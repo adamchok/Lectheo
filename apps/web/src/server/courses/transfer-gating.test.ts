@@ -21,15 +21,17 @@ const TRANSFER_ITEM = '0190a000-0000-7000-8000-0000000c0001'
 const SESSION_2 = '0190a000-0000-7000-8000-0000000b0002'
 
 let f: Fixture
+let savedFeatures: typeof FEATURES
 
 /** FEATURES is read-only in app code; map/next read it per call. */
 const setTransferFlag = (on: boolean) => Object.assign(FEATURES, { transfer: on })
 
 beforeEach(async () => {
+  savedFeatures = { ...FEATURES }
   f = await createFixture()
 })
 afterEach(() => {
-  setTransferFlag(true)
+  Object.assign(FEATURES, savedFeatures)
 })
 
 const addTransferItem = () =>
@@ -86,9 +88,6 @@ describe('next step offers transfer only with an unseen item', () => {
   // so these cases isolate the transfer gate.
   beforeEach(() => {
     Object.assign(FEATURES, { stump: false })
-  })
-  afterEach(() => {
-    Object.assign(FEATURES, { stump: true })
   })
 
   /** C3 tops the ranking (latest answer wrong) with spot_flaw and teach_back already passed. */

@@ -1,11 +1,23 @@
 import { expect, type Page } from '@playwright/test'
 import { getDb, sql } from '@lectheo/db'
-import { e2eEnv } from './env'
+import { E2E_OFFLINE, e2eEnv } from './env'
 
 export { LIBRARY_COURSE_ID, lectureId } from '@lectheo/db/seed'
 
+/** Explicit-render Turnstile that passes on execute, like the always-pass test site key. */
+const TURNSTILE_STUB = `window.turnstile = {
+  render: (el, opts) => { window.__ts = opts; return 'e2e' },
+  execute: () => setTimeout(() => window.__ts.callback('e2e-offline-token'), 0),
+  reset: () => {}, remove: () => {},
+}`
+
 /** Landing → "Explore with a sample account" (Turnstile test keys always pass) → dashboard. */
 export async function signInSample(page: Page): Promise<void> {
+  if (E2E_OFFLINE) {
+    await page.route(/challenges\.cloudflare\.com\/turnstile\/v0\/api\.js/, (route) =>
+      route.fulfill({ contentType: 'text/javascript', body: TURNSTILE_STUB }),
+    )
+  }
   await page.goto('/')
   await page.getByRole('button', { name: /explore with a sample account/i }).click()
   await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 })
@@ -47,4 +59,21 @@ export async function correctOptionId(itemId: string): Promise<string> {
   const id = rows[0]?.id
   if (!id) throw new Error(`no answer key for item ${itemId}`)
   return id
+}
+
+export interface FlawKey {
+  hasFlaw: boolean
+  flawSentenceIdx: number | null
+}
+
+/** The spot-the-flaw answer key of an activity's item, read from the local DB (like above). */
+export async function flawKeyOf(activityId: string): Promise<FlawKey> {
+  const db = getDb(e2eEnv().POSTGRES_URL)
+  const rows = await db.execute<{ key: FlawKey }>(
+    sql`select s.answer_key as key from activities a
+        join item_secrets s on s.item_id = a.item_id where a.id = ${activityId}`,
+  )
+  const key = rows[0]?.key
+  if (!key) throw new Error(`no flaw key for activity ${activityId}`)
+  return key
 }
