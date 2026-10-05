@@ -349,10 +349,7 @@ export const itemSecrets = pgTable('item_secrets', {
   distractorMeta: jsonb('distractor_meta').$type<DistractorMeta>(),
   rubric: jsonb('rubric').$type<RubricSecret>(),
   hints: jsonb('hints').$type<HintsSecret>(),
-  leakKeywords: text('leak_keywords')
-    .array()
-    .notNull()
-    .default(sql`'{}'::text[]`),
+  leakKeywords: text('leak_keywords').array().notNull().default(sql`'{}'::text[]`),
 })
 
 // ---------- learner activity ----------

@@ -23,9 +23,11 @@ const LOOPBACK = /^(127\.|::1$|::ffff:127\.)/
  */
 async function purgeExpired(db: DbLike): Promise<void> {
   try {
-    const ids = await purgeSampleAccounts(db)
-    await Promise.allSettled(ids.map((id) => supabaseAdmin().auth.admin.deleteUser(id)))
     await pruneRateLimits(db, new Date(Date.now() - DAY_MS))
+    const ids = await purgeSampleAccounts(db)
+    if (ids.length === 0) return
+    const admin = supabaseAdmin()
+    await Promise.allSettled(ids.map((id) => admin.auth.admin.deleteUser(id)))
   } catch (err) {
     console.log(JSON.stringify({ event: 'sample_purge_failed', reason: safeErrorMessage(err) }))
   }
@@ -54,9 +56,9 @@ export const POST = route(
     ) {
       throw new ApiError('rate_limited')
     }
-    after(() => purgeExpired(db))
-
     await verifyTurnstile(body.turnstileToken, ip)
+    // Only verified traffic schedules purge work.
+    after(() => purgeExpired(db))
 
     const supabase = await createSupabaseServerClient()
     const { data, error } = await supabase.auth.signInAnonymously()
