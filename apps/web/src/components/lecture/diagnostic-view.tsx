@@ -338,7 +338,12 @@ function OptionList({
     if (shouldFocus.current) list.current?.focus()
   }, [])
   return (
-    <ul ref={list} tabIndex={-1} className="space-y-2 outline-none" aria-label="Answer options">
+    <ul
+      ref={list}
+      tabIndex={-1}
+      className="focus-visible:ring-ring/50 space-y-2 rounded-lg outline-none focus-visible:ring-[3px]"
+      aria-label="Answer options"
+    >
       {options.map((option, i) => {
         const isCorrect = correctOptionId === option.id
         const isWrongPick = correctOptionId !== undefined && chosen === option.id && !isCorrect
