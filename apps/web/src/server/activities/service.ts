@@ -5,6 +5,7 @@ import {
   type ActivityResponse,
   type ActivityType,
   type CreateActivityResponse,
+  type HintResponse,
   type MasterySummary,
   type StumpResult,
 } from '@lectheo/contracts'
@@ -17,6 +18,7 @@ import { loadMasteryForUser } from '../mastery'
 import { consume } from '../quota'
 import { buildContext, findActivity, loadConceptForRead, loadOwnedActivity } from './load'
 import { handlerFor } from './registry'
+import { activitySources } from './sources'
 import type {
   ActivityContext,
   ActivityRow,
@@ -210,7 +212,7 @@ export async function takeHint(
   actor: Actor,
   id: string,
   db: DbLike = appDb(),
-): Promise<{ hint: string; hintsUsed: number; hintsLeft: number }> {
+): Promise<HintResponse> {
   const current = await loadOwnedActivity(db, actor, id)
   const handler = handlerFor(current.type)
   if (!handler.hint || handler.hintsAvailable === 0) throw notFound()
@@ -227,8 +229,17 @@ export async function takeHint(
     )
     .returning()
   if (!row) throw invalidState('No hints left.', { reason: 'hints_used' })
-  const hint = await handler.hint(await buildContext(db, actor, row), row.hintsUsed)
-  return { hint, hintsUsed: row.hintsUsed, hintsLeft: handler.hintsAvailable - row.hintsUsed }
+  const ctx = await buildContext(db, actor, row)
+  const [hint, sources] = await Promise.all([
+    handler.hint(ctx, row.hintsUsed),
+    activitySources(db, ctx.concept, ctx.item),
+  ])
+  return {
+    hint,
+    hintsUsed: row.hintsUsed,
+    hintsLeft: handler.hintsAvailable - row.hintsUsed,
+    sources,
+  }
 }
 
 /** POST /activities/{id}/explanation ("Show me"): marks later tries assisted before the final. */

@@ -1,6 +1,6 @@
 'use client'
 
-import type { ActivityResponse, SubmitResponse } from '@lectheo/contracts'
+import type { ActivityResponse, HintResponse, SubmitResponse } from '@lectheo/contracts'
 import { useSearchParams } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -43,7 +43,7 @@ export function SpotFlawView({ activity }: { activity: ActivityResponse }) {
   const startState = parseMasteryState(useSearchParams().get('from'))
   const [answer, setAnswer] = useState<Answer>(EMPTY_ANSWER)
   const [results, setResults] = useState<SubmitResponse[]>([])
-  const [hints, setHints] = useState<string[]>([])
+  const [hints, setHints] = useState<HintResponse[]>([])
   // The explanation response carries the rubric once the activity is closed (reopen).
   const [explanation, setExplanation] = useState<Revealed | null>(null)
   const [retrying, setRetrying] = useState(false)
@@ -84,7 +84,7 @@ export function SpotFlawView({ activity }: { activity: ActivityResponse }) {
   }
   const onHint = () =>
     takeHint.mutate(undefined, {
-      onSuccess: (res) => setHints((prev) => [...prev, res.hint]),
+      onSuccess: (res) => setHints((prev) => [...prev, res]),
       onError: failed("Couldn't load a hint"),
     })
   const onShowMe = () =>
@@ -144,7 +144,8 @@ export function SpotFlawView({ activity }: { activity: ActivityResponse }) {
 
       {!closed && (
         <HintLadder
-          hints={hints}
+          hints={hints.map((h) => h.hint)}
+          sources={hints.at(-1)?.sources ?? []}
           hintsUsed={activity.hintsUsed}
           hintsAvailable={HINTS_AVAILABLE}
           onTake={onHint}
