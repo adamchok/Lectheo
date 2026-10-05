@@ -3,7 +3,7 @@ import { PIPELINE_STEPS, type LectureSource, type PipelineStep } from '@lectheo/
 import { and, eq, inArray, lectures, pipelineSteps, sql } from '@lectheo/db'
 import { FatalError } from 'workflow'
 import type { DbLike } from '../db'
-import { ApiError } from '../errors'
+import { ApiError, withoutQueryParams } from '../errors'
 import { markAiDegraded } from '../quota'
 
 /*
@@ -186,7 +186,8 @@ export async function runStep<T>(
     // Keeps flags already in the output (e.g. verifyItems' redraft round) for the retry.
     await mergeStepOutput(db, lectureId, step, { error: failure })
     console.warn(JSON.stringify({ event: 'pipeline_step_failed', lectureId, step, ...failure }))
-    throw fatal ? new FatalError(`${failure.code}: ${failure.message}`) : err
+    // The workflow runtime logs what a step throws: never a failed query's params.
+    throw fatal ? new FatalError(`${failure.code}: ${failure.message}`) : withoutQueryParams(err)
   }
 }
 
