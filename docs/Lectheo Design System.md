@@ -1,4 +1,23 @@
+---
+title: Lectheo Design System
+updated: 2026-10-06
+version: v1
+tags:
+  - lectheo
+  - design
+  - ui
+  - ux
+related:
+  - "[[Lectheo Product Spec]]"
+  - "[[Lectheo Architecture]]"
+  - "[[Lectheo Tech Stack]]"
+  - "[[Lectheo Competition]]"
+  - "[[Lectheo Landing Copy]]"
+---
+
 # Lectheo Design System
+
+Part of the doc set: [[Lectheo Product Spec]] · [[Lectheo Architecture]] · [[Lectheo Tech Stack]] · **Design System** · [[Lectheo Landing Copy]]. The library and motion decision is recorded as [[Lectheo Tech Stack#ADR-016 · Design system and motion: tokens first, CSS before JavaScript|ADR-016]].
 
 > Source of truth for tokens, UX foundations, motion, the app shell and the landing page. Interactive version (live token tables, previews in both themes): https://claude.ai/artifact/DUPAHrAQEWtkeF7qbHy9Tz. Tokens are implemented in `apps/web/src/app/globals.css`; keep this file, the artifact and globals.css in step.
 
@@ -32,7 +51,7 @@ Lectheo is a calm, precise study workspace for CS students. It should feel like 
 - Ground is `background`; text is `foreground`; secondary text is `muted-foreground`. Raise one object at a time on `card`; recess navigation and transcripts on `sunken` (the sidebar uses `sidebar`, an alias of `sunken`).
 - `primary` (ink blue) is the only accent: the primary action (one per view), links, active indicators, the logo mark and focus. Selected rows and active nav use `accent` with `accent-foreground`, not a primary fill. A fill alone is too faint to mark state (about 1.1:1), so on/active controls (toggles, nav links) also carry a 2px `primary` underline (`inset-shadow-[0_-2px_0_0_var(--primary)]`, ≥ 3:1).
 - Separate regions with `border` hairlines. A control's own edge uses `input` (≥ 3:1). Never rely on `border` alone to show where a field or checkbox is.
-- Mastery states are a semantic set: `mastery-*-fg` text on `mastery-*-bg` for badges, `mastery-*-solid` for bars, rings and map nodes. Always pair the colour with its icon (dashed circle, alert circle, ellipsis circle, check circle) and its label. Never use mastery colours for anything else: no green success buttons, no red decoration.
+- Mastery states (rules in [[Lectheo Architecture#6.2 Mastery|Architecture §6.2]]) are a semantic set: `mastery-*-fg` text on `mastery-*-bg` for badges, `mastery-*-solid` for bars, rings and map nodes. Always pair the colour with its icon (dashed circle, alert circle, ellipsis circle, check circle) and its label. Never use mastery colours for anything else: no green success buttons, no red decoration.
 - Markers: `marker-lost-*` (flag icon, "I'm lost") and `marker-important-*` (star icon, "Important"). Same rule: icon, word and colour together.
 - `destructive` is for irreversible actions and error text only; text on its fill is `destructive-foreground`.
 - Dark theme is designed, not inverted: `primary`, `destructive` and the `-fg` tokens lighten, so their foreground tokens flip to dark ink. Check both themes for every new pair.
@@ -353,6 +372,8 @@ How, with TanStack Query: in `onMutate` cancel the related queries, snapshot the
 
 #### Library decision
 
+Recorded as [[Lectheo Tech Stack#ADR-016 · Design system and motion: tokens first, CSS before JavaScript|ADR-016]].
+
 - **CSS first.** Tailwind transitions and `tw-animate-css` (already installed) handle hover, press, focus, colour changes, simple enters, spinners and the skeleton pulse at zero JavaScript cost.
 - **Motion** (the `motion` package, `motion/react`, successor to Framer Motion) only where CSS falls short: exit animations (`AnimatePresence`), layout animations (sidebar collapse, list reordering, expanding panels), shared-element indicators (active nav pill, tab underline), number transitions (stat counts) and staggered reveals.
   - Load it lean: `LazyMotion` with the `domAnimation` features loaded asynchronously, and `m.*` components (`import * as m from 'motion/react-m'`) instead of `motion.*`. Measured with Motion 14 and Turbopack, `LazyMotion` + `MotionConfig` alone still cost about 12 kB gzip of first-load JS, so they do not go in the root providers.
@@ -381,7 +402,7 @@ Define the durations and easings as CSS custom properties (`--duration-fast`, �
 - Stagger lists by 30 ms, for at most the first 6 items.
 - Content is visible at rest. Never leave something at `opacity: 0` waiting for a scroll observer; landing sections may fade up 8px once, after the hero has painted.
 - Under `prefers-reduced-motion: reduce`, transitions become instant (the global rule in `globals.css`, plus `MotionConfig` for Motion).
-- **Signature moment:** when a concept's mastery changes after practice, the badge cross-fades to the new state and the map node's ring fills over `duration-emphasis`. This is the one place motion celebrates; everywhere else it only explains. In code: `<MasteryBadgeTransition>` (`components/mastery-badge-transition.tsx`) where the state can change in place (node panel, result panels); plain `<MasteryBadge>` everywhere else imports no Motion code.
+- **Signature moment:** when a concept's mastery changes after practice ([[Lectheo Product Spec#F6. Mastery map — Must|F6]]), the badge cross-fades to the new state and the map node's ring fills over `duration-emphasis`. This is the one place motion celebrates; everywhere else it only explains. In code: `<MasteryBadgeTransition>` (`components/mastery-badge-transition.tsx`) where the state can change in place (node panel, result panels); plain `<MasteryBadge>` everywhere else imports no Motion code.
 
 ## 4. App shell
 
@@ -392,7 +413,7 @@ The signed-in product is a workspace: a persistent sidebar to move between cours
 - **Sidebar**: `sidebar` ground, a `border` hairline on its right edge, `sidebar-width` wide. It collapses to `sidebar-rail` (icons with tooltips) and remembers that per browser. Below 1024px it becomes an off-canvas sheet opened from a menu button in the top bar, with `shadow-popover`.
   - Top: the wordmark, linking to Home.
   - Primary items: Home (dashboard) and New lecture.
-  - "Courses" (`overline` label): every course, the CS50 library first. The current course expands to list its lectures (number and title, truncated, the full title in a tooltip). The active item uses `sidebar-active` with `sidebar-active-foreground` and `aria-current="page"`.
+  - "Courses" (`overline` label): every course, the CS50 library first. *(decided 6 Oct 2026, to be built)*: the student's own courses, most recent first; sample accounts keep the CS50 library first, and a new Google account's list is empty. The current course expands to list its lectures (number and title, truncated, the full title in a tooltip). The active item uses `sidebar-active` with `sidebar-active-foreground` and `aria-current="page"`.
   - Bottom: an account card (initials, name, "Sample account · deleted in 23 h" when relevant) that opens the account menu: theme, Reset sample, Sign out.
   - Items: `body-sm`, `radius-sm`, 32px tall, `space-3` horizontal padding, 16px icons. The active indicator glides between items with a Motion shared layout animation.
 - **Top bar**: `topbar-height`, sticky, `background` at 85 % opacity with backdrop blur, a `border` hairline below. Breadcrumbs with real names (Course › Lecture 5 › Spot the flaw) on the left; the page's actions on the right (map/list toggle, Delete lecture). The skip link stays the first focusable element.
@@ -406,7 +427,9 @@ The signed-in product is a workspace: a persistent sidebar to move between cours
 
 ### Key screens
 
-- **Home (dashboard)**: a summary row of four figures (Mastered, Getting there, Needs work, Confident mistakes) as one card split by hairlines, each with a `caption` label, a tabular `title-md` value and its icon. Then the next-step card (the one hero, `radius-xl`), then courses with a segmented mastery bar each, then recent lectures as rows. No streaks, points or badges.
+- **Home, first run** *(decided 6 Oct 2026, to be built)* ([[Lectheo Product Spec#F0. Accounts, sample account and dashboard — Must|F0.8–F0.9]]; a Google account with no courses): no summary row and no empty cards. One centred `reading-max` block: a `title-lg` "Add your first lecture", three numbered lines (mark, diagnose, practice), what to bring, the time expectation, a primary *Add your first lecture* button and a quiet link to the sample account. After the first lecture is added, the processing step list sits where the next-step card will go.
+- **Home (dashboard)**: a summary row of four figures (Mastered, Getting there, Needs work, Confident mistakes) as one card split by hairlines, each with a `caption` label, a tabular `title-md` value and its icon. Then the next-step card (the one hero, `radius-xl`; planned anatomy below), then courses with a segmented mastery bar each, then recent lectures as rows. No streaks, points or badges.
+- **Next-step card** *(decided 6 Oct 2026, to be built)* ([[Lectheo Product Spec#F0. Accounts, sample account and dashboard — Must|F0.10–F0.12]]): an `overline` "Next step" with the step's icon; the `reason` as a `title-md` headline; a "Why" list of up to two evidence lines in `body-sm` (each with its icon: flag, star or confident-mistake, and a `▶ 12:41` link when it has a lecture moment); a `caption` row with the estimate and the payoff ("About 5 minutes · One more independent win → Mastered"); the primary action on the right (below on narrow screens). Under the card, **Also worth doing**: up to two hairline-separated rows (mastery badge, concept name, one-line reason, a small outline start button). While a lecture processes, the card becomes the step list (each step pending, running, done or failed). Today's card shows the action and its reason only.
 - **Course**: map/list toggle in the top bar. The concept map fills the content area, with the node panel as a right column (`panel-width`) rather than an overlay. The list view groups concepts under lecture h2s; each row shows its mastery badge, markers and all four practice actions.
 - **Lecture and watch**: player on the left, transcript on the right (`panel-width`, `sunken`), marker buttons under the player with `kbd` hints. Sticky panels start below the top bar.
 - **Diagnostic and activities**: a centred reading column (`reading-max`), one question or task card at a time, and result panels with "See it on the map" as the primary next step.
@@ -418,7 +441,7 @@ The signed-in product is a workspace: a persistent sidebar to move between cours
 
 ## 5. Landing page
 
-The public page sells Lectheo to a student in under a minute and to a judge in two. Same tokens as the app; more air, larger type, real product imagery.
+The public page sells Lectheo to a student in under a minute and to a judge in two. The words are in [[Lectheo Landing Copy]]; positioning and competitors in [[Lectheo Competition]]. Same tokens as the app; more air, larger type, real product imagery.
 
 ### Structure
 
@@ -426,7 +449,7 @@ The public page sells Lectheo to a student in under a minute and to a judge in t
 - **Header**: `topbar-height`, sticky; the wordmark on the left; anchor nav (How it works · Practice · Why Lectheo · FAQ); "Sign in" (ghost) and "Try the sample account" (primary) on the right. On mobile: wordmark, primary button and a menu.
 - **Hero**: a `display-xl` headline ("Find what you missed. *Prove* what you know."), a `body-lg` lead in `muted-foreground`, two calls to action (primary: sample account; outline: Continue with Google), a `caption` trust line, and a real product screenshot in a `radius-xl` frame with `shadow-frame`. Height follows content; no full-viewport hero.
 - **Sections** alternate text and product imagery. Each has an `overline` eyebrow only when it labels a real category, a `display-lg` title, a `body-lg` lead, then content.
-- **Practice**: the four activities as equal cards (`card`, `radius-lg`, hairline border) with an icon, the name, what you do and what it proves. Stump the AI carries a "Beta" badge.
+- **Practice** ([[Lectheo Product Spec#F4. Understanding-level practice|F4]]): the four activities as equal cards (`card`, `radius-lg`, hairline border) with an icon, the name, what you do and what it proves. Stump the AI carries a "Beta" badge.
 - **Comparison**: a real `<table>` with a caption, the Lectheo column on `accent`, ✓ and — glyphs with text alternatives. It scrolls inside its own container on mobile.
 - **FAQ**: native `<details>`/`<summary>` split by hairlines, `heading` summaries, `body` answers.
 - **Final call to action**: a `sunken` band, one `display-md` line, the same two buttons.
@@ -438,7 +461,7 @@ Real screenshots of the app only, in light and dark variants that follow the vie
 
 ### Honesty
 
-No testimonials, user counts, university logos, star ratings or pricing that don't exist. Every claim (privacy, grading, deletion times) must match the app and the privacy page. Competitors appear only in the comparison table, and only with facts.
+No testimonials, user counts, university logos, star ratings or pricing that don't exist. Every claim (privacy, grading, deletion times) must match the app, the privacy page and [[Lectheo Product Spec#F8. Trust, privacy and limits — Must|F8]]. Competitors appear only in the comparison table, and only with facts.
 
 ### Performance and sharing
 
