@@ -349,7 +349,10 @@ export const itemSecrets = pgTable('item_secrets', {
   distractorMeta: jsonb('distractor_meta').$type<DistractorMeta>(),
   rubric: jsonb('rubric').$type<RubricSecret>(),
   hints: jsonb('hints').$type<HintsSecret>(),
-  leakKeywords: text('leak_keywords').array().notNull().default(sql`'{}'::text[]`),
+  leakKeywords: text('leak_keywords')
+    .array()
+    .notNull()
+    .default(sql`'{}'::text[]`),
 })
 
 // ---------- learner activity ----------
@@ -533,4 +536,15 @@ export const appFlags = pgTable(
     updatedAt: tsz('updated_at').notNull().defaultNow(),
   },
   (t) => [check('app_flags_single_row', sql`${t.id} = 1`)],
+)
+
+/** Fixed-window request counters (per-IP limit on sample sign-in). Server-only, RLS deny-all. */
+export const rateLimits = pgTable(
+  'rate_limits',
+  {
+    key: text('key').notNull(),
+    windowStart: tsz('window_start').notNull(),
+    count: integer('count').notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.key, t.windowStart] })],
 )

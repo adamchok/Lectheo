@@ -29,6 +29,13 @@
       "when": 1791112295999,
       "tag": "0003_llm_calls_gateway_key",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791225237808,
+      "tag": "0004_rate_limits",
+      "breakpoints": true
     }
   ]
 }
