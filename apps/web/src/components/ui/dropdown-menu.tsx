@@ -134,7 +134,7 @@ function DropdownMenuRadioItem({
     >
       <span className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
         <DropdownMenuPrimitive.ItemIndicator>
-          <span className="size-2 rounded-full bg-current forced-colors:bg-[CanvasText]" />
+          <span className="block size-2 rounded-full bg-current forced-colors:bg-[CanvasText]" />
         </DropdownMenuPrimitive.ItemIndicator>
       </span>
       {children}
