@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { signInSample } from './fixtures'
 
 /*
  * Sample sign-in when Cloudflare Turnstile can't load (blocked network, ad blocker). The widget's
@@ -26,4 +27,10 @@ test('a security check that never loads times out with the same error', async ({
   // Hold the request open: the script neither loads nor errors.
   await page.route(TURNSTILE, () => new Promise<void>(() => {}))
   await expectCheckFailed(page)
+})
+
+test('a signed-in visitor on the landing page goes to the dashboard (F0.2)', async ({ page }) => {
+  await signInSample(page)
+  await page.goto('/')
+  await expect(page).toHaveURL(/\/dashboard$/)
 })
