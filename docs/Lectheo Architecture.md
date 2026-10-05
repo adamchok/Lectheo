@@ -1,7 +1,7 @@
 ---
 title: Lectheo System Architecture
-updated: 2026-10-04
-version: v2 (post-review)
+updated: 2026-10-06
+version: v2.1 (as built)
 tags:
   - lectheo
   - architecture
@@ -12,13 +12,14 @@ related:
   - "[[Lectheo Data Model]]"
   - "[[Lectheo Product Spec]]"
   - "[[Lectheo Design Review v1]]"
+  - "[[Lectheo Design System]]"
 ---
 
 # Lectheo System Architecture
 
-Part of the architecture set: **Architecture** · [[Lectheo API Spec]] · [[Lectheo Data Model]] · [[Lectheo Tech Stack]]
+Part of the architecture set: **Architecture** · [[Lectheo API Spec]] · [[Lectheo Data Model]] · [[Lectheo Tech Stack]] · UI and UX: [[Lectheo Design System]]
 
-This note explains *how* Lectheo meets [[Lectheo Product Spec]] v2. Requirement IDs ([[Lectheo Product Spec#F1. Capture with markers — Must (by mode)|F1.4]], [[Lectheo Product Spec#F4c. Spot the flaw — Must (the main activity)|F4c.6]] …) refer to that spec. v2 applies the decisions of 4 Oct 2026 and every finding from [[Lectheo Design Review v1]]; the review note has the resolution table.
+This note explains *how* Lectheo meets [[Lectheo Product Spec]] v2. Requirement IDs ([[Lectheo Product Spec#F1. Capture with markers — Must (by mode)|F1.4]], [[Lectheo Product Spec#F4c. Spot the flaw — Must (the main activity)|F4c.6]] …) refer to that spec. v2 applies the decisions of 4 Oct 2026 and every finding from [[Lectheo Design Review v1]]; the review note has the resolution table. **v2.1 (6 Oct 2026)** marks what was built: Should items that were cut say *not built*, and the deliberate deviations are listed in [[Lectheo Product Spec#11. As-built deviations]].
 
 ---
 
@@ -51,7 +52,7 @@ Ranked. When two goals conflict, the higher one wins.
 | Item validity | ≥ 95% correct on manual review of the library bank. Verifier rejection rate reported |
 | Cost | Judge path ≈ **$0.15** per visitor. Global hard stops via gateway budgets and the app governor |
 | Accessibility | Keyboard-only use, list view of the map, state shown by icon + label, not only color |
-| Browser | Desktop Chrome (current and previous major version) |
+| Browser | Desktop Chrome (current and previous major version). Phones: landing fully responsive; app usable (no sideways scroll, sidebar as a sheet, list view and on-screen marker buttons) but desktop-first |
 
 ---
 
@@ -100,27 +101,29 @@ flowchart LR
 
 ## 3. Code organization
 
-One Next.js app, organized by feature, with **one seam**: all AI calls go through `runTask()`, which supports a fake mode (`AI_FAKE=1`) for tests. There are no ports, adapters or lint-enforced layers. Pure rules live in `domain/` and are unit-tested.
+One Next.js app in a pnpm + Turborepo workspace, organized by feature, with **one seam**: all AI calls go through `runTask()` in `packages/ai`, which supports a fake mode (`AI_FAKE=1`) for tests. There are no ports, adapters or lint-enforced layers. Pure rules live in `packages/domain` and are unit-tested. *As built: the planned single `src/` tree became a workspace so contracts, rules and the AI seam are shared by the app, the seed scripts and the tests.*
 
 ```
-src/
-  app/                    pages + app/api/v1/**/route.ts (thin: auth → zod → service → response schema)
+apps/web/src/
+  app/                    pages + app/api/v1/**/route.ts (thin: route({ auth, body, query, params, response }, handler))
   proxy.ts                Supabase session refresh (Next 16 replaces middleware.ts)
-  server/
-    db/                   schema.ts, client.ts (postgres.js, prepare:false, max:3), migrations/
-    auth.ts               getActor() via getClaims(); ensureProfile(); sample clone/reset
-    http.ts               error envelope, zod parsing, response schemas (allow-lists)
-    quota.ts              per-user counters + global spend governor
-    lectures/  diagnostic/  activities/  concepts/  library/
-    pipeline/             workflow.ts ('use workflow'), steps.ts ('use step')
-    ai/                   models.ts (role → model), run-task.ts, tasks/<task>/{prompt,schema,task}.ts
-    stt/assemblyai.ts     storage.ts   turnstile.ts
-  domain/                 mastery.ts, recommender.ts, align-markers.ts, scoring.ts,
-                          scale.ts, parse-vtt.ts, parse-srt.ts, strip-speakers.ts   (pure)
-  client/
-    capture/              watch-player (YouTube IFrame API), local-player (<video> object URL),
-                          recorder (reducer, idb chunks), marker-queue
-scripts/                  seed-library.ts, eval-items.ts, eval-judge.ts, eval-guard.ts
+  server/                 server-only services by feature
+    http.ts  errors.ts    route() wrapper, error envelope, safeErrorMessage (strips SQL params)
+    auth.ts  ownership.ts getActor() via getClaims(); ensureProfile(); ownership loads (other user → 404)
+    quota.ts  ai-hooks.ts per-user counters, spend governor, aiContext() → llm_calls ledger
+    rate-limit.ts  sample.ts  turnstile.ts  storage.ts  mastery.ts  features.ts
+    lectures/  diagnostic/  activities/  courses/  pipeline/  stt/
+  client/                 browser-only: apiFetch, query hooks, capture/ (watch player, local
+                          player, marker queue + hotkeys), focus, keyboard
+  components/             UI (shadcn/ui based; see [[Lectheo Design System]])
+packages/
+  contracts/              Zod schemas for every request/response, jsonb shapes, enums
+  db/                     Drizzle schema.ts, migrations/, PGlite test harness, seed fixtures
+  domain/                 mastery, recommender, align-markers, scoring, scale, diagnostic plan and
+                          findings, layout (ELK), parse-vtt/srt/transcript, strip-speakers   (pure)
+  ai/                     models.ts (role → model), run-task.ts, stream-task.ts, guard.ts,
+                          tasks/<task>/{prompt,schema,task}.ts
+scripts/                  seed-library.ts, eval-items.ts, eval-judge.ts, eval-guard.ts, eval-stump.ts
 ```
 
 ---
@@ -146,18 +149,20 @@ sequenceDiagram
     API->>API: signInAnonymously (server-side, sets cookie)
     API->>DB: BEGIN · insert profile(kind=sample) · clone_sample(seed, user) · COMMIT
     API-->>UI: {redirect: /dashboard}
-    Note over V,DB: Google path: OAuth → /auth/callback → ensureProfile(kind=google) → /dashboard
+    Note over V,DB: Google path: OAuth → /auth/callback → ensureProfile(kind=google) → /dashboard (first run: empty, no library)
 ```
 
-The sample account is **lived-in**: L3 practiced (mostly green/amber), L4 with a confident mistake on *pointers*, L5 "Ready to watch". **Reset sample** deletes the per-user rows and clones again. A daily cron purges sample accounts older than 24 h.
+The sample account is **lived-in**: L3 practiced (mostly green/amber), L4 with a confident mistake on *pointers*, L5 "Ready to watch". **Reset sample** deletes the per-user rows and clones again. Sample accounts older than 24 h are purged by the daily cron **and** after every sample sign-in (Hobby cron is daily only). Before Turnstile is even checked, the route applies a per-IP limit (5 per 10 min, `rate_limits`).
+
+**Google accounts start fresh** (decided 6 Oct 2026, [[Lectheo Product Spec#F0. Accounts, sample account and dashboard — Must|F0.7–F0.9]]): no courses, no library. The first dashboard is a first-run screen whose one action is *Add your first lecture*; while that lecture processes, the dashboard shows its pipeline steps. The CS50 library is part of the sample experience only.
 
 ### 4.2 Capture modes (F1)
 
 | Mode | Media | Marker time source | What's uploaded | Pipeline entry |
 |---|---|---|---|---|
 | **A. Watch (library)** | YouTube IFrame embed | `player.getCurrentTime()` | markers only | none: already processed. Markers are aligned on write |
-| **B. Import** | local file → `<video src=objectURL>` | `video.currentTime` | transcript file (.vtt / .srt; .docx Should) + markers | `parseTranscript` |
-| **C. Live (Should)** | `MediaRecorder` (Opus codec, 32 kbps, 10 s pieces) | elapsed media time = pieces × 10 s + offset into the current piece | audio (signed URL) + markers | `transcribe` |
+| **B. Import** | local file → `<video src=objectURL>` | `video.currentTime` | transcript file (.vtt / .srt; Teams .docx, Must since 6 Oct, *to be built*) + markers | `parseTranscript` |
+| **C. Live (Should, *not built*)** | `MediaRecorder` (Opus codec, 32 kbps, 10 s pieces) | elapsed media time = pieces × 10 s + offset into the current piece | audio (signed URL) + markers | `transcribe` |
 | **D. Upload** | audio file, or transcript / text | none (no markers) | audio or transcript | `transcribe` or `parseTranscript` |
 
 ```mermaid
@@ -180,7 +185,7 @@ sequenceDiagram
 
 **Import details (B):** the student picks the MP4 or audio file and its transcript. The file is opened with `URL.createObjectURL` and **never uploaded**. The transcript is uploaded; the server parses VTT/SRT cues into segments and **strips speaker labels** (`<v Name>` tags, "Name:" prefixes). The marker and transcript clocks are the same recording timeline, so no offset is needed.
 
-**Live recorder (C, slim):**
+**Live recorder (C, slim; design only, not built):**
 - States: `idle → requesting_mic → recording ⇄ paused → stopping → uploading → submitted`, plus `recovering` and `error`.
 - Each piece is stored in IndexedDB with a `recorderSession` ID. Only pieces from the **same** recorder session are joined into one valid WebM file.
 - A gap in wall-clock time (sleep or a closed lid) ends the session. The next recording starts a new session and becomes a separate audio file.
@@ -194,8 +199,8 @@ Workflow `processLecture(lectureId, from?)`. Every step is a `'use step'` functi
 ```mermaid
 flowchart TD
     start(["POST /lectures/{id}/process<br/>guarded claim → status=processing"]) --> src{"source"}
-    src -- "import / transcript" --> pt["parseTranscript<br/>VTT/SRT/DOCX/TXT · strip speakers · cap tokens by tier"]
-    src -- "live / audio" --> kt["buildKeyterms<br/>from slides (Should)"]
+    src -- "import / transcript" --> pt["parseTranscript<br/>VTT/SRT/TXT · strip speakers · cap tokens by tier"]
+    src -- "live / audio" --> kt["buildKeyterms<br/>from slides (Should, not built: no keyterms sent)"]
     kt --> sub["submitTranscription<br/>reserve stt_job_id first · reuse if set"]
     sub --> poll["pollTranscription<br/>sleep 15 s → GET status · loop to terminal · max 60 min"]
     poll --> fetch["fetchTranscript<br/>sentences → truncate to tier limit · delete audio + remote transcript"]
@@ -219,7 +224,7 @@ flowchart TD
 - **Re-run `?from=`** clears `pipeline_steps` from that step onward. New concepts are **added**, old items are marked `retired` (never deleted, because attempts reference them), and edges are recomputed. It counts against the `reprocess` quota.
 - **Step time budget:** each step < 300 s. Drafting in batches of 4 keeps each call around 30–60 s.
 - **Library lectures** are processed by `scripts/seed-library.ts` locally (dev key, `reasoner-premium` = Opus 5.5) and imported as data. They never run through the production pipeline.
-- **If the Workflow SDK fails the day-1 spike:** fallback = the same step functions chained through route handlers with `after()`, driven by `pipeline_steps`. (Hobby cron runs only daily, so a cron-based runner isn't viable.)
+- **Workflow SDK spike:** passed, so the planned `after()` fallback chain was never built. `server/pipeline/start.ts` starts the workflow and records `workflow_run_id`; if the engine refuses the run, the claim is released as a retryable failure and `503 upstream_unavailable` is returned.
 
 ### 4.4 Adaptive diagnostic (F3)
 
@@ -294,15 +299,15 @@ sequenceDiagram
 
 ### 4.6 Teach-back (F4a)
 
-The confused friend (Sonnet 5.5, low effort) is streamed for up to 6 turns. On submit, the judge sees the **friend's questions (style stripped) and the student's answers**, plus `rubric_snapshot` (the concept's key points, frozen when the activity starts). It returns per-key-point coverage (0–2) and misconceptions, and code totals them. Feedback follows the same retry pattern.
+The confused friend (Sonnet 5.5, low effort) is streamed for up to 6 turns. One persona is built; the persona picker ([[Lectheo Product Spec#F4a. Teach-back — Must (supporting activity)|F4a.2]], Should) is not. On submit, the judge sees the **friend's questions (style stripped) and the student's answers**, plus `rubric_snapshot` (the concept's key points, frozen when the activity starts). It returns per-key-point coverage (0–2) and misconceptions, and code totals them. Feedback follows the same retry pattern.
 
-### 4.7 Stump the AI (F4d, Should)
+### 4.7 Stump the AI (F4d, beta)
 
 1. Referee pass 1 (judge role): valid? on-concept? unambiguous? answerable from the lecture or standard course knowledge? is the key correct? → reject with a reason (outcome `invalid`, no mastery effect).
 2. Answerer (Sonnet 5.5, never sees the key) answers.
 3. Referee pass 2 compares the answer to the key → `aiStumped`.
 
-Referee and answerer are different model families, so the referee isn't grading its own family's work.
+Referee and answerer are different model families, so the referee isn't grading its own family's work. Built and shown with a "Beta" label; `scripts/eval-stump.ts` measures it.
 
 ---
 
@@ -373,8 +378,19 @@ priority = 100·confidentMistake + 60·red + 40·markedLost + 25·amber
          + 10·prerequisiteOfRed − 15·practicedInLast10Min
 next type = first of [spot_flaw, teach_back, transfer*, stump*] without an independent correct
             (* only when enabled)
-dashboard "Next step": unwatched library lecture → pending diagnostic → top concept
+dashboard course: the course the student last worked in; a lecture of theirs that just became ready wins
+dashboard "Next step" (for that course): processing lecture (show steps) → unwatched library lecture (sample only)
+                 → pending diagnostic → top concept
+no courses (Google first run) → no next step; the first-run screen replaces the card
+all concepts green → Stump the AI on the concept mastered longest ago
+nothing at all left → add_lecture ("Add Lecture N+1" / "Add your next lecture")
 ```
+
+**Card content ([[Lectheo Product Spec#F0. Accounts, sample account and dashboard — Must|F0.10–F0.12]]).** The response carries the evidence, estimate and payoff, so the card never computes them:
+- **Evidence** (≤ 2, strongest first): confident mistake → wrong or partial in the latest attempt ("Partial in Spot the flaw") → a *lost* marker linked to the concept (with its lecture moment) → an *important* marker. Only the student's own data.
+- **Estimate:** watch = lecture duration; diagnostic = 3 min; any practice activity = 5 min. Fixed values, revisited once real timings exist.
+- **Payoff:** confident mistake → "A correct answer here clears the confident mistake." · red → "A correct answer moves it to Getting there." · amber with one independent type done → "One more independent win in a different activity → Mastered." · watch → "Your marks decide what the diagnostic asks." · diagnostic → "Finds the mistakes you're sure about." · Stump on a green concept → "The hardest test there is: write a question the AI can't answer."
+- **Also worth doing:** ranked concepts 2 and 3 from the same ranking, each with its own next activity type and reason.
 
 ### 6.4 Scaling and scoring
 `scale.ts` (node and item counts) and `scoring.ts` (spot-flaw totals, outcome bands, Stump outcome) are unit-tested against the spec tables.
@@ -385,17 +401,20 @@ dashboard "Next step": unwatched library lecture → pending diagnostic → top 
 
 | Route | Purpose |
 |---|---|
-| `/` | Sign-in page: Continue with Google · Explore with a sample account (Turnstile) |
-| `/dashboard` | Course cards, lecture list and status, "Next step" card, account menu (sample label + Reset) |
+| `/` | Public landing and sign-in: Continue with Google · Try the sample account (Turnstile). Signed-in visitors are redirected to `/dashboard` (`proxy.ts`) |
+| `/privacy`, `/terms` | Legal pages |
+| `/dashboard` | Course cards, lecture list and status, "Next step" card, account menu (sample label + Reset). Google first run: an empty first-run screen with *Add your first lecture* |
 | `/courses/[id]` | Concept map (React Flow, stored ELK layout) + list view toggle + lecture timeline with unlinked markers |
-| `/lectures/new` | Add lecture: Import recording · Upload audio · Upload transcript · Record live (if enabled), with the consent checkbox |
+| `/lectures/new` | Add lecture: Import recording · Upload audio · Paste or upload transcript, with the consent checkbox (Record live is not built) |
 | `/lectures/[id]/watch` | Watch mode (YouTube or local file) with L/I marking, transcript side panel |
-| `/lectures/[id]/record` | Live recorder (Should) |
 | `/lectures/[id]` | Processing progress (2 s polling) and transcript |
 | `/lectures/[id]/diagnostic` | Confidence-first questions, instant feedback, results |
-| `/activities/[id]` | Spot the flaw / Teach-back / Transfer / Stump |
+| `/activities/[id]` | Spot the flaw / Teach-back / Transfer / Stump (beta) |
 
-- **Data fetching:** TanStack Query for fetches and polling; AI SDK `useChat` for teach-back.
+Signed-in pages share one layout (`app/(app)/layout.tsx`) with `error.tsx` and `not-found.tsx`, so errors render inside the shell. The visual language, the app shell, loading states and motion rules are specified in [[Lectheo Design System]].
+
+- **Data fetching:** TanStack Query for fetches and polling; AI SDK `useChat` for teach-back. Optimistic updates only where [[Lectheo Design System#Optimistic updates]] allows (markers, preferences).
+- **Theme and feedback:** light/dark via `next-themes`, toasts via `sonner`, components from shadcn/ui (Radix). Motion: CSS first, `motion` only where the design system says so.
 - **Keyboard:** L / I are handled only when `document.activeElement` isn't an input, textarea or contenteditable.
 - **Grounding links:** a shared `<SourceRef>` component renders "▶ 12:41 · excerpt". It seeks the YouTube or local player when available, and otherwise opens the transcript panel.
 - **CS50 license notice** on all library pages ([[Lectheo Product Spec#F7. CS50 lecture library — Must|F7.4]]).
@@ -415,9 +434,8 @@ dashboard "Next step": unwatched library lecture → pending diagnostic → top 
 | Gateway 402 (key budget hit) | Same as `ai_paused` |
 | Judge model outage | Fallback judge, recorded in `attempts.judge_model` |
 | Jev outage | Escalate every check to GPT-6 Luna (fail closed) |
-| Supabase pausing | The daily cron hits `/api/v1/health` |
-| Workflow engine problem | Fallback chain via `after()` ([[#4.3 Ingestion pipeline\|§4.3]]) |
-| Recording interrupted | Recover from IndexedDB, per recorder session |
+| Supabase pausing | The daily cron (`/api/cron/daily`) queries the database while purging sample accounts |
+| Workflow engine problem | A failed start releases the claim and returns `503`; the student can retry. The `after()` fallback chain was not needed ([[#4.3 Ingestion pipeline\|§4.3]]) |
 | Double clicks or retries | Client UUIDs + `ON CONFLICT`, guarded state transitions, unique `(activity, try_no)` and `(session, item)` |
 
 ---
@@ -425,8 +443,8 @@ dashboard "Next step": unwatched library lecture → pending diagnostic → top 
 ## 9. Security, abuse and cost
 
 ### 9.1 Identity and authorization
-- **Google accounts** (OAuth) and **sample accounts** (anonymous, created only by clicking the button, after Turnstile). The anonymous sign-in rate limit is raised to ~300/h per IP for judges on a shared network.
-- Every handler loads the resource with an ownership join (`WHERE user_id = actor OR course.kind = 'library'` for reads; strict ownership for writes). IDs from other users → 404. Specific checks:
+- **Google accounts** (OAuth) and **sample accounts** (anonymous, created only by clicking the button, after Turnstile). Supabase's anonymous sign-in limit is raised to ~300/h (it only sees Vercel's egress IPs). The app enforces its own per-IP limit: 5 sample sign-ins per 10 minutes.
+- Every handler loads the resource with an ownership join (`WHERE user_id = actor OR (course.kind = 'library' AND actor is sample or owner)` for reads; strict ownership for writes). Google accounts never see library content. IDs from other users → 404. Specific checks:
   - The diagnostic confidence and answer endpoints require `itemId` ∈ that session.
   - Segment and asset routes join through the lecture owner.
   - `GET /activities/{id}` returns only visible messages.
@@ -435,7 +453,8 @@ dashboard "Next step": unwatched library lecture → pending diagnostic → top 
 ### 9.2 Abuse and cost
 | Layer | Control |
 |---|---|
-| Bots | Turnstile on the sample button. Sign-in only on click. Vercel DDoS protection |
+| Bots | Turnstile on the sample button. Per-IP limit (5 / 10 min, `rate_limits`). Sign-in only on click. Vercel DDoS protection |
+| Browser hardening | Enforced CSP `frame-ancestors 'none'; object-src 'none'; base-uri 'self'`, plus a full CSP in report-only mode (Supabase, Turnstile and YouTube origins) until it runs clean |
 | Per-user quotas (daily) | Lectures: sample 1 (≤ 20 min / 20 MB), Google 3 (≤ 2 h / 50 MB). Re-processing: 2. LLM tasks: 60. Activities: 30 |
 | Inputs | Upload size enforced when the signed URL is created. Transcripts capped in tokens by tier. Messages ≤ 2,000 chars. 1 slides PDF ≤ 20 MB / 60 pages. Duration measured server-side and truncated to the tier limit |
 | **Global spend governor** | Before each `runTask`, sum `llm_calls.cost_usd` for the **prod** key: ≥ $3 in the last hour or ≥ 75% of the prod budget → `intake_paused`. ≥ 95% → `ai_paused`. About 40% of the prod budget is kept for practice on library content, so judges keep working even if uploads are abused |
@@ -446,10 +465,11 @@ dashboard "Next step": unwatched library lecture → pending diagnostic → top 
 - Consent checkbox before any recording or upload.
 - Uploaded audio is deleted after transcription, and remote transcripts are deleted at AssemblyAI. Imported video never leaves the device.
 - Speaker names are stripped from imported transcripts.
-- `DELETE /lectures/{id}` cascades to derived data and Storage. Orphaned concepts are removed.
+- `DELETE /lectures/{id}` cascades to derived data and Storage. Orphaned concepts are removed. `DELETE /courses/{id}` does the same for every lecture in a course, and `DELETE /me` deletes a Google account's courses, files, counters, profile and auth user (self-serve, decided 6 Oct 2026).
 - Sample accounts are purged after 24 h.
 - Secrets live only in Vercel env vars.
-- The README lists data processors: Supabase, AssemblyAI (audio only), Anthropic, OpenAI, Google, TypeSafe through Vercel AI Gateway.
+- The README states what is stored (table, retention) and every processor: Supabase, Vercel, AssemblyAI (audio only), Anthropic, OpenAI, Google and TypeSafe through Vercel AI Gateway, Cloudflare Turnstile and YouTube.
+- Error responses never echo internals: `safeErrorMessage()` strips query parameters from database errors before they are logged or stored in `lectures.error`.
 
 ---
 
@@ -465,8 +485,8 @@ dashboard "Next step": unwatched library lecture → pending diagnostic → top 
 | Level | What | Tool |
 |---|---|---|
 | Unit | `domain/*`: mastery, recommender, alignment, scaling, scoring, VTT/SRT parsers, speaker stripping, recorder reducer | Vitest |
-| Contract | Response schemas never include 🔒 fields. Ownership checks on every route | Vitest |
-| E2E | The **judge path** in a fresh browser, with `AI_FAKE=1` for determinism. Recorder with `--use-fake-device-for-media-stream --use-file-for-fake-audio-capture` | Playwright |
+| Contract | Response schemas never include 🔒 fields. Ownership checks on every route. Every migration enables RLS | Vitest (PGlite, no Docker) |
+| E2E | The **judge path** in a fresh browser with `AI_FAKE=1`: sample sign-in, watch + markers, diagnostic, all four activities, a mastery change, sample reset. Runs against local Supabase on port 3100 | Playwright |
 
 ---
 
@@ -480,7 +500,7 @@ dashboard "Next step": unwatched library lecture → pending diagnostic → top 
 | [[Lectheo Product Spec#F3. Adaptive, confidence-rated diagnostic — Must\|F3]] adaptive diagnostic | [[#4.4 Adaptive diagnostic (F3)\|§4.4]], `diagnostic_responses`, follow-up rule |
 | [[Lectheo Product Spec#F4c. Spot the flaw — Must (the main activity)\|F4c]] spot the flaw | [[#4.5 Spot the flaw (F4c), the main activity\|§4.5]], `item_secrets`, scoring [[#6.4 Scaling and scoring\|§6.4]], leak check |
 | [[Lectheo Product Spec#F4a. Teach-back — Must (supporting activity)\|F4a]] teach-back | [[#4.6 Teach-back (F4a)\|§4.6]] |
-| [[Lectheo Product Spec#F4b. Transfer problem — Should\|F4b]] transfer, [[Lectheo Product Spec#F4d. Stump the AI — Should (labeled "beta")\|F4d]] Stump (Should) | [[#4.7 Stump the AI (F4d, Should)\|§4.7]], `/activities` types |
+| [[Lectheo Product Spec#F4b. Transfer problem — Should\|F4b]] transfer, [[Lectheo Product Spec#F4d. Stump the AI — Should (labeled "beta")\|F4d]] Stump (both built) | [[#4.7 Stump the AI (F4d, beta)\|§4.7]], `/activities` types |
 | [[Lectheo Product Spec#F5. Socratic feedback — Must\|F5]] Socratic feedback | Submit feedback shape, try_no retry, explanation endpoint |
 | [[Lectheo Product Spec#F6. Mastery map — Must\|F6]] mastery | [[#6.2 Mastery\|§6.2]] (computed on read) |
 | [[Lectheo Product Spec#F7. CS50 lecture library — Must\|F7]] CS50 library | `scripts/seed-library.ts`, library course kind, pre-generated bank, attribution |
@@ -493,11 +513,12 @@ dashboard "Next step": unwatched library lecture → pending diagnostic → top 
 
 | # | Risk | Plan |
 |---|---|---|
-| 1 | Workflow SDK maturity | Day-1 spike on a preview deploy (a step + sleep + poll). Fallback `after()` chain |
+| 1 | Workflow SDK maturity | **Resolved:** the day-1 spike passed; the pipeline runs on Workflows |
 | 2 | Days-old models (Sonnet 5.5, GPT-6.1 Sol) and the experimental Jev API | Day-1 smoke test of every role. Pinned slugs + fallbacks. Jev behind `runTask`, with the Luna escalation |
 | 3 | Verifier rejects many Sonnet items | Measure on the library bank. If > 40%, switch `reasoner` to Opus 5.5 (one config line) |
 | 4 | Leak check deflects too often | Tune thresholds on `eval-guard`. Log the deflection rate |
-| 5 | Teams `.docx` transcript format varies | VTT/SRT first. DOCX is Should |
+| 5 | Teams `.docx` transcript format varies | VTT/SRT/TXT shipped. DOCX was cut (refused with a clear message) |
 | 6 | Long recordings exceed 50 MB | 32 kbps Opus. 2 h cap. Suggest transcript import |
 | 7 | YouTube embed blocked (school network or privacy settings) | Detect the player error and fall back to CS50's official lecture MP3 (CC-licensed, same timeline as the subtitles) in a local `<audio>` player |
 | 8 | Name collision | Resolved: renamed to **Lectheo**. Register lectheo.com and the GitHub org before submission |
+| 9 | The demo looks like a prototype | [[Lectheo Design System]]: one token set, a SaaS app shell and a product landing page, built after the features froze |
