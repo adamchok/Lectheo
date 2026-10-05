@@ -1,7 +1,7 @@
 ---
 title: Lectheo Tech Stack & Architecture Decisions
-updated: 2026-10-04
-version: v2 (post-review)
+updated: 2026-10-06
+version: v2.1 (as built)
 tags:
   - lectheo
   - architecture
@@ -13,13 +13,14 @@ related:
   - "[[Lectheo Data Model]]"
   - "[[Lectheo Product Spec]]"
   - "[[Lectheo Design Review v1]]"
+  - "[[Lectheo Design System]]"
 ---
 
 # Lectheo Tech Stack & Architecture Decisions
 
-Part of the architecture set: [[Lectheo Architecture]] · [[Lectheo API Spec]] · [[Lectheo Data Model]] · **Tech Stack & ADRs**
+Part of the architecture set: [[Lectheo Architecture]] · [[Lectheo API Spec]] · [[Lectheo Data Model]] · **Tech Stack & ADRs** · UI and UX: [[Lectheo Design System]]
 
-*Prices and versions were checked on 4 Oct 2026 (vendor pages, the AI Gateway catalog, npm). Re-check before relying on any number.*
+*Prices and versions were checked on 4 Oct 2026 (vendor pages, the AI Gateway catalog, npm). Re-check before relying on any number. Versions and the "as built" notes were re-checked against `package.json` on 6 Oct 2026.*
 
 ---
 
@@ -40,11 +41,12 @@ Part of the architecture set: [[Lectheo Architecture]] · [[Lectheo API Spec]] �
 
 | Layer | Choice | Version | Why |
 |---|---|---|---|
-| Language | **TypeScript** (strict) | – | Shared Zod types from the DB to the UI. STT and LLMs are APIs, so no Python is needed. |
+| Language | **TypeScript** (strict) | 6.0.x | Shared Zod types from the DB to the UI. STT and LLMs are APIs, so no Python is needed. |
+| Workspace | **pnpm** workspaces + **Turborepo**: `apps/web` and `packages/{contracts,db,domain,ai}` | pnpm 12.6 / turbo 2.11 | Contracts, rules and the AI seam shared by the app, seed scripts and tests. |
 | Framework | **Next.js** App Router + Route Handlers (`proxy.ts` for session refresh) | 16.3.x | UI + API in one deploy. Streaming. |
-| UI | **React**, **Tailwind CSS v4**, **shadcn/ui** | Tailwind 4.3.x | Fast, accessible, keyboard-friendly. |
-| Concept map | **React Flow** (`@xyflow/react`) + **elkjs** (layout computed once in the pipeline, stored) | 12.12.x / 0.12.x | Custom nodes (state icon + label). Stable layered layout. |
-| Media | **YouTube IFrame Player API** (library), HTML `<video>`/`<audio>` with local object URLs (imports), `MediaRecorder` (live, Should) | – | Marker time = media time. Imported video never uploaded. |
+| UI | **React 19**, **Tailwind CSS v4**, **shadcn/ui** (Radix), `next-themes`, `sonner`, `lucide-react`, `tw-animate-css`; `motion` for the few animations CSS can't do | React 19.3 / Tailwind 4.3.x | Fast, accessible, keyboard-friendly. Rules in [[Lectheo Design System]] ([[#ADR-016 · Design system and motion: tokens first, CSS before JavaScript\|ADR-016]]). |
+| Concept map | **React Flow** (`@xyflow/react`) + **elkjs** (layout computed once in the pipeline or seed, stored; `packages/domain/src/layout.ts`, server only) | 12.12.x / 0.12.x | Custom nodes (state icon + label). Stable layered layout. |
+| Media | **YouTube IFrame Player API** (library), HTML `<video>`/`<audio>` with local object URLs (imports), `MediaRecorder` (live, Should, *not built*) | – | Marker time = media time. Imported video never uploaded. |
 | Hosting | **Vercel Hobby** (Fluid compute) | – | Free. 300 s per function. Preview deploys. Daily cron. |
 | Background pipeline | **Vercel Workflows** (`workflow`) with **polling, no webhook** | 5.0.x | Durable steps, retries, `sleep`. Hobby includes 50k events/month. |
 | LLM SDK | **AI SDK** (`ai`) + `@ai-sdk/gateway` | 7.0.x (≥ 7.0.105 for `experimental_evaluate`) | Structured output (Zod), streaming chat, Jev decisions, telemetry. |
@@ -53,15 +55,15 @@ Part of the architecture set: [[Lectheo Architecture]] · [[Lectheo API Spec]] �
 | Database, Storage, Auth | **Supabase via the Vercel Marketplace**: Postgres, private Storage, **Google OAuth + anonymous (sample) users** | `@supabase/supabase-js` 2.117 / `@supabase/ssr` 0.12 | One integration, env vars auto-synced, no separate account. **Data API off, RLS deny-all.** |
 | ORM | **Drizzle** + `postgres` (postgres.js) via the transaction pooler (`prepare: false`, `max: 3`) | 0.45.x / 3.4.x | Typed SQL, migrations as code. |
 | Bot protection | **Cloudflare Turnstile** | – | Free. Protects the sample-account button. |
-| Transcript parsing | Own small VTT/SRT parser (`domain/`). `mammoth` for Teams `.docx` (Should) | – | Simple formats. Pure and tested. |
+| Transcript parsing | Own small VTT/SRT/TXT parser (`packages/domain`). Teams `.docx`: Must since 6 Oct, *to be built* | – | Simple formats. Pure and tested. |
 | Validation | **Zod 4** | 4.x | API input, LLM output and JSON columns share schemas. |
 | Client storage | **IndexedDB** (`idb-keyval`) | – | Marker queue and recording pieces survive crashes. |
-| Tests | **Vitest** (domain + contract), **Playwright** (judge path, fake media), eval **scripts** (CSV output) | – | Right-sized: no Docker integration suite. |
-| CI | GitHub Actions (typecheck, lint, unit) + Vercel previews | – | |
+| Tests | **Vitest** (domain, contracts, server services on in-process **PGlite**), **Playwright** (judge path, `AI_FAKE=1`, local Supabase), eval **scripts** (CSV output) | Vitest 5 / Playwright 1.63 | Right-sized: unit and DB tests need no Docker. |
+| CI | GitHub Actions: `check` (typecheck, lint, unit) and `e2e` (Playwright judge path) + Vercel previews | – | |
 
 ### Model routing table
 
-All slugs live in `server/ai/models.ts` and were checked against the live AI Gateway catalog on 4 Oct 2026. *Decision 4 Oct: Option B (Sonnet generates, Opus only for the library seed, GPT-6.1 Sol checks and grades once). Jev chosen for the leak check.*
+All slugs live in `packages/ai/src/models.ts` and were checked against the live AI Gateway catalog on 4 Oct 2026. *Decision 4 Oct: Option B (Sonnet generates, Opus only for the library seed, GPT-6.1 Sol checks and grades once). Jev chosen for the leak check.*
 
 | Role | Used for | Primary | Settings | Fallback |
 |---|---|---|---|---|
@@ -73,7 +75,7 @@ All slugs live in `server/ai/models.ts` and were checked against the live AI Gat
 | `answerer` | The AI's answer in Stump the AI | `anthropic/claude-sonnet-5.5` | medium effort | `google/gemini-3.8-flash` |
 | `guard` | Leak check on author replies | `typesafe-ai/jev` | 2 boolean questions, timeout 800 ms | `guard-escalation` |
 | `guard-escalation` | Gray zone (0.3–0.7) or Jev unavailable | `openai/gpt-6-luna` | low effort, boolean + reason | canned deflection (fail closed) |
-| `vision` *(Should)* | Slides PDF pages that have no text layer | `google/gemini-3.8-flash` | low thinking | `anthropic/claude-sonnet-5.5` |
+| `vision` *(Should, unused: slides input not built)* | Slides PDF pages that have no text layer | `google/gemini-3.8-flash` | low thinking | `anthropic/claude-sonnet-5.5` |
 
 > **Why the verifier and judge aren't Claude:** generation, personas and the Stump answerer are Claude. A different family checking and grading avoids correlated blind spots and self-preference bias.
 
@@ -106,14 +108,14 @@ Benchmarks used (checked 4 Oct 2026):
 
 | Operation | Models | Cost |
 |---|---|---|
-| **Library seed** (3 × CS50 core 30–45 min, ~12 concepts each, ~160 items: 2 MCQ + 2 flaw per concept + transfer for half) | Opus 5.5 + GPT-6.1 Sol | **≈ $10–12, once** (dev key) |
+| **Library seed** (3 × CS50 core 45 min). Planned: ~12 concepts each, ~160 items. **Actual:** 6 concepts each (18), 95 drafts → 90 verified items | Opus 5.5 + GPT-6.1 Sol | Planned ≈ $10–12. **Actual $5.25, once** (dev key) |
 | Ingest a user lecture, **imported transcript**, 60 min (extraction + ~12 diagnostic items + ~6 practice items, verified) | Sonnet 5.5 + Sol | ≈ $0.80 (no STT) |
 | Same, **audio** source | + AssemblyAI ≈ $0.26/h | ≈ $0.80 (STT covered by free hours) |
 | 20-min sample-tier lecture | | ≈ $0.30 |
 | Diagnostic | none (graded in code) | $0 |
 | Spot the flaw (pre-generated item; ~4 author turns + Jev + 1 judge call) | Sonnet + Jev + Sol | ≈ $0.05 |
 | Teach-back (~4 turns + 1 judge call) | Sonnet + Sol | ≈ $0.05 |
-| Transfer / Stump (Should) | Sol / Sonnet + Sol ×2 | ≈ $0.03 / $0.07 |
+| Transfer / Stump (beta) | Sol / Sonnet + Sol ×2 | ≈ $0.03 / $0.07 |
 | On-demand item (if the bank runs out) | Sonnet + Sol | ≈ $0.05 |
 | **Judge path** (diagnostic + spot the flaw + teach-back) | | **≈ $0.10–0.15** |
 
@@ -157,7 +159,7 @@ Format: context → decision → consequences. All **Accepted, 4 Oct 2026** (v2 
   - \+ No webhook authentication gap or race, works in local dev, idempotent and resumable.
   - − Polling adds up to 15 s of latency and a few workflow events (well within Hobby's 50k).
   - − Run state is kept for only 1 day on Hobby; `pipeline_steps` is our record.
-- **Fallback:** if the day-1 spike fails, chain the same step functions through route handlers with `after()`. A cron runner isn't viable because Hobby cron runs daily.
+- **Fallback:** if the day-1 spike fails, chain the same step functions through route handlers with `after()`. A cron runner isn't viable because Hobby cron runs daily. *As built: the spike passed and the fallback was never needed.*
 
 ### ADR-003 · Supabase via the Vercel Marketplace, server-only data access
 - **Context:** Need relational data, private uploads, Google sign-in and per-visitor sample users, with minimal accounts.
@@ -167,8 +169,9 @@ Format: context → decision → consequences. All **Accepted, 4 Oct 2026** (v2 
   - The browser uses Supabase only for **Google OAuth**, **anonymous sample sign-in (server-side, on click, Turnstile)** and **signed uploads**.
 - **Consequences:**
   - \+ The publishable key can't read any table. Authorization is in one place (app code), backed by a contract test.
-  - − Free-plan limits: 500 MB DB, 50 MB per file, pauses after 7 days idle. A daily cron hits `/api/v1/health`.
-  - − The anonymous sign-in rate limit must be raised (default 30/h per IP) for judges on one network.
+  - − Free-plan limits: 500 MB DB, 50 MB per file, pauses after 7 days idle. The daily cron (`/api/cron/daily`, sample purge) keeps it awake.
+  - − The anonymous sign-in rate limit must be raised (default 30/h per IP): on Vercel it only sees egress IPs. The app adds its own per-IP limit (`rate_limits`, 5 per 10 min).
+  - Defense in depth (`0004`): `anon` and `authenticated` hold no table privileges and can't execute the sample functions.
 - **Rejected:** RLS as the main authorization (the server connection bypasses it, and policies would duplicate app logic); a separate Supabase account; Neon + Blob + Clerk.
 
 ### ADR-004 · Transcripts first, speech-to-text only when needed
@@ -179,7 +182,8 @@ Format: context → decision → consequences. All **Accepted, 4 Oct 2026** (v2 
   - Audio is deleted after transcription, and the remote transcript is deleted at AssemblyAI.
 - **Consequences:**
   - \+ Faster, cheaper, more accurate timing, better privacy.
-  - − Must handle transcript format quirks (VTT/SRT first; Teams .docx is Should).
+  - − Must handle transcript format quirks (VTT/SRT/TXT shipped; Teams .docx is a Must since 6 Oct, to be built).
+  - *As built: slide keyterms aren't sent, because slides input (Should) was cut.*
 - **Alternative:** Deepgram Nova-3 (keyterms capped at 500 tokens), if AssemblyAI is down.
 
 ### ADR-005 · Best-model-per-role through Vercel AI Gateway (Option B)
@@ -231,10 +235,11 @@ Format: context → decision → consequences. All **Accepted, 4 Oct 2026** (v2 
   - Every item is verified blind by a different model family before use.
   - The **CS50 library bank is generated in advance** with Opus (every concept: 2 MCQ, 2 flaw scenarios (~30% correct), a teach-back rubric, transfer for half).
   - User lectures get diagnostic items plus practice for the top 3 concepts in the pipeline; the rest are generated on demand.
+  - *As built:* the library bank is 18 concepts and 90 verified items (6 of 95 drafts rejected, one redraft round), $5.25. See [[Lectheo Product Spec#11. As-built deviations]] for why the library has fewer concepts than F2.2's rule.
   - Items a user has already seen are never served again.
 - **Consequences:**
   - \+ The judge path makes no generation calls.
-  - − ≈ $10–12 one-time seed cost.
+  - − One-time seed cost: planned ≈ $10–12, actual $5.25.
 
 ### ADR-011 · Capture modes share one timeline: media time
 - **Decision:**
@@ -267,20 +272,33 @@ Format: context → decision → consequences. All **Accepted, 4 Oct 2026** (v2 
 - **Context:** Judges need instant access to a realistic, non-"demo" dashboard, and several judges may test at once.
 - **Decision:**
   - The button creates an anonymous user (Turnstile-protected, server-side, on click).
-  - `clone_sample()` copies the seed student's per-user rows in one transaction. Library content stays shared and read-only.
-  - The account menu shows "Sample account · progress resets when you leave" plus Reset. A daily purge removes accounts older than 24 h.
+  - `clone_sample()` copies the seed student's per-user rows in one transaction. Library content stays shared and read-only, and today every account can read it. *(decided 6 Oct 2026, to be built)*: visible to sample accounts only, so Google accounts get a fresh start with no library.
+  - The account menu shows "Sample account · progress resets when you leave" plus Reset. Accounts older than 24 h are purged daily by cron and after every sample sign-in.
 - **Consequences:**
   - \+ No collisions, a clean start every time, and it looks like the real product.
   - − Seed data must be kept in step with the library item IDs (built by the same seed script).
 
 ### ADR-015 · CS50 library content under CC BY-NC-SA 4.0
 - **Decision:**
-  - Use CS50x 2026 Lectures 3–5 (the core 30–45 min of each), official subtitles and slides.
+  - Use CS50x 2026 Lectures 3–5 (the core 45 min of each), official subtitles. *As built: slides were not used (a documented deviation from F7.1).*
   - Videos are **embedded** (YouTube IFrame API), not re-hosted. The official MP3 is the fallback player.
   - An attribution notice is shown on every library page. Generated library content is shared under the same license. There's no implied endorsement.
 - **Consequences:**
   - \+ High-quality, recognisable, verifiable content.
   - − Non-commercial only. A commercial version would need different demo content.
+
+### ADR-016 · Design system and motion: tokens first, CSS before JavaScript
+*Accepted 6 Oct 2026.*
+- **Context:** The features worked, but the UI read as a demo rather than a product, and spacing, focus and loading behaviour varied by screen ([[Lectheo Design System]] and the frontend review in `docs/audit/frontend-review.md`).
+- **Decision:**
+  - One token set (colour, type, spacing, radius, shadow, layout, z-index, motion) defined in [[Lectheo Design System]] and implemented as CSS custom properties in `globals.css`. Components never use literal colours.
+  - A Linear/Vercel-style app shell (sidebar, top bar, breadcrumbs) and a product landing page, both specified there.
+  - **Motion:** CSS transitions and `tw-animate-css` first. The `motion` package (`motion/react`, loaded lean with `LazyMotion` + `domAnimation` and `m.*`) only for exits, layout changes, shared indicators and number transitions. `MotionConfig reducedMotion="user"` everywhere.
+  - Loading, skeleton, spinner, optimistic-update and error-state rules are part of the system, not left to each screen.
+- **Consequences:**
+  - \+ Consistent screens and a product the demo can show without apology.
+  - − About 5 kB of JavaScript for Motion's first load; the feature bundle loads asynchronously.
+- **Rejected:** GSAP, react-spring, Lottie (weight and style); View Transitions (still experimental in Next.js).
 
 ---
 

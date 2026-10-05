@@ -1,7 +1,7 @@
 ---
 title: Lectheo Product Specification
-status: v2 (scoped for the hackathon; ready for your review)
-updated: 2026-10-04
+status: v2.1 (as built for submission; deviations in §11)
+updated: 2026-10-06
 tags:
   - lectheo
   - spec
@@ -13,6 +13,7 @@ related:
   - "[[Lectheo Data Model]]"
   - "[[Lectheo API Spec]]"
   - "[[Lectheo Design Review v1]]"
+  - "[[Lectheo Design System]]"
 ---
 
 # Lectheo Product Specification
@@ -83,10 +84,15 @@ Anything visible in the UI must work. Unbuilt features are hidden, not shown as 
 | F0.1 | **Sign-in page** with two options: **Continue with Google** (a real account) and **Explore with a sample account**. | Must |
 | F0.2 | "Explore with a sample account" gives **each visitor their own fresh copy** of a pre-seeded student. Visitors never share data, and every click starts clean. Bot protection (a CAPTCHA-style check) runs on this button. | Must |
 | F0.3 | The sample account is **lived-in, not empty**. In the CS50 course: Lecture 3 has been watched and practiced (mostly green and amber), Lecture 4 has been watched with a diagnostic done and one **confident mistake** (red), and **Lecture 5 is new: "Ready to watch"**. | Must |
-| F0.4 | The **dashboard is the real product dashboard**. It shows course cards with mastery progress, a lecture list with status, the concept map entry point, and a **"Next step" card** from the practice recommender (e.g. "Lecture 5 is ready. Watch it and tap when you're lost"). It contains no tour and no "demo" banner. | Must |
+| F0.4 | The **dashboard is the real product dashboard**. It shows course cards with mastery progress, a lecture list with status, the concept map entry point, and a **"Next step" card** from the practice recommender (e.g. "Lecture 5 is ready. Watch it and tap when you're lost"). It contains no tour and no "demo" banner. The dashboard **follows the student's own work**: it centres on the course they last worked in, and a lecture of theirs that has just finished processing takes priority. | Must |
 | F0.5 | The account menu shows a small label, **"Sample account · progress resets when you leave"**, plus a **Reset sample** action. | Must |
-| F0.6 | Sample accounts are deleted automatically after 24 hours. Google accounts persist until the user deletes them. | Must |
-| F0.7 | Users can create their own courses and add lectures (sample accounts: one course, within the [[#F8. Trust, privacy and limits — Must\|F8.3]] limits). Everyone can open the **lecture library** ([[#F7. CS50 lecture library — Must\|F7]]). | Must |
+| F0.6 | Sample accounts are deleted automatically after 24 hours. Google accounts persist until the user deletes them: **Delete account** in the account menu opens a confirm dialog that names the consequence ("This deletes your courses, lectures, marks and practice, and signs you out. It can't be undone."), then removes all their data, their stored files and their sign-in. | Must |
+| F0.7 | Users can create their own courses and add lectures (sample accounts: one course, within the [[#F8. Trust, privacy and limits — Must\|F8.3]] limits). Students can **rename** their own courses and **delete** them (confirm dialog; deletes the course's lectures, map, marks and practice). The **lecture library** ([[#F7. CS50 lecture library — Must\|F7]]) belongs to the **sample account only**: Google accounts never see it listed, recommended or reachable (a library URL returns not found). | Must |
+| F0.8 | **Google accounts get a fresh start.** A new Google account has no courses and no library. Its dashboard is a first-run screen with one primary action, **Add your first lecture**, which: explains the loop in three short steps (mark, diagnose, practice); says what to bring (a recording plus its `.vtt`/`.srt` file, an audio file, or a transcript); sets expectations (for a 60-minute lecture the map is ready in about 3 minutes and questions in about 8); and links to the sample account for anyone who wants to look around first. | Must |
+| F0.9 | While a student's first lecture processes, the dashboard shows its pipeline steps and status in place of the next-step card, and the page is safe to leave. When it reaches `map_ready` the map opens; at `ready` the next-step card offers the diagnostic. | Must |
+| F0.10 | The **next-step card explains itself**. Besides the action, it shows: **why** (up to two pieces of the student's own evidence, e.g. "You marked *I'm lost* at 12:41 in Lecture 5", "Sure but wrong, twice, in the diagnostic", each linking to its lecture moment when there is one); **how long** ("About 5 minutes"); and **what it leads to** (e.g. "One more independent win in a different activity → Mastered"). Every number shown must come from real data or a fixed, honest estimate. | Must |
+| F0.11 | Under the card, **Also worth doing** lists the next two ranked concepts, each with its mastery badge, a one-line reason and a start action. Hidden when there are none. | Should |
+| F0.12 | **No dead end.** When every concept in the course is Mastered, the card suggests *Stump the AI* on the concept mastered longest ago. If the student also has nothing else to do (no unwatched or unprocessed lectures), it suggests adding the next lecture. "All caught up" alone is never shown. | Must |
 
 ### F1. Capture with markers — Must (by mode)
 
@@ -105,7 +111,7 @@ There are four ways to add a lecture. All of them feed the same pipeline after t
 | F1.2 | Markers are made during the student's **first experience** of the lecture: live, or the first viewing of a recording. There is no separate "replay and re-mark" feature. | Must |
 | F1.3 | Visible but unobtrusive confirmation when a marker is saved (counter + toast). Markers can be undone within 5 s. | Must |
 | F1.4 | **Watch mode (A):** embedded YouTube player for library lectures. Marker time = player time, so markers line up exactly with the official timestamped transcript. | Must |
-| F1.5 | **Import (B):** the student picks a local video or audio file plus a **.vtt or .srt** transcript. The media plays from the local file and is never uploaded. Only the transcript is uploaded. **Speaker names are stripped** on import. Teams **.docx** transcripts are supported if time allows. | Must (VTT/SRT) · Should (DOCX) |
+| F1.5 | **Import (B):** the student picks a local video or audio file plus a **.vtt or .srt** transcript. The media plays from the local file and is never uploaded. Only the transcript is uploaded. **Speaker names are stripped** on import. Teams **.docx** transcripts are supported too (timestamps and speaker lines parsed, speaker names stripped). | Must (VTT/SRT) · Must (DOCX, decided 6 Oct 2026) |
 | F1.6 | **Upload audio (D):** mp3 / m4a / webm / wav up to the per-account size limit ([[#F8. Trust, privacy and limits — Must\|F8.3]]). Lectheo transcribes it with vocabulary from the slides if they were provided ([[#F1. Capture with markers — Must (by mode)\|F1.9]]). Audio is **deleted after transcription**. | Must |
 | F1.7 | **Upload transcript only (D):** .vtt / .srt / .txt or pasted text. **Plain text has no timestamps**, so the map and diagnostic still work but there are no markers, and the UI says so. | Must |
 | F1.8 | **Record live (C):** in-browser audio recording with the screen kept awake and a "keep this tab open" warning. Audio is saved in pieces as it records, so a page refresh or crash doesn't lose it, and the student is offered to upload what was captured. Max 2 h (Google) / 20 min (sample). | Should |
@@ -223,7 +229,7 @@ Activities are ordered by the recommender: confident mistakes → red → marked
 | ID | Requirement |
 |---|---|
 | F8.1 | Consent prompt before recording or uploading ([[#F1. Capture with markers — Must (by mode)\|F1.11]]). |
-| F8.2 | **Delete lecture** removes media, transcript, markers and derived content. Uploaded audio is deleted automatically after transcription. Imported video never leaves the laptop. |
+| F8.2 | **Delete lecture**, **delete course** and **delete account** remove media, transcripts, markers and all derived content. Uploaded audio is deleted automatically after transcription. Imported video never leaves the laptop. |
 | F8.3 | **Fair-use limits** (shown when hit, with the reset time): sample account 1 lecture per day (≤ 20 min, ≤ 20 MB); Google account 3 per day (≤ 2 h, ≤ 50 MB). Activities are limited per day. |
 | F8.4 | **AI unavailable mode:** if the AI budget runs out, practice on already-prepared items and the map still work, and new processing pauses with a clear message. |
 | F8.5 | The README states which providers receive data (transcription, AI models) and what is stored. |
@@ -256,11 +262,11 @@ flowchart LR
 
 ### 4.2 Real student (Teams recording)
 
-Sign in with Google → create course → **Import recorded lecture** (Teams MP4 + .vtt) → watch in Lectheo and tap L / I → map → diagnostic → practice over the following days → map turns green.
+Sign in with Google → **empty first-run dashboard** → Add your first lecture (creates the course) → **Import recorded lecture** (Teams MP4 + .vtt) → watch in Lectheo and tap L / I → processing shown on the dashboard → map → diagnostic → practice over the following days → map turns green. No CS50 content appears anywhere in a Google account.
 
 ### 4.3 Real student (in-person lecture)
 
-Sign in with Google → **Record live** in the lecture hall and tap L / I → stop and upload → map in a few minutes → diagnostic → practice.
+Sign in with Google → **Record live** in the lecture hall and tap L / I → stop and upload → map in a few minutes → diagnostic → practice. *(Record live is a cut Should; until it ships, this student uploads the audio afterwards and gets the map without markers.)*
 
 ---
 
@@ -304,7 +310,10 @@ Full analysis, profiles, feature matrix and sources: **[[Lectheo Competition]]**
 
 **Out of scope (Later):**
 - Live in-lecture transcription and translation
-- Mobile, tablet and desktop apps
+- Mobile, tablet and desktop apps (native)
+
+**Phones (decided 6 Oct 2026):** the landing page is fully responsive. The app is *usable* on a phone (readable, no sideways scrolling, the sidebar becomes a sheet) but desktop-first: the concept map and watch mode are designed for a laptop; on phones the map defaults to the list view and watch mode shows on-screen *I'm lost* / *Important* buttons instead of relying on L/I keys.
+
 - Video upload; audio extraction from video in the browser
 - Re-marking on replay; aligning marks made during a live Teams meeting with a later recording
 - Picture-in-picture controller; slide or whiteboard photos
@@ -326,6 +335,7 @@ Full analysis, profiles, feature matrix and sources: **[[Lectheo Competition]]**
 6. **Understanding over engagement.** Progress rewards independent, demonstrated understanding, never app opens or guessing.
 7. **Honest about limits.** If an input can't be processed (bad audio, plain text with no timestamps, too few concepts), say so and offer the next best option.
 8. **Privacy by default.** Consent before capture, minimal storage, speaker names stripped, easy deletion.
+9. **Looks and behaves like one product.** Every screen follows [[Lectheo Design System]]: the same tokens, app shell, loading and error states, focus rules and motion.
 
 ---
 
@@ -352,4 +362,48 @@ Full analysis, profiles, feature matrix and sources: **[[Lectheo Competition]]**
 - [ ] Final tagline.
 - [ ] Any evidence from 3–5 real students that they would tap "I'm lost" during a lecture? (Strengthens Real-World Impact.)
 
+*Decided on 6 Oct 2026:* self-serve account deletion · rename and delete own courses · Teams `.docx` import becomes Must · record live stays cut · app usable on phones but desktop-first · code licensed MIT · launch on `lectheo.vercel.app` (no custom domain) · no analytics · the author reviews the eval labels before submission.
+
+*Decided on 6 Oct 2026:* the next-step card shows why, how long and what it leads to, plus two "Also worth doing" items, and never dead-ends (F0.10–F0.12).
+
+*Decided on 6 Oct 2026:* Google accounts get a **pure fresh start**: no CS50 library, no opt-in to add it later. The library exists to let visitors try Lectheo through the sample account.
+
 *Decided on 4 Oct 2026:* spot the flaw is the main activity · rubric criteria and explanation revealed after the final submission · slides input is Should · each visitor gets their own sample account · Google sign-in is real · CS50x 2026 L3–5 is the library · watch mode and Teams import are in scope.
+
+## 11. As-built deviations
+
+Recorded at submission (6 Oct 2026). Each deviation is deliberate; evidence is in the repo's `docs/audit/spec-compliance.md`.
+
+| Req | Spec says | As built | Why |
+|---|---|---|---|
+| F2.2 | About 1 concept per 3 minutes (min 3, max 20) | The pipeline follows the rule (`packages/domain/src/scale.ts`). The **CS50 library** has 6 concepts per 45-minute window, where the rule gives about 15. | The library curriculum is fixed: the item bank's stable ids, the seed student and the e2e judge path depend on it. Six well-verified concepts per lecture beat fifteen thinner ones for a two-minute judge path. Student-added lectures get the full rule. |
+| F7.1 | Library processed from the official subtitles **and slides** | Built from the official timestamped subtitles only (`scripts/seed-library.ts`). | Slides input is a Should in the decision log (§10). Every concept and item cites subtitle timestamps, so grounding is checkable without slides. |
+
+### Decided 6 Oct 2026, to be built
+
+These requirements are specified above but **not implemented yet**. Until they ship, the product behaves as before (for example, Google accounts still see the CS50 library).
+
+| Req | Item |
+|---|---|
+| F0.4 | Dashboard follows the student's own course |
+| F0.6 | Self-serve *Delete account* (today: email the author) |
+| F0.7 | Rename and delete own courses; CS50 library visible to sample accounts only |
+| F0.8 | First-run screen for new Google accounts |
+| F0.9 | Processing steps on the dashboard |
+| F0.10–F0.12 | Next-step card: why, how long, payoff; *Also worth doing*; no dead end |
+| F1.5 | Teams `.docx` transcripts (today refused with a clear message) |
+| F8.2 | Delete course and delete account (delete lecture is built) |
+| §7 | Phone usability for the app (sidebar sheet, on-screen marker buttons) |
+
+### Should items: built or cut
+
+| Req | Item | Status |
+|---|---|---|
+| F1.5 | Teams `.docx` transcripts | Promoted to Must (6 Oct 2026); to be built |
+| F1.8 | Record live (mode C) | Cut, confirmed 6 Oct 2026. No entry point; the API returns `404` for `live`. Audio upload covers in-person lectures |
+| F1.9 | Slides PDF input | Cut. No upload; no transcription keyterms from slides |
+| F1.10 | Transcript correction and re-process | Cut. Contract exists, no route or UI |
+| F2.7 | Deduplicate concepts in own courses | Built (normalised canonical key) |
+| F4a.2 | Persona picker | Cut. One persona |
+| F4b | Transfer problem | Built (shown when an unseen transfer item exists) |
+| F4d | Stump the AI | Built, labeled "Beta" |

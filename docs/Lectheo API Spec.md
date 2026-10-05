@@ -1,9 +1,9 @@
 ---
 title: Lectheo API Specification
-updated: 2026-10-04
-version: v2 (post-review)
+updated: 2026-10-06
+version: v2.1 (as built)
 tags: [lectheo, architecture, api]
-related: ["[[Lectheo Architecture]]", "[[Lectheo Data Model]]", "[[Lectheo Tech Stack]]", "[[Lectheo Product Spec]]"]
+related: ["[[Lectheo Architecture]]", "[[Lectheo Data Model]]", "[[Lectheo Tech Stack]]", "[[Lectheo Product Spec]]", "[[Lectheo Design System]]"]
 ---
 
 # Lectheo API Specification (v1 routes, doc v2)
@@ -15,6 +15,8 @@ Part of the architecture set: [[Lectheo Architecture]] · **API Spec** · [[Lect
 - The diagnostic contract is fixed: confidence first, then answer, each once.
 - New: session endpoints for Google and sample accounts, plus capture endpoints for watch mode and import.
 - Removed: the `Idempotency-Key` store, `If-Match`, the admin page, `/me/progress`, pagination, and the transcription webhook.
+
+**As built (6 Oct 2026):** `packages/contracts` is the executable form of this spec; where they differ, the contracts win. Added since v2: `GET /me`, the cron route, map-node `moments` and `sources`, transfer and Stump as working types, and a per-IP limit on sample sign-in. Routes marked *not built* are Should items that were cut.
 
 ---
 
@@ -28,7 +30,7 @@ Part of the architecture set: [[Lectheo Architecture]] · **API Spec** · [[Lect
 | Validation | Zod on every body, query and path param. Every response goes through an **explicit response schema** (allow-list), and a contract test asserts no 🔒 field ever appears. |
 | Safe retries | **No idempotency-key store.** Creating requests carry a **client-generated UUIDv7 `id`**, and the server does `INSERT … ON CONFLICT (id) DO NOTHING RETURNING`, then returns the existing row. State changes are **guarded updates** (`… WHERE status = 'active' RETURNING`). A second call gets `409 invalid_state` or the same result. |
 | Streaming | Teach-back replies use the AI SDK **UI message stream** (SSE). The client uses `useChat` with `prepareSendMessagesRequest`, sending only the newest message. |
-| Authorization | Every handler checks ownership in code. Library content is readable by all and writable by none. Any ID belonging to another user returns **404** (no existence leak). Writes to library or other users' resources return **404**; `403` is used only for `sample_account_restricted`. |
+| Authorization | Every handler checks ownership in code. Library content is readable by all and writable by none. *(decided 6 Oct 2026, to be built)*: readable by sample (and owner) accounts only; for Google accounts it won't exist (404), so they get a fresh start ([[Lectheo Product Spec#F0. Accounts, sample account and dashboard — Must|F0.7]]). Any ID belonging to another user returns **404** (no existence leak). Writes to library or other users' resources return **404**; `403` is used only for `sample_account_restricted`. |
 | Limits | 429 uses the standard envelope with `details.resetAt`. |
 
 ### Error envelope
@@ -54,6 +56,7 @@ Part of the architecture set: [[Lectheo Architecture]] · **API Spec** · [[Lect
 | 413 | `payload_too_large` |
 | 422 | `unprocessable_input` (unreadable transcript, too few concepts) |
 | 429 | `quota_exceeded`, `rate_limited` |
+| 500 | `internal_error` (generic message; details only in server logs, with SQL parameters stripped) |
 | 503 | `ai_paused` (budget governor), `intake_paused`, `upstream_unavailable` |
 
 ---
@@ -66,15 +69,18 @@ Part of the architecture set: [[Lectheo Architecture]] · **API Spec** · [[Lect
   /session/sample          POST           start sample account
   /session/sample/reset    POST
   /session/sign-out        POST
+  /me                      GET            account menu (kind, display name, isSample)
+  /me                      DELETE         delete account, Google only  (to be built)
   /courses                 GET POST
+  /courses/{id}            PATCH DELETE   rename, delete own course   (to be built)
   /courses/{id}/map        GET            map + mastery + markers
   /courses/{id}/next       GET            recommender
   /lectures                POST           (body has courseId)
   /lectures/{id}           GET PATCH DELETE
   /lectures/{id}/audio-upload-url   POST
   /lectures/{id}/transcript         POST GET
-  /lectures/{id}/transcript/segments/{idx}  PATCH   (Should)
-  /lectures/{id}/slides-upload-url  POST           (Should)
+  /lectures/{id}/transcript/segments/{idx}  PATCH   (Should, not built)
+  /lectures/{id}/slides-upload-url  POST           (Should, not built)
   /lectures/{id}/process            POST
   /lectures/{id}/markers            GET POST
   /lectures/{id}/markers/{markerId} DELETE        (undo)
@@ -90,6 +96,7 @@ Part of the architecture set: [[Lectheo Architecture]] · **API Spec** · [[Lect
   /activities/{id}/submit       POST
   /activities/{id}/explanation  POST
   /health                  GET
+/api/cron/daily            GET            Vercel cron (Bearer CRON_SECRET)
 ```
 
 ---
@@ -103,11 +110,18 @@ Supabase Google OAuth callback. It exchanges the code, upserts `profiles(kind='g
 Body: `{ turnstileToken }`. Verifies Turnstile, then (server-side) `signInAnonymously()` sets the session cookie. Runs `clone_sample(seed, newUser)` in one transaction and creates `profiles(kind='sample')`.
 → `200 { redirect: "/dashboard" }` · `400` bad token · `429 rate_limited`.
 Sign-in happens **only on click**, never on page load, so bots and link previews don't create users.
+**Per-IP limit first:** 5 sign-ins per IP per 10 minutes (`rate_limits` table). Supabase's own anonymous limit sees Vercel's egress IPs, so it is effectively global and can't do this. After the response, the route purges expired sample accounts and stale rate-limit windows (best effort, logged on failure).
 
 ### `POST /session/sample/reset`
 Sample accounts only. Deletes the user's per-user rows and clones again. → `200 { redirect: "/dashboard" }`
 
 ### `POST /session/sign-out` → `204`
+
+### `GET /me`
+`200 { id, kind: "google"|"sample"|"owner", displayName, isSample }`. Drives the account menu (sample label and Reset sample).
+
+### `DELETE /me` (Google accounts; to be built)
+Deletes the account: every course the user owns (cascading to lectures, segments, markers, concepts, items, sessions, activities, attempts), their Storage objects, usage counters, the profile and finally the auth user. Then signs out. → `204`. Sample accounts → `403 sample_account_restricted` (they use Reset and expire after 24 h). Idempotent: a retry after partial failure finishes the job.
 
 ---
 
@@ -115,9 +129,16 @@ Sample accounts only. Deletes the user's per-user rows and clones again. → `20
 
 ### `GET /courses`
 `200 { data: [{ id, title, kind: "library"|"personal", attribution?, lectureCount, mastery: {gray, red, amber, green} }] }`
+As built: library courses first, then the user's own, each in creation order (`kind, createdAt`), for every account. *(decided 6 Oct 2026, to be built)*: Google accounts get their own courses only, most recently active first; an empty list means first run ([[Lectheo Product Spec#F0. Accounts, sample account and dashboard — Must|F0.8]]).
 
 ### `POST /courses`
-`{ id, title(1..120) }` → `201 course`. Sample accounts can create **one** personal course (a second gets `403 sample_account_restricted`). Library courses are read-only for everyone.
+`{ id, title(1..120) }` → `201 course`. Sample accounts can create **one** personal course (a second gets `403 sample_account_restricted`). Library courses are read-only, and exist only for sample accounts.
+
+### `PATCH /courses/{courseId}` (to be built)
+`{ title(1..120) }` → `200 course`. Own courses only; library → `404`.
+
+### `DELETE /courses/{courseId}` (to be built)
+`204`. Own courses only; library → `404`. Cascades to every lecture in the course (as `DELETE /lectures/{id}`), then removes the course's Storage objects. Refused with `409 already_processing` while one of its lectures is processing.
 
 ### `GET /courses/{courseId}/map`
 Joins concepts, edges, layout, this user's markers and **mastery computed on read**.
@@ -131,6 +152,8 @@ Joins concepts, edges, layout, this user's markers and **mastery computed on rea
     "id": "c_…", "name": "Hash tables", "summary": "…", "lectureIds": ["…"],
     "mastery": { "state": "red", "confidentMistake": true, "reasons": ["Sure and wrong in Diagnostic (twice)"] },
     "markers": { "lost": 1, "important": 0 },
+    "moments": [{ "id": "m_…", "lectureId": "…", "kind": "lost", "tMs": 1834000 }],
+    "sources": [{ "lectureId": "…", "idx": 42, "startMs": 1812000, "excerpt": "…" }],
     "position": { "x": 120, "y": 340 },
     "transferAvailable": true
   }],
@@ -139,9 +162,25 @@ Joins concepts, edges, layout, this user's markers and **mastery computed on rea
 }
 ```
 
+`moments` are this user's markers on the concept ("▶ 12:41" links). `sources` are where the lecture teaches it ([[Lectheo Product Spec#F2. Concept map — Must|F2.4]]): up to 3, most salient first. `position` is `null` before the layout exists.
+
 ### `GET /courses/{courseId}/next`
-`200 { kind: "watch"|"diagnostic"|"activity", lectureId?, conceptId?, conceptName?, activityType?, reason }`
-For example, `{ kind: "watch", lectureId: "L5", reason: "Lecture 5 is ready to watch" }`.
+**As built:** `200 { kind: "watch"|"diagnostic"|"activity"|"none", lectureId?, conceptId?, conceptName?, activityType?, reason }` (`packages/contracts/src/api/courses.ts`).
+
+**Planned, F0.9–F0.12 *(decided 6 Oct 2026, to be built)*:** `200 { kind: "processing"|"watch"|"diagnostic"|"activity"|"add_lecture", lectureId?, conceptId?, conceptName?, activityType?, reason, evidence, estimateMinutes, payoff, alsoWorthDoing }`
+
+| Field | Meaning |
+|---|---|
+| `kind` | `processing`: a lecture of the student's is in the pipeline (the dashboard shows its steps). `add_lecture`: nothing left to do in the course (replaces v2's `none`). |
+| `reason` | The card's headline, written for the student (see the examples below). |
+| `evidence` | 0–2 items `{ kind: "marked_lost"|"marked_important"|"confident_mistake"|"wrong"|"partial", text, source?: { lectureId, tMs } }`, strongest first. Built from the student's own markers and attempts only. |
+| `estimateMinutes` | Watch: the lecture's duration. Diagnostic: 3. Spot the flaw, teach-back, transfer, Stump: 5. `null` for `processing` and `add_lecture`. |
+| `payoff` | One line on what finishing the step changes, or `null`. Rules in [[Lectheo Architecture#6.3 Practice recommender|Architecture §6.3]]. |
+| `alsoWorthDoing` | 0–2 items `{ conceptId, conceptName, state, confidentMistake, activityType, reason }`: the next ranked concepts after the top one. Empty unless `kind = "activity"`. |
+
+Examples:
+- `{ kind: "watch", reason: "Lecture 5 is ready. Watch it and tap when you're lost.", evidence: [], estimateMinutes: 45, payoff: "Your marks decide what the diagnostic asks." }`
+- `{ kind: "activity", activityType: "spot_flaw", conceptName: "Hash tables", reason: "You were sure about hash tables, but got it wrong. Let's fix that.", evidence: [{ kind: "confident_mistake", text: "Sure but wrong, twice, in the diagnostic" }, { kind: "marked_lost", text: "You marked I'm lost at 12:41 in Lecture 5", source: { lectureId: "…", tMs: 761000 } }], estimateMinutes: 5, payoff: "A correct answer here clears the confident mistake." }`
 
 ---
 
@@ -151,17 +190,17 @@ For example, `{ kind: "watch", lectureId: "L5", reason: "Lecture 5 is ready to w
 ```json
 { "id": "uuid-v7", "courseId": "…", "title": "Week 6 – Trees", "source": "import" }
 ```
-`source`: `import` | `live` | `audio` | `transcript`. `library` can't be created at runtime.
+`source`: `import` | `live` | `audio` | `transcript`. `library` can't be created at runtime. *As built: `live` (the recorder, Should) is not built and returns `404`.*
 → `201 lecture { id, status: "draft" }`. A replay with the same `id` returns the existing lecture.
 
 ### `GET /lectures/{id}`
 ```json
-{ "id": "…", "title": "…", "source": "import", "status": "map_ready",
+{ "id": "…", "courseId": "…", "title": "…", "seq": 6, "source": "import", "status": "map_ready",
   "progress": { "step": "verifyItems", "done": 7, "total": 10 },
-  "media": { "youtubeId": null, "durationMs": 3120000 }, "hasTimestamps": true,
+  "media": { "youtubeId": null, "localFileName": "week6.mp4", "durationMs": 3120000 }, "hasTimestamps": true,
   "markerCounts": { "lost": 4, "important": 3 }, "needsReprocess": false, "error": null }
 ```
-Polled every 2 s while `status ∈ {processing, map_ready}`. The map is usable from `map_ready` onwards; `ready` means questions are available too.
+Library media also carries `startMs`/`endMs` (the core window) and `fallbackAudioUrl` (CS50's official MP3 on the same timeline, used when the YouTube embed is blocked). Polled every 2 s while `status ∈ {processing, map_ready}`. The map is usable from `map_ready` onwards; `ready` means questions are available too.
 
 ### `PATCH /lectures/{id}`: `{ title }` → `200`
 ### `DELETE /lectures/{id}`: `204`. Cascades and removes Storage objects. Library lectures → `404`.
@@ -171,15 +210,15 @@ Polled every 2 s while `status ∈ {processing, map_ready}`. The map is usable f
 → `200 { uploadUrl, path, expiresAt }`. The server enforces the **per-tier size** (sample ≤ 20 MB, Google ≤ 50 MB) here, and the bucket enforces 50 MB. The client then `PUT`s straight to Storage. Duration is **measured later** (from the transcription result), never trusted from the client. Audio longer than the tier limit is truncated before any AI processing.
 
 ### `POST /lectures/{id}/transcript` (sources `import`, `transcript`)
-`multipart/form-data`: one file `.vtt` | `.srt` | `.txt` (≤ 2 MB), `.docx` (Teams format, Should), **or** JSON `{ text }`.
+`multipart/form-data`: one file `.vtt` | `.srt` | `.txt` (≤ 2 MB), `.docx` (Teams format; Must since 6 Oct 2026, *to be built*; until then refused with `422`), **or** JSON `{ text }`.
 The server parses it, **strips speaker names**, stores segments, and sets `hasTimestamps`. Size is capped in tokens by tier (sample ≈ 20 min of speech, Google ≈ 2 h).
 → `201 { segments: n, hasTimestamps: true, durationMs }` · `422 unprocessable_input`.
 
 ### `GET /lectures/{id}/transcript?fromMs=&toMs=`
 `200 { segments: [{ idx, startMs, endMs, text, edited }] }`
 
-### `PATCH /lectures/{id}/transcript/segments/{idx}` (Should)
-`{ editedText }` → `200`. Sets `needsReprocess`.
+### `PATCH /lectures/{id}/transcript/segments/{idx}` (Should, not built)
+`{ editedText }` → `200`. Sets `needsReprocess`. The contract (`PatchSegmentRequest`) exists; the route and UI don't.
 
 ### `POST /lectures/{id}/process`
 Starts the ingestion workflow, or re-runs it from a step after edits.
@@ -208,10 +247,10 @@ Undo (soft delete) → `204`.
 
 ### `POST /lectures/{id}/diagnostic`
 Creates, or returns the active, session for (user, lecture) from **verified** items. Items this user has already seen are excluded.
-`200 { sessionId, items: [{ id, conceptId, stem, position }], maxFollowUps: 2 }`. Options are **not** included.
+`200 { sessionId, items: [{ id, conceptId, stem, position }], maxFollowUps: 2, note? }`. Options are **not** included. `note` explains a shorter diagnostic (fewer than 3 verified items) or a general check (no markers).
 
 ### `GET /diagnostic/{sid}`
-Resume: `{ sessionId, status, items: [{ id, stem, position, confidence?, answered, correct? }] }`
+Resume: `{ sessionId, status, items: [{ id, stem, position, isFollowUp, confidence?, answered, correct? }] }`
 
 ### `POST /diagnostic/{sid}/items/{itemId}/confidence`
 `{ level: "sure"|"unsure"|"guess"|"no_idea" }` → `200 { options: [{ id: "a", text: "…" }, …] }`.
@@ -246,7 +285,7 @@ Ordered confident mistakes → wrong → unsure-right → right:
 ```json
 { "id": "uuid-v7", "conceptId": "c_…", "type": "spot_flaw" }
 ```
-`type`: `spot_flaw` | `teach_back` | `transfer` (Should) | `stump` (Should). `persona` is optional for teach-back.
+`type`: `spot_flaw` | `teach_back` | `transfer` | `stump` (beta). All four are built. `persona` is accepted for teach-back, but only one persona exists (the picker is a cut Should).
 The server picks an **unseen verified item** from the bank. If none exists, it generates and verifies one **inside the request** (≈ 15–25 s; the route sets `maxDuration = 60`, and the client shows "Preparing…"). The response is always final: there is no 202 or polling.
 
 | `type` | `201` response |
@@ -257,7 +296,8 @@ The server picks an **unseen verified item** from the bank. If none exists, it g
 | `stump` | `{ id, type, concept, guidance }` |
 
 ### `GET /activities/{id}`
-`{ id, type, concept, status, turnsUsed, turnBudget, hintsUsed, tries: [{ tryNo, outcome, feedback }], messages: [{ role, content, createdAt }] }`
+`{ id, type, concept, courseId, courseKind, status, turnsUsed, turnBudget, hintsUsed, scenario, prompt?, tries: [{ tryNo, outcome, feedback, stump? }], messages: [{ role, content, createdAt }] }`
+`courseId` and `courseKind` drive the "See it on the map" link and the library license notice. `tries[].stump` repeats the student's question, their key (as `studentKey`, never `answerKey`) and the referee result, so a reload shows the last verdict.
 Only `visible` messages are returned. Blocked author drafts never are.
 `scenario` (spot_flaw) and `prompt` (transfer) carry the item's public payload. `transferAvailable` on map nodes is true when a verified transfer item this user hasn't seen exists (F4b entry point).
 
@@ -267,7 +307,7 @@ Only `visible` messages are returned. Blocked author drafts never are.
 - **spot_flaw:** `200 application/json { reply, turnsLeft }`. Not streamed, because the leak check runs first (keywords → Jev → GPT-6 Luna in the gray zone).
 
 ### `POST /activities/{id}/hints` (spot_flaw)
-`200 { hint, hintsUsed, hintsLeft }` (2-step ladder). The activity is marked assisted from this point.
+`200 { hint, hintsUsed, hintsLeft, sources }` (2-step ladder). `sources` point to where the lecture covers it ([[Lectheo Product Spec#F5. Socratic feedback — Must|F5.2]]). The activity is marked assisted from this point.
 
 ### `POST /activities/{id}/submit`
 The body depends on `type`:
@@ -291,7 +331,7 @@ Try 1 moves the activity to `awaiting_retry` (unless it's correct); try 2 closes
 }
 ```
 Once `final = true`, the response adds `explanation` and the `rubric` criteria (labels and descriptions).
-**Stump** responses add `{ valid, rejectionReason?, aiAnswer, aiStumped, refereeNotes, groundedIn: "lecture"|"course_knowledge" }`. Shown as "Accepted" / "Accepted · you stumped the AI".
+**Stump** responses add a `stump` object: `{ valid, rejectionReason?, aiAnswer, aiStumped, refereeNotes, groundedIn: "lecture"|"course_knowledge" }`. Shown as "Accepted" / "Accepted · you stumped the AI".
 
 ### `POST /activities/{id}/explanation`
 Before the final try, this reveals the explanation now ("Show me"). It sets `explanation_shown`, so later tries are `assisted`.
@@ -302,7 +342,10 @@ Before the final try, this reveals the explanation now ("Show me"). It sets `exp
 ## 8. Platform
 
 ### `GET /health` (public)
-`200 { ok: true, db: "ok", aiPaused: false, intakePaused: false, version: "git-sha" }`. Hit by the daily cron (keeps Supabase awake) and by uptime checks.
+`200 { ok: true, db: "ok", aiPaused: false, intakePaused: false, version: "git-sha" }`. For uptime checks.
+
+### `GET /api/cron/daily` (Vercel cron, `0 4 * * *`)
+Requires `Authorization: Bearer CRON_SECRET` (constant-time compare). Purges sample accounts older than 24 h, then deletes their auth users (best effort). `200 { purged, authUsersDeleted }`. The query also keeps the free Supabase project from pausing.
 
 There is no admin API. Quality and cost numbers come from SQL in Supabase Studio, and the library is built by the local script `scripts/seed-library.ts`.
 
@@ -314,13 +357,13 @@ There is no admin API. Quality and cost numbers come from SQL in Supabase Studio
 Google OAuth provider enabled in Supabase. Redirect URLs for production and Vercel previews (the integration syncs preview URLs). Scopes: `openid email profile` only.
 
 ### Sample accounts (Supabase anonymous auth)
-Anonymous sign-ins enabled. The rate limit is **raised from the default 30/hour per IP to ~300**, because judges may share one network. Turnstile protects the endpoint instead.
+Anonymous sign-ins enabled. Supabase's per-IP limit is **raised from the default 30/hour to ~300**: on Vercel every sign-in arrives from a few egress IPs, so that limit is effectively global. Turnstile plus the app's own per-IP limit (5 per 10 min, see `POST /session/sample`) protect the endpoint instead. Supabase's captcha stays **off**; the app verifies Turnstile itself.
 
 ### Cloudflare Turnstile
 Widget on the sign-in page. The server verifies the token via `POST https://challenges.cloudflare.com/turnstile/v0/siteverify`.
 
 ### YouTube (watch mode, library only)
-Embedded with the **IFrame Player API** (`youtube-nocookie.com`). The client reads `getCurrentTime()` when L or I is pressed. Video is never downloaded or re-hosted.
+Embedded with the **IFrame Player API** (`youtube-nocookie.com`). The client reads `getCurrentTime()` when L or I is pressed. Video is never downloaded or re-hosted. If the embed fails, the player falls back to CS50's official MP3 (`media.fallbackAudioUrl`) in a local `<audio>` element on the same timeline.
 
 ### AssemblyAI (only for `live` and `audio` sources)
 
@@ -339,7 +382,7 @@ Embedded with the **IFrame Player API** (`youtube-nocookie.com`). The client rea
 | Structured output | `generateText({ output: Output.object({ schema }) })`. On `NoObjectGeneratedError`, one repair try, then fail with `FatalError` (no workflow retry) |
 | Decisions (Jev) | `experimental_evaluate({ model: 'typesafe-ai/jev', state, questions })` (`ai` ≥ 7.0.105), used by the leak check |
 | Caching | Anthropic prompt caching set explicitly with `providerOptions.anthropic.cacheControl` on the lecture-context block (only worth it above ~1–2k tokens) |
-| Models by role | `reasoner`/`persona`/`answerer`: `anthropic/claude-sonnet-5.5` · `reasoner-premium` (library seed only): `anthropic/claude-opus-5.5` · `verifier`/`judge`: `openai/gpt-6.1-sol` · `judge` fallback: `google/gemini-3.8-flash` · `vision` (Should): `google/gemini-3.8-flash` · `guard`: `typesafe-ai/jev` · `guard-escalation`: `openai/gpt-6-luna`. See [[Lectheo Tech Stack#Model routing table]] |
+| Models by role | `reasoner`/`persona`/`answerer`: `anthropic/claude-sonnet-5.5` · `reasoner-premium` (library seed only): `anthropic/claude-opus-5.5` · `verifier`/`judge`: `openai/gpt-6.1-sol` · `judge` fallback: `google/gemini-3.8-flash` · `vision` (Should, unused: slides not built): `google/gemini-3.8-flash` · `guard`: `typesafe-ai/jev` · `guard-escalation`: `openai/gpt-6-luna`. See [[Lectheo Tech Stack#Model routing table]] |
 | Errors | 402 `quota_for_entity_exceeded` → set `ai_degraded`, return `503 ai_paused` · 429 → backoff · 5xx → 1 retry, then the role's fallback model |
 
 ### Supabase (provisioned through the Vercel Marketplace)

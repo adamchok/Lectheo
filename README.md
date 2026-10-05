@@ -4,11 +4,15 @@
 
 **Lectheo (LEK-thee-oh)** is an AI study partner for university CS students. It uses your lecture to find what _you personally_ don't understand, then makes you reason with it instead of just recalling it.
 
-1. **Capture** — tap **L** ("I'm lost") or **I** ("Important") while you watch or record a lecture.
+1. **Capture** — tap **L** ("I'm lost") or **I** ("Important") while you watch a lecture.
 2. **Map** — Lectheo builds a concept map of the whole lecture; your markers sit on top.
 3. **Diagnose** — a short, adaptive, confidence-rated diagnostic finds your _confident mistakes_.
-4. **Practice** — _spot the flaw_ and _teach-back_ make you use each idea.
+4. **Practice** — _spot the flaw_, _teach-back_, _transfer problems_ and _Stump the AI_ (beta) make you use each idea.
 5. **Master** — a concept turns green only after two independent correct answers, in two different activity types.
+
+**Try it:** [lectheo.vercel.app](https://lectheo.vercel.app) → **Try the sample account** (no sign-up; a pre-loaded CS50
+student with markers and a diagnostic already taken; deleted after 24 hours). Sign in with Google to add your own
+lectures. Demo video: _TODO link_.
 
 Built for ForgeHacks 2026 (AI + Education). Product docs live in [`docs/`](docs/).
 
@@ -58,13 +62,45 @@ watch test loads YouTube (or the MP3 fallback), so it needs internet. First run:
 
 ## Data and privacy
 
-- **Imported video never leaves your laptop.** Only the transcript is uploaded.
-- Uploaded audio is **deleted after transcription**; the remote transcript is deleted at AssemblyAI.
+- **Imported video never leaves your laptop.** It plays locally; only the transcript is uploaded.
+- Uploaded audio is **deleted after transcription**, and the copy at AssemblyAI is deleted too.
 - Speaker names are stripped from imported transcripts.
 - Deleting a lecture removes its media, transcript, markers and everything derived from it.
-- Sample accounts are deleted after 24 hours.
+- Sample accounts and all their data are deleted after 24 hours.
+- No advertising, no tracking cookies, no analytics.
 
-Data processors: **Supabase** (database, auth, storage), **AssemblyAI** (audio sources only), and through **Vercel AI Gateway**: **Anthropic** (generation, personas), **OpenAI** (verification, grading, leak-check escalation), **Google** (fallbacks), **TypeSafe** (Jev leak check).
+### What we store
+
+| Data | Where | Kept until |
+| --- | --- | --- |
+| Google sign-in: name, email, Google account id (`openid email profile` only) | Supabase Auth, `profiles` | You ask us to delete the account |
+| Courses, lectures, transcript segments | `courses`, `lectures`, `transcript_segments` | You delete the lecture |
+| Uploaded audio | Supabase Storage, `audio` bucket | Transcription finishes |
+| Uploaded transcript files (`.vtt`, `.srt`, `.txt`) | Supabase Storage, `transcripts` bucket | You delete the lecture |
+| Your markers ("lost" / "important") | `markers`, `marker_concepts` | You delete the lecture |
+| Generated concept map and questions | `concepts`, `concept_edges`, `concept_occurrences`, `items`, `item_secrets` | You delete the lecture |
+| Your answers, confidence ratings, practice chats | `diagnostic_sessions`, `diagnostic_responses`, `activities`, `messages`, `attempts` | You delete the lecture |
+| AI call ledger: task, model, token counts, cost (no prompt or answer text) | `llm_calls`, `usage_counters` | Kept for budget accounting |
+| Your IP address, as the key of a counter for the sample-account button | `rate_limits` | Removed once older than 24 hours (cleared when the next sample account is created) |
+
+Mastery is computed from `attempts` on every read; it is never stored separately.
+
+### Who receives data
+
+| Processor | Receives | When |
+| --- | --- | --- |
+| **Supabase** | Everything above (database, auth, storage) | Always |
+| **Vercel** | Requests (hosting) and AI traffic (AI Gateway) | Always |
+| **Anthropic** (via AI Gateway) | Lecture text, your practice answers | Generation, practice personas |
+| **OpenAI** (via AI Gateway) | Lecture text, your practice answers | Verification, grading, leak-check escalation |
+| **Google** (via AI Gateway) | Same as above | Fallback models only |
+| **TypeSafe** (via AI Gateway) | The AI author's reply, plus the scenario and its intended correction (no personal data) | Leak check on Spot the flaw and Transfer replies |
+| **AssemblyAI** | Your audio | Only when you upload audio |
+| **Cloudflare Turnstile** | Browser signals for the bot check | Sample-account button only |
+| **YouTube** | The player script (`www.youtube.com/iframe_api`) and the video embed (`youtube-nocookie.com`) | Watching a library lecture |
+| **CS50** (`cdn.cs50.net`) | A request for the lecture's official MP3 | Only if the YouTube embed fails |
+
+AI providers never receive your name or email.
 
 ## Quality
 
@@ -86,6 +122,10 @@ pnpm --filter @lectheo/scripts eval-judge
 pnpm --filter @lectheo/scripts eval-guard
 ```
 
+## License
+
+Code: [MIT](LICENSE). CS50-derived content (the library fixtures and the eval data built from them) is CC BY-NC-SA 4.0, not MIT; see [NOTICE](NOTICE).
+
 ## Library content
 
-CS50x 2026 by Harvard University, [CC BY-NC-SA 4.0](https://cs50.harvard.edu/x/license/). Adapted by Lectheo (questions and maps generated). Not affiliated with or endorsed by CS50. Generated library content is shared under the same license. Videos are embedded, not re-hosted.
+CS50x 2026 by Harvard University (Fall 2025 lecture recordings), [CC BY-NC-SA 4.0](https://cs50.harvard.edu/x/license/). Adapted by Lectheo (questions and maps generated). Not affiliated with or endorsed by CS50. Generated library content is shared under the same license. Videos are embedded, not re-hosted.

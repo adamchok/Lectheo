@@ -1,22 +1,22 @@
 ---
 title: Lectheo Data Model
-updated: 2026-10-04
-version: v2 (post-review)
+updated: 2026-10-06
+version: v2.1 (as built)
 tags: [lectheo, architecture, database]
-related: ["[[Lectheo Architecture]]", "[[Lectheo API Spec]]", "[[Lectheo Tech Stack]]", "[[Lectheo Product Spec]]"]
+related: ["[[Lectheo Architecture]]", "[[Lectheo API Spec]]", "[[Lectheo Tech Stack]]", "[[Lectheo Product Spec]]", "[[Lectheo Design System]]"]
 ---
 
 # Lectheo Data Model
 
 Part of the architecture set: [[Lectheo Architecture]] · [[Lectheo API Spec]] · **Data Model** · [[Lectheo Tech Stack]]
 
-Postgres (Supabase, provisioned through Vercel), managed with Drizzle migrations.
+Postgres (Supabase, provisioned through Vercel), managed with Drizzle migrations. The executable form is `packages/db/src/schema.ts`; migrations live in `packages/db/migrations/` (`0000_init` → `0004_rate_limits`).
 
 **Conventions**
 - **Primary keys:** `uuid` **v7 generated in the app** (Drizzle `$defaultFn`; Postgres 17 has no built-in v7). The client generates IDs for markers and created resources, and inserts use `ON CONFLICT DO NOTHING`, so retries are safe without an idempotency table.
 - **Times:** timestamps are `timestamptz` (UTC). Times inside a lecture are integer **ms of media time** (position in the recording or video).
 - **JSON:** every `jsonb` column is validated by the same Zod schema the app uses.
-- **Access:** **RLS is enabled on every table with no policies (deny-all)**, and the Supabase Data API is turned off for the `public` schema. Only the Next.js server reads or writes data, using the privileged connection. Authorization happens **in app code**. The browser uses Supabase only for Auth (Google + anonymous) and signed Storage uploads.
+- **Access:** **RLS is enabled on every table with no policies (deny-all)**, and the Supabase Data API is turned off for the `public` schema. Only the Next.js server reads or writes data, using the privileged connection. Authorization happens **in app code**. The browser uses Supabase only for Auth (Google + anonymous) and signed Storage uploads. As defense in depth, the Data API roles (`anon`, `authenticated`) have no table privileges and can't execute the sample functions (`0004`). Every new table enables RLS in its migration (a migrations test fails otherwise).
 - **Server-only data:** answer keys, rubrics, hints and leak keywords live in **separate secret tables or columns** (🔒) that no client response schema includes. A contract test enforces this.
 - **Indexes:** every foreign-key column used for lookups has an index (Postgres doesn't create them automatically).
 
@@ -75,8 +75,8 @@ erDiagram
 | Column | Type | Notes |
 |---|---|---|
 | `id` | uuid PK | |
-| `owner_id` | uuid FK → profiles, **null for library courses** | |
-| `kind` | enum `library`, `personal` | library = readable by everyone, writable by no one at runtime |
+| `owner_id` | uuid FK → profiles ON DELETE CASCADE, **null for library courses** | `CHECK ((kind = 'library') = (owner_id IS NULL))` |
+| `kind` | enum `library`, `personal` | library = readable by everyone, writable by no one at runtime. *(decided 6 Oct 2026, to be built)*: readable by sample (and owner) accounts only, so Google accounts start fresh |
 | `title` | text | e.g. "CS50x 2026" |
 | `attribution` | jsonb null | library license notice: `{source, license, url, adaptedBy}` |
 | `layout` | jsonb null | ELK node positions `{conceptId: {x, y}}` |
@@ -121,7 +121,7 @@ Index: `(course_id, seq)`. The **"one processing lecture per course"** rule is a
 
 Edits never re-segment, so citations stay stable.
 
-**`lecture_assets`** (Should: slides PDF and typed notes)
+**`lecture_assets`** (Should: slides PDF and typed notes). *As built: the table exists, but nothing writes it yet (slides input is not built).*
 
 | Column | Type | Notes |
 |---|---|---|
@@ -276,16 +276,16 @@ Index: `(concept_id, kind, status)`, `(lecture_id)`.
 | `user_id` | uuid FK ON DELETE CASCADE | |
 | `concept_id` | uuid FK ON DELETE CASCADE | |
 | `type` | enum | `spot_flaw`, `teach_back`, `transfer`, `stump` |
-| `item_id` | uuid FK null | flaw / transfer item |
+| `item_id` | uuid FK null ON DELETE CASCADE | flaw / transfer item |
 | `persona` | text null | teach-back persona key |
 | `status` | enum | `active` → `awaiting_retry` → `closed` |
-| `turns_used`, `turn_budget` | int | guarded increment: `… SET turns_used = turns_used + 1 WHERE turns_used < turn_budget RETURNING` |
+| `turns_used`, `turn_budget` | int, budget default 6 | guarded increment: `… SET turns_used = turns_used + 1 WHERE turns_used < turn_budget RETURNING`. `CHECK (turns_used <= turn_budget)` |
 | `hints_used` | int | |
 | `explanation_shown` | bool | marks later attempts as assisted |
 | `rubric_snapshot` 🔒 | jsonb | teach-back: concept key points at start. Flaw/transfer: copied from `item_secrets.rubric` |
 | `created_at` | timestamptz | |
 
-Index: `(user_id, concept_id)`.
+Index: `(user_id, concept_id)`, `(item_id)`.
 
 **`messages`**
 
@@ -322,7 +322,7 @@ Index: `(activity_id, created_at)`.
 | `judge_model` | text null | recorded for consistency analysis |
 | `created_at` | timestamptz | |
 
-Constraints: `UNIQUE (activity_id, try_no)`, `UNIQUE (diagnostic_session_id, item_id)`. Index: `(user_id, concept_id, created_at)`.
+Constraints: `UNIQUE (activity_id, try_no)`, `UNIQUE (diagnostic_session_id, item_id)`. Index: `(user_id, concept_id, created_at)`, `(item_id)`.
 
 ### Platform
 
@@ -334,11 +334,14 @@ Constraints: `UNIQUE (activity_id, try_no)`, `UNIQUE (diagnostic_session_id, ite
 | `user_id` | uuid null | |
 | `lecture_id` | uuid null | |
 | `task`, `role`, `model`, `prompt_version` | text | |
+| `gateway_key` | text default `'prod'` | which AI Gateway key paid: `dev` or `prod`. The governor and quotas sum `prod` rows only, so seeding and evals never pause the app |
 | `input_tokens`, `cached_tokens`, `output_tokens` | int | output includes reasoning tokens |
 | `cost_usd` | numeric(10,6) | from gateway response metadata |
 | `latency_ms` | int | |
 | `outcome` | enum | `ok`, `repaired`, `failed`, `quota_blocked`, `budget_blocked` |
 | `created_at` | timestamptz | Index: `(created_at)` |
+
+No prompt or answer text is stored here; the ledger is tokens, cost and outcome only. `user_id` has no foreign key, so when an account is deleted (`DELETE /me`) its ledger rows stay for budget accounting with a bare id that no longer points at anyone.
 
 **`usage_counters`**: per-user daily quotas.
 
@@ -347,16 +350,27 @@ Constraints: `UNIQUE (activity_id, try_no)`, `UNIQUE (diagnostic_session_id, ite
 | `user_id`, `day`, `metric` | PK | metrics: `lectures`, `reprocess`, `llm_tasks`, `activities` |
 | `count` | int | `INSERT … ON CONFLICT (user_id, day, metric) DO UPDATE SET count = usage_counters.count + 1 RETURNING count` |
 
-**`app_flags`**: single row, `{ai_degraded: bool, intake_paused: bool}`, set by the spend governor (see [[Lectheo Architecture#9.2 Abuse and cost]]).
+**`app_flags`**: single row (`id = 1`, enforced by `CHECK`), columns `ai_degraded`, `intake_paused` (bool) and `updated_at`, set by the spend governor (see [[Lectheo Architecture#9.2 Abuse and cost]]).
+
+**`rate_limits`**: fixed-window request counters (per-IP limit on sample sign-in, `server/rate-limit.ts`).
+
+| Column | Type | Notes |
+|---|---|---|
+| `key`, `window_start` | text, timestamptz | **PK**. `key` names the limit and the client IP |
+| `count` | int | atomic `INSERT … ON CONFLICT DO UPDATE SET count = count + 1 RETURNING count`, so concurrent requests can't both slip under the limit |
+
+Windows older than 24 h are pruned on each sample sign-in.
 
 ---
 
 ## 3. Sample accounts (copy on start)
 
-- **Shared and read-only:** the library course, its lectures, segments, concepts, edges and items.
-- **Seed student** (`profiles.kind = 'seed'`): owns the "lived-in" per-user rows. That means markers on L3–L4, a completed diagnostic on L4 with a confident mistake, and activities and attempts on L3 (mostly green/amber).
+- **Shared and read-only:** the library course, its lectures, segments, concepts, edges and items. Today every account can read them. *(decided 6 Oct 2026, to be built)*: visible to sample accounts only; Google accounts start with no courses at all.
+- **Seed student** (`profiles.kind = 'seed'`): owns the "lived-in" per-user rows, scripted in `packages/db/src/seed/fixtures/student-script.ts`. That means markers on L3–L4, completed diagnostics on L3 and L4 (L4 with a confident mistake), and spot-the-flaw, teach-back and transfer activities with attempts (mostly green/amber). L5 is left unwatched for the judge.
 - **Copy:** "Explore with a sample account" → create an anonymous auth user → `clone_sample(seed_id, new_user_id)`, a SQL function that copies the seed's `markers`, `marker_concepts`, `diagnostic_sessions`, `diagnostic_responses`, `activities`, `messages` and `attempts` with new IDs, in **one transaction** (~0.5 s).
-- **Reset** = delete the user's per-user rows and copy again. **Purge:** a daily cron deletes `sample` profiles older than 24 h (cascades remove their rows and auth users).
+- **Reset** = `reset_sample(user_id)`: delete the user's per-user rows and copy again.
+- **Purge** = `purge_sample_accounts(interval '24 hours')`, which deletes `sample` profiles older than 24 h (cascades remove their rows) and returns their ids so the server can delete the auth users. It runs from the daily cron (`/api/cron/daily`) **and** after every sample sign-in, so no sample outlives ~24 h even though Hobby cron runs only daily.
+- The three functions are defined in `0002_clone_sample` (plpgsql / SQL). `EXECUTE` is revoked from `PUBLIC`, `anon` and `authenticated`, so only the server's database role can call them.
 
 ## 4. Storage layout (Supabase Storage, private buckets)
 
@@ -364,7 +378,7 @@ Constraints: `UNIQUE (activity_id, try_no)`, `UNIQUE (diagnostic_session_id, ite
 |---|---|---|
 | `audio` | `{userId}/{lectureId}` | Types `audio/webm`, `audio/ogg`, `audio/mpeg`, `audio/mp4` (m4a), `audio/wav`. Per-tier size enforced at **signed-URL creation**: sample ≤ 20 MB, Google ≤ 50 MB (bucket max 50 MB). Deleted after transcription |
 | `transcripts` | `{userId}/{lectureId}.{vtt,srt,txt,docx}` | ≤ 2 MB. Kept until the lecture is deleted |
-| `assets` | `{userId}/{lectureId}/slides.pdf` | ≤ 20 MB, ≤ 60 pages (Should) |
+| `assets` | `{userId}/{lectureId}/slides.pdf` | ≤ 20 MB, ≤ 60 pages (Should; bucket exists, not used yet) |
 
 Video files are **never** uploaded: imported video plays from the local file.
 
