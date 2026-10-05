@@ -30,7 +30,7 @@ Part of the architecture set: [[Lectheo Architecture]] · **API Spec** · [[Lect
 | Validation | Zod on every body, query and path param. Every response goes through an **explicit response schema** (allow-list), and a contract test asserts no 🔒 field ever appears. |
 | Safe retries | **No idempotency-key store.** Creating requests carry a **client-generated UUIDv7 `id`**, and the server does `INSERT … ON CONFLICT (id) DO NOTHING RETURNING`, then returns the existing row. State changes are **guarded updates** (`… WHERE status = 'active' RETURNING`). A second call gets `409 invalid_state` or the same result. |
 | Streaming | Teach-back replies use the AI SDK **UI message stream** (SSE). The client uses `useChat` with `prepareSendMessagesRequest`, sending only the newest message. |
-| Authorization | Every handler checks ownership in code. Library content is readable by **sample (and owner) accounts only** and writable by none; for Google accounts it doesn't exist (404), so they get a fresh start ([[Lectheo Product Spec#F0. Accounts, sample account and dashboard — Must|F0.7]]). Any ID belonging to another user returns **404** (no existence leak). Writes to library or other users' resources return **404**; `403` is used only for `sample_account_restricted`. |
+| Authorization | Every handler checks ownership in code. Library content is readable by all and writable by none. *(decided 6 Oct 2026, to be built)*: readable by sample (and owner) accounts only; for Google accounts it won't exist (404), so they get a fresh start ([[Lectheo Product Spec#F0. Accounts, sample account and dashboard — Must|F0.7]]). Any ID belonging to another user returns **404** (no existence leak). Writes to library or other users' resources return **404**; `403` is used only for `sample_account_restricted`. |
 | Limits | 429 uses the standard envelope with `details.resetAt`. |
 
 ### Error envelope
@@ -69,9 +69,10 @@ Part of the architecture set: [[Lectheo Architecture]] · **API Spec** · [[Lect
   /session/sample          POST           start sample account
   /session/sample/reset    POST
   /session/sign-out        POST
-  /me                      GET DELETE     account menu; DELETE = delete account (Google only)
+  /me                      GET            account menu (kind, display name, isSample)
+  /me                      DELETE         delete account, Google only  (to be built)
   /courses                 GET POST
-  /courses/{id}            PATCH DELETE   rename, delete (own courses only)
+  /courses/{id}            PATCH DELETE   rename, delete own course   (to be built)
   /courses/{id}/map        GET            map + mastery + markers
   /courses/{id}/next       GET            recommender
   /lectures                POST           (body has courseId)
@@ -128,7 +129,7 @@ Deletes the account: every course the user owns (cascading to lectures, segments
 
 ### `GET /courses`
 `200 { data: [{ id, title, kind: "library"|"personal", attribution?, lectureCount, mastery: {gray, red, amber, green} }] }`
-Sample accounts: the library course first, then their own. Google accounts: their own courses only, most recently active first. An empty list means first run ([[Lectheo Product Spec#F0. Accounts, sample account and dashboard — Must|F0.8]]).
+As built: library courses first, then the user's own, each in creation order (`kind, createdAt`), for every account. *(decided 6 Oct 2026, to be built)*: Google accounts get their own courses only, most recently active first; an empty list means first run ([[Lectheo Product Spec#F0. Accounts, sample account and dashboard — Must|F0.8]]).
 
 ### `POST /courses`
 `{ id, title(1..120) }` → `201 course`. Sample accounts can create **one** personal course (a second gets `403 sample_account_restricted`). Library courses are read-only, and exist only for sample accounts.
@@ -164,7 +165,9 @@ Joins concepts, edges, layout, this user's markers and **mastery computed on rea
 `moments` are this user's markers on the concept ("▶ 12:41" links). `sources` are where the lecture teaches it ([[Lectheo Product Spec#F2. Concept map — Must|F2.4]]): up to 3, most salient first. `position` is `null` before the layout exists.
 
 ### `GET /courses/{courseId}/next`
-`200 { kind: "processing"|"watch"|"diagnostic"|"activity"|"add_lecture", lectureId?, conceptId?, conceptName?, activityType?, reason, evidence, estimateMinutes, payoff, alsoWorthDoing }`
+**As built:** `200 { kind: "watch"|"diagnostic"|"activity"|"none", lectureId?, conceptId?, conceptName?, activityType?, reason }` (`packages/contracts/src/api/courses.ts`).
+
+**Planned, F0.9–F0.12 *(decided 6 Oct 2026, to be built)*:** `200 { kind: "processing"|"watch"|"diagnostic"|"activity"|"add_lecture", lectureId?, conceptId?, conceptName?, activityType?, reason, evidence, estimateMinutes, payoff, alsoWorthDoing }`
 
 | Field | Meaning |
 |---|---|

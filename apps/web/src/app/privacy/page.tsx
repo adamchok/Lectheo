@@ -7,7 +7,7 @@ const CONTACT = 'adam.c11304@gmail.com'
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy policy" updated="4 October 2026">
+    <LegalPage title="Privacy policy" updated="6 October 2026">
       <p>
         Lectheo is a study tool built for the ForgeHacks 2026 hackathon. This page explains what we
         store, who processes it, and how to delete it. We keep as little as we can.
@@ -32,6 +32,11 @@ export default function PrivacyPage() {
           <strong>Operational data:</strong> request logs (time, route, anonymous request id) and a
           record of AI calls (task, model, token counts, cost) used to keep the service within
           budget.
+        </li>
+        <li>
+          <strong>Your IP address,</strong> only as the key of a counter that limits how often the
+          sample-account button can be used. Counters older than 24 hours are removed when the next
+          sample account is created.
         </li>
       </ul>
 
@@ -67,6 +72,15 @@ export default function PrivacyPage() {
         </li>
         <li>
           <strong>Cloudflare Turnstile</strong> — bot check on the sample-account button.
+        </li>
+        <li>
+          <strong>YouTube</strong> — plays the library lectures. Your browser loads YouTube&apos;s
+          player script and a privacy-enhanced embed (<code>youtube-nocookie.com</code>) when you
+          watch one.
+        </li>
+        <li>
+          <strong>CS50</strong> — if the YouTube embed fails, your browser fetches the
+          lecture&apos;s official audio from <code>cdn.cs50.net</code> instead.
         </li>
       </ul>
 

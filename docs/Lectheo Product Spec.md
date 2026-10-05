@@ -379,6 +379,22 @@ Recorded at submission (6 Oct 2026). Each deviation is deliberate; evidence is i
 | F2.2 | About 1 concept per 3 minutes (min 3, max 20) | The pipeline follows the rule (`packages/domain/src/scale.ts`). The **CS50 library** has 6 concepts per 45-minute window, where the rule gives about 15. | The library curriculum is fixed: the item bank's stable ids, the seed student and the e2e judge path depend on it. Six well-verified concepts per lecture beat fifteen thinner ones for a two-minute judge path. Student-added lectures get the full rule. |
 | F7.1 | Library processed from the official subtitles **and slides** | Built from the official timestamped subtitles only (`scripts/seed-library.ts`). | Slides input is a Should in the decision log (§10). Every concept and item cites subtitle timestamps, so grounding is checkable without slides. |
 
+### Decided 6 Oct 2026, to be built
+
+These requirements are specified above but **not implemented yet**. Until they ship, the product behaves as before (for example, Google accounts still see the CS50 library).
+
+| Req | Item |
+|---|---|
+| F0.4 | Dashboard follows the student's own course |
+| F0.6 | Self-serve *Delete account* (today: email the author) |
+| F0.7 | Rename and delete own courses; CS50 library visible to sample accounts only |
+| F0.8 | First-run screen for new Google accounts |
+| F0.9 | Processing steps on the dashboard |
+| F0.10–F0.12 | Next-step card: why, how long, payoff; *Also worth doing*; no dead end |
+| F1.5 | Teams `.docx` transcripts (today refused with a clear message) |
+| F8.2 | Delete course and delete account (delete lecture is built) |
+| §7 | Phone usability for the app (sidebar sheet, on-screen marker buttons) |
+
 ### Should items: built or cut
 
 | Req | Item | Status |

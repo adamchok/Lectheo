@@ -76,7 +76,7 @@ erDiagram
 |---|---|---|
 | `id` | uuid PK | |
 | `owner_id` | uuid FK → profiles ON DELETE CASCADE, **null for library courses** | `CHECK ((kind = 'library') = (owner_id IS NULL))` |
-| `kind` | enum `library`, `personal` | library = readable by sample (and owner) accounts only, writable by no one at runtime. Google accounts never see it (fresh start) |
+| `kind` | enum `library`, `personal` | library = readable by everyone, writable by no one at runtime. *(decided 6 Oct 2026, to be built)*: readable by sample (and owner) accounts only, so Google accounts start fresh |
 | `title` | text | e.g. "CS50x 2026" |
 | `attribution` | jsonb null | library license notice: `{source, license, url, adaptedBy}` |
 | `layout` | jsonb null | ELK node positions `{conceptId: {x, y}}` |
@@ -365,7 +365,7 @@ Windows older than 24 h are pruned on each sample sign-in.
 
 ## 3. Sample accounts (copy on start)
 
-- **Shared and read-only:** the library course, its lectures, segments, concepts, edges and items. They are visible to sample accounts only; Google accounts start with no courses at all.
+- **Shared and read-only:** the library course, its lectures, segments, concepts, edges and items. Today every account can read them. *(decided 6 Oct 2026, to be built)*: visible to sample accounts only; Google accounts start with no courses at all.
 - **Seed student** (`profiles.kind = 'seed'`): owns the "lived-in" per-user rows, scripted in `packages/db/src/seed/fixtures/student-script.ts`. That means markers on L3–L4, completed diagnostics on L3 and L4 (L4 with a confident mistake), and spot-the-flaw, teach-back and transfer activities with attempts (mostly green/amber). L5 is left unwatched for the judge.
 - **Copy:** "Explore with a sample account" → create an anonymous auth user → `clone_sample(seed_id, new_user_id)`, a SQL function that copies the seed's `markers`, `marker_concepts`, `diagnostic_sessions`, `diagnostic_responses`, `activities`, `messages` and `attempts` with new IDs, in **one transaction** (~0.5 s).
 - **Reset** = `reset_sample(user_id)`: delete the user's per-user rows and copy again.

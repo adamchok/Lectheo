@@ -14,7 +14,7 @@ related:
 
 # Lectheo Landing Copy
 
-The words for the public landing page at `/`. Layout, tokens and section rules are in [[Lectheo Design System#5. Landing page]]; this file is only the copy, in page order. Every claim here is true of the shipped product (checked 6 Oct 2026). If the product changes, change the copy.
+The words for the public landing page at `/`. Layout, tokens and section rules are in [[Lectheo Design System#5. Landing page]]; this file is only the copy, in page order. Claims were checked against the product on 6 Oct 2026. Lines marked *ship when …* describe decided features: leave them out until that feature is live. If the product changes, change the copy.
 
 **Voice:** calm, precise, a little academic. Sentence case. No hype words, no emoji, no exclamation marks. Speak to one student ("you"). Use the product's words: "I'm lost", "Important", "confident mistake", "Spot the flaw", "Teach-back", "Transfer", "Stump the AI", "Mastered".
 
@@ -84,11 +84,11 @@ The words for the public landing page at `/`. Layout, tokens and section rules a
 **Eyebrow:** Diagnosis
 **Title:** The mistakes you're sure about matter most.
 
-**Lead:** Getting something wrong when you guessed is normal. Getting it wrong when you were sure means you'll keep getting it wrong, in the exam too. Lectheo asks for your confidence first, follows up on every sure-but-wrong answer with a second question, and only calls it a confident mistake when it happens twice.
+**Lead:** Getting something wrong when you guessed is normal. Getting it wrong when you were sure means you'll keep getting it wrong, in the exam too. Lectheo asks for your confidence first, follows up on sure-but-wrong answers with a second question on the same idea where it can, and flags a confident mistake when you're sure and wrong.
 
 **Points (three short lines, icon + text):**
 - Confidence before options, so you can't adjust after seeing them.
-- A follow-up on the same idea, so one slip isn't treated as a misconception.
+- A follow-up on the same idea where possible, so one slip isn't treated as a misconception.
 - Every answer explained, with a link to the lecture moment.
 
 **Image:** a diagnostic result card showing "Confident mistake: hash table lookup cost" with its lecture link.
@@ -142,7 +142,7 @@ Three columns:
 2. **Graded against a fixed rubric.**
    Answers are marked against criteria written before you start, by a separate judge, not the character you're talking to. Whatever can be checked exactly, like which sentence holds the flaw, is checked in code.
 3. **Always tied to the lecture.**
-   Every concept, question and piece of feedback links to the moment in the lecture it came from, so you can check it yourself.
+   Every concept, question and piece of feedback links to the moment in the lecture it came from (when the transcript has timestamps), so you can check it yourself.
 
 ---
 
@@ -151,13 +151,15 @@ Three columns:
 **Eyebrow:** Your lectures
 **Title:** Try it on CS50, then bring your own.
 
-**Lead:** The sample account comes with Harvard's CS50x Lectures 3, 4 and 5, ready to watch and practice. A Google account starts empty and is yours alone. Add your own lectures:
+**Lead:** The sample account comes with Harvard's CS50x Lectures 3, 4 and 5, ready to watch and practice. With a Google account you can add your own:
+
+*Ship when the fresh start is live: replace the last sentence with "A Google account starts empty and is yours alone. Add your own lectures:"*
 
 - **A recording with its transcript.** Pick the video or audio file and its `.vtt` or `.srt` captions (Teams, Zoom and Panopto can export them). The video plays from your laptop and is never uploaded.
 - **Audio only.** Upload the audio; Lectheo transcribes it, then deletes the audio.
 - **A transcript.** Paste or upload the text. Without timestamps you can't mark moments, but you still get the map, the diagnosis and practice.
 
-**Caption:** Up to 3 lectures a day, each up to 2 hours.
+**Caption:** With a Google account, up to 3 lectures a day, each up to 2 hours.
 
 *When Teams `.docx` import ships, change the first bullet to "…and its `.vtt`, `.srt` or Teams `.docx` transcript". Until then, don't mention `.docx`.*
 
@@ -195,7 +197,9 @@ An AI study partner for lectures. It finds what you personally don't understand,
 Computer science students who learn from lectures, live or recorded. The sample uses CS50x, and the activities are written for CS concepts.
 
 **Do I need an account to try it?**
-No. **Try the sample account** gives you your own copy of a student partway through CS50x, with Lecture 5 ready to watch. It's deleted after 24 hours. To add your own lectures, continue with Google. Your account starts empty: just your courses, nothing preloaded.
+No. **Try the sample account** gives you your own copy of a student partway through CS50x, with Lecture 5 ready to watch. It's deleted after 24 hours. To add your own lectures, continue with Google.
+
+*Ship when the fresh start is live: add "Your account starts empty: just your courses, nothing preloaded."*
 
 **What happens to my lecture recordings?**
 Video never leaves your laptop; only the transcript is uploaded. Audio you upload is deleted as soon as it's transcribed, and so is the transcription provider's copy. Speaker names are removed from transcripts. Deleting a lecture deletes everything made from it. Details are in the [privacy policy](/privacy).
@@ -231,6 +235,6 @@ Lectheo is built by Adam Chok, a computer science master's student. It started a
 - Product: How it works · Practice · Why Lectheo · FAQ
 - Legal: Privacy · Terms
 - GitHub (https://github.com/adamchok/Lectheo; the repo must be public by launch)
-- Credit (caption): Sample lectures from CS50x 2026 by Harvard University, CC BY-NC-SA 4.0. Not affiliated with or endorsed by CS50.
+- Credit (caption): Sample lectures from CS50x 2026 by Harvard University (Fall 2025 recordings), CC BY-NC-SA 4.0. Not affiliated with or endorsed by CS50.
 - Name note (caption): Lectheo: *lectio*, a reading, + *theōria*, seeing.
-- © 2026 Lectheo
+- © 2026 Adam Chok

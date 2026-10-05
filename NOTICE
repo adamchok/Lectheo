@@ -1,0 +1,14 @@
+Lectheo
+Copyright (c) 2026 Adam Chok
+
+The source code is licensed under the MIT License (see LICENSE), except as noted below.
+
+CS50-derived content is NOT covered by the MIT License. It is adapted from CS50x 2026 by
+Harvard University (Fall 2025 lecture recordings and subtitles) and is licensed under
+CC BY-NC-SA 4.0 (https://creativecommons.org/licenses/by-nc-sa/4.0/, see
+https://cs50.harvard.edu/x/license/). This covers:
+
+- packages/db/src/seed/fixtures/  (library lectures, concepts, questions and answer keys)
+- docs/evals/                     (evaluation data built from the library items)
+
+Adapted by Lectheo (questions and maps generated). Not affiliated with or endorsed by CS50.

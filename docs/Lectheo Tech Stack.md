@@ -55,7 +55,7 @@ Part of the architecture set: [[Lectheo Architecture]] · [[Lectheo API Spec]] �
 | Database, Storage, Auth | **Supabase via the Vercel Marketplace**: Postgres, private Storage, **Google OAuth + anonymous (sample) users** | `@supabase/supabase-js` 2.117 / `@supabase/ssr` 0.12 | One integration, env vars auto-synced, no separate account. **Data API off, RLS deny-all.** |
 | ORM | **Drizzle** + `postgres` (postgres.js) via the transaction pooler (`prepare: false`, `max: 3`) | 0.45.x / 3.4.x | Typed SQL, migrations as code. |
 | Bot protection | **Cloudflare Turnstile** | – | Free. Protects the sample-account button. |
-| Transcript parsing | Own small VTT/SRT/TXT parser (`packages/domain`). Teams `.docx` (Should) *not built* | – | Simple formats. Pure and tested. |
+| Transcript parsing | Own small VTT/SRT/TXT parser (`packages/domain`). Teams `.docx`: Must since 6 Oct, *to be built* | – | Simple formats. Pure and tested. |
 | Validation | **Zod 4** | 4.x | API input, LLM output and JSON columns share schemas. |
 | Client storage | **IndexedDB** (`idb-keyval`) | – | Marker queue and recording pieces survive crashes. |
 | Tests | **Vitest** (domain, contracts, server services on in-process **PGlite**), **Playwright** (judge path, `AI_FAKE=1`, local Supabase), eval **scripts** (CSV output) | Vitest 5 / Playwright 1.63 | Right-sized: unit and DB tests need no Docker. |
@@ -182,7 +182,7 @@ Format: context → decision → consequences. All **Accepted, 4 Oct 2026** (v2 
   - Audio is deleted after transcription, and the remote transcript is deleted at AssemblyAI.
 - **Consequences:**
   - \+ Faster, cheaper, more accurate timing, better privacy.
-  - − Must handle transcript format quirks (VTT/SRT/TXT shipped; Teams .docx was cut).
+  - − Must handle transcript format quirks (VTT/SRT/TXT shipped; Teams .docx is a Must since 6 Oct, to be built).
   - *As built: slide keyterms aren't sent, because slides input (Should) was cut.*
 - **Alternative:** Deepgram Nova-3 (keyterms capped at 500 tokens), if AssemblyAI is down.
 
@@ -272,7 +272,7 @@ Format: context → decision → consequences. All **Accepted, 4 Oct 2026** (v2 
 - **Context:** Judges need instant access to a realistic, non-"demo" dashboard, and several judges may test at once.
 - **Decision:**
   - The button creates an anonymous user (Turnstile-protected, server-side, on click).
-  - `clone_sample()` copies the seed student's per-user rows in one transaction. Library content stays shared and read-only, and is visible to sample accounts only: Google accounts get a fresh start with no library (decided 6 Oct 2026).
+  - `clone_sample()` copies the seed student's per-user rows in one transaction. Library content stays shared and read-only, and today every account can read it. *(decided 6 Oct 2026, to be built)*: visible to sample accounts only, so Google accounts get a fresh start with no library.
   - The account menu shows "Sample account · progress resets when you leave" plus Reset. Accounts older than 24 h are purged daily by cron and after every sample sign-in.
 - **Consequences:**
   - \+ No collisions, a clean start every time, and it looks like the real product.
