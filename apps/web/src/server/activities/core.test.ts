@@ -1,6 +1,7 @@
 import {
   activities,
   attempts,
+  courses,
   diagnosticResponses,
   diagnosticSessions,
   eq,
@@ -94,6 +95,17 @@ describe('POST /activities', () => {
 })
 
 describe('ownership', () => {
+  it("404s an activity on a concept in another user's personal course", async () => {
+    await db
+      .update(courses)
+      .set({ kind: 'personal', ownerId: BOB.userId })
+      .where(eq(courses.id, IDS.course))
+    await expect(createActivity(ALICE, spotFlaw(), db)).rejects.toMatchObject({
+      code: 'not_found',
+    })
+    await expect(createActivity(BOB, spotFlaw(), db)).resolves.toMatchObject({ type: 'spot_flaw' })
+  })
+
   it("returns 404 for every route on another user's activity", async () => {
     const { id } = await createActivity(ALICE, spotFlaw(), db)
     const verdict = { verdict: 'correct' }

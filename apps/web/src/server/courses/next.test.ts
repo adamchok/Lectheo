@@ -20,6 +20,11 @@ beforeEach(async () => {
 const SESSION_2 = '0190a000-0000-7000-8000-0000000b0002'
 
 describe('GET /courses/{id}/next', () => {
+  it('404s another user’s personal course and malformed ids', async () => {
+    await expect(getNextStep(ACTOR_B, ID.P, f.db)).rejects.toMatchObject({ code: 'not_found' })
+    await expect(getNextStep(ACTOR_B, 'nope', f.db)).rejects.toMatchObject({ code: 'not_found' })
+  })
+
   it('goes watch → diagnostic → activity', async () => {
     expect(await getNextStep(ACTOR_A, ID.LIB, f.db)).toEqual({
       kind: 'watch',
