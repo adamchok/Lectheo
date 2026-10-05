@@ -18,7 +18,7 @@ import {
 import type { Route } from 'next'
 import Link from 'next/link'
 import { Fragment } from 'react'
-import { MasteryBadge } from '@/components/mastery-badge'
+import { MasteryBadgeTransition } from '@/components/mastery-badge-transition'
 import { SourceRef } from '@/components/source-ref'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -218,7 +218,7 @@ export function MasteryChange({ start, results, courseId }: MasteryChangeProps) 
         {trail.map((state, i) => (
           <Fragment key={`${state}-${i}`}>
             {i > 0 && <ArrowRight aria-label="then" className="text-muted-foreground size-4" />}
-            <MasteryBadge
+            <MasteryBadgeTransition
               state={state}
               reasons={i === trail.length - 1 ? latest.reasons : undefined}
               confidentMistake={i === trail.length - 1 ? latest.confidentMistake : undefined}

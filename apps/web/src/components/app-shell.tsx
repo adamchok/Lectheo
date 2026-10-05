@@ -77,7 +77,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   className={cn(
                     'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
                     active
-                      ? 'bg-accent text-accent-foreground'
+                      ? 'bg-accent text-accent-foreground inset-shadow-[0_-2px_0_0_var(--primary)]'
                       : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                   )}
                 >

@@ -341,11 +341,15 @@
 @layer base {
   * {
     @apply border-border;
+    /* Resting outline is ring-coloured and 0 wide, so `transition-all` grows the focus ring in place
+       instead of animating it from a 3px currentColor outline. */
+    outline: 0 solid var(--ring);
+    outline-offset: 2px;
   }
   html {
     -webkit-text-size-adjust: 100%;
     text-rendering: optimizeLegibility;
-    scroll-padding-top: 72px;
+    scroll-padding-top: calc(var(--topbar-height) + 16px);
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;

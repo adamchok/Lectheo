@@ -30,7 +30,7 @@ Lectheo is a calm, precise study workspace for CS students. It should feel like 
 ### Colour
 
 - Ground is `background`; text is `foreground`; secondary text is `muted-foreground`. Raise one object at a time on `card`; recess navigation and transcripts on `sunken` (the sidebar uses `sidebar`, an alias of `sunken`).
-- `primary` (ink blue) is the only accent: the primary action (one per view), links, active indicators, the logo mark and focus. Selected rows and active nav use `accent` with `accent-foreground`, not a primary fill.
+- `primary` (ink blue) is the only accent: the primary action (one per view), links, active indicators, the logo mark and focus. Selected rows and active nav use `accent` with `accent-foreground`, not a primary fill. A fill alone is too faint to mark state (about 1.1:1), so on/active controls (toggles, nav links) also carry a 2px `primary` underline (`inset-shadow-[0_-2px_0_0_var(--primary)]`, ≥ 3:1).
 - Separate regions with `border` hairlines. A control's own edge uses `input` (≥ 3:1). Never rely on `border` alone to show where a field or checkbox is.
 - Mastery states are a semantic set: `mastery-*-fg` text on `mastery-*-bg` for badges, `mastery-*-solid` for bars, rings and map nodes. Always pair the colour with its icon (dashed circle, alert circle, ellipsis circle, check circle) and its label. Never use mastery colours for anything else: no green success buttons, no red decoration.
 - Markers: `marker-lost-*` (flag icon, "I'm lost") and `marker-important-*` (star icon, "Important"). Same rule: icon, word and colour together.
@@ -50,7 +50,7 @@ Lectheo is a calm, precise study workspace for CS students. It should feel like 
 - 4px grid (`space-*`). Group with flex or grid `gap`; avoid margins between siblings.
 - App: sidebar (`sidebar-width`, collapsible to `sidebar-rail`) beside the content column. Content is centred up to `content-max` with a gutter of `space-4` below 640px and `space-6` above; vertical page padding `space-6`, `space-8` from 1024px. Detail panels take `panel-width` on the right instead of floating over content.
 - Rhythm in the app: PageHeader, then `space-8`, then sections separated by `space-8`; inside cards `space-4` or `space-5`. Landing sections: `space-16` padding, `space-24` from 1024px.
-- Sticky elements sit below the top bar: `html { scroll-padding-top: 72px }`, and sticky panels offset by `topbar-height` plus `space-4`.
+- Sticky elements sit below the top bar: `html { scroll-padding-top: calc(var(--topbar-height) + 16px) }` (72px), and sticky panels offset by `topbar-height` plus `space-4`.
 - Works from 320px wide and at 400 % zoom with no horizontal page scroll. Wide tables and the comparison grid scroll inside their own container.
 
 ### Shape and depth
@@ -61,7 +61,7 @@ Lectheo is a calm, precise study workspace for CS students. It should feel like 
 
 ### Focus and accessibility
 
-- Focus: a solid 2px `ring` outline with a 2px offset on every focusable element, at full opacity. A component may hide the browser outline only with `outline-hidden`, and only when it draws this ring instead. Never use `outline-none` on its own.
+- Focus: a solid 2px `ring` outline with a 2px offset on every focusable element, at full opacity. It comes from one global `:focus-visible` rule in `globals.css`; components add no focus utilities, so it also survives forced-colors mode (where box-shadow rings are stripped). Where the real control is visually hidden, the visible wrapper takes the outline with `has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring`; menu items pull it inside with `-outline-offset-2`. Never `outline-none` or an unconditional `outline-hidden` on a focusable control.
 - Targets at least `target-min` (24px); icon buttons 32px, buttons 36px (`h-9`), large calls to action 40–44px.
 - Text contrast at least 4.5:1, large text and UI boundaries at least 3:1, in both themes.
 - Single-key shortcuts (L/I while watching, 1–4 confidence, A–E answers) only act while focus is inside their region, never while typing, and are shown with `kbd` hints.
@@ -355,8 +355,8 @@ How, with TanStack Query: in `onMutate` cancel the related queries, snapshot the
 
 - **CSS first.** Tailwind transitions and `tw-animate-css` (already installed) handle hover, press, focus, colour changes, simple enters, spinners and the skeleton pulse at zero JavaScript cost.
 - **Motion** (the `motion` package, `motion/react`, successor to Framer Motion) only where CSS falls short: exit animations (`AnimatePresence`), layout animations (sidebar collapse, list reordering, expanding panels), shared-element indicators (active nav pill, tab underline), number transitions (stat counts) and staggered reveals.
-  - Load it lean: `LazyMotion` with the `domAnimation` features loaded asynchronously, and `m.*` components instead of `motion.*`. The first load pays about 5 kB; the feature bundle follows.
-  - Wrap the app in `<MotionConfig reducedMotion="user">` so every Motion animation respects the OS setting.
+  - Load it lean: `LazyMotion` with the `domAnimation` features loaded asynchronously, and `m.*` components (`import * as m from 'motion/react-m'`) instead of `motion.*`. Measured with Motion 14 and Turbopack, `LazyMotion` + `MotionConfig` alone still cost about 12 kB gzip of first-load JS, so they do not go in the root providers.
+  - Wrap only the subtree that animates in `<MotionProvider>` (`components/motion-provider.tsx`: `LazyMotion` strict + `<MotionConfig reducedMotion="user">`), so routes without motion pay nothing and every Motion animation respects the OS setting. Components that animate wrap themselves, as `MasteryBadgeTransition` does.
   - Client components only. Nothing animates on the landing page above the fold before the hero image paints.
 - **Not used:** GSAP, react-spring, Lottie, scroll-jacking libraries, and View Transitions (still experimental in Next.js; revisit later).
 
@@ -381,7 +381,7 @@ Define the durations and easings as CSS custom properties (`--duration-fast`, �
 - Stagger lists by 30 ms, for at most the first 6 items.
 - Content is visible at rest. Never leave something at `opacity: 0` waiting for a scroll observer; landing sections may fade up 8px once, after the hero has painted.
 - Under `prefers-reduced-motion: reduce`, transitions become instant (the global rule in `globals.css`, plus `MotionConfig` for Motion).
-- **Signature moment:** when a concept's mastery changes after practice, the badge cross-fades to the new state and the map node's ring fills over `duration-emphasis`. This is the one place motion celebrates; everywhere else it only explains.
+- **Signature moment:** when a concept's mastery changes after practice, the badge cross-fades to the new state and the map node's ring fills over `duration-emphasis`. This is the one place motion celebrates; everywhere else it only explains. In code: `<MasteryBadgeTransition>` (`components/mastery-badge-transition.tsx`) where the state can change in place (node panel, result panels); plain `<MasteryBadge>` everywhere else imports no Motion code.
 
 ## 4. App shell
 
@@ -465,10 +465,10 @@ Buttons trigger an action; use exactly one `default` (primary) button per view. 
 
 #### States
 
-- Focus: a solid 2px `ring` outline with 2px offset at full opacity (`outline-hidden` plus ring utilities; never `outline-none` alone).
+- Focus: the global `:focus-visible` outline (solid 2px `ring`, 2px offset, full opacity). The button adds no focus utilities.
 - Hover: the fill shifts one step (`primary` at 90 %, `muted`, `accent`); nothing moves.
-- Pending: a 16px spinning `LoaderCircle` replaces the leading icon, the label becomes the pending verb ("Grading…"), the width stays, `aria-busy="true"`, clicks are ignored. In code: `<Button pending={isPending} pendingLabel="Grading…">Submit</Button>`; both labels share one grid cell so the width holds. Without `pendingLabel` the spinner replaces the leading icon.
-- Disabled: 50 % opacity. When the student needs to know why, keep it focusable with `aria-disabled="true"` and show the reason beside it.
+- Pending: a 16px spinning `LoaderCircle` replaces the leading icon (trailing icons stay), the label becomes the pending verb ("Grading…"), the width stays, `aria-busy="true"`, clicks are ignored. In code: `<Button pending={isPending} pendingLabel="Grading…">Submit</Button>`; both labels share one grid cell so the width holds, and a polite `role="status"` region next to the button announces the pending label. Without `pendingLabel` the width holds only when a leading icon is swapped for the spinner. `pending` is ignored with `asChild`, and a Button with `pendingLabel` can't be an `asChild` target (the status region is its sibling).
+- Disabled: 50 % opacity. When the student needs to know why, keep it focusable with `aria-disabled="true"` and show the reason beside it. Both `disabled` and `aria-disabled="true"` get the 50 % treatment.
 
 #### Consumer provides
 

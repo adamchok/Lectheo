@@ -6,7 +6,7 @@ import type { Route } from 'next'
 import Link from 'next/link'
 import { useEffect, useRef, type ReactNode } from 'react'
 import { useStartPractice } from '@/client/practice'
-import { MasteryBadge } from '@/components/mastery-badge'
+import { MasteryBadgeTransition } from '@/components/mastery-badge-transition'
 import { SourceRef } from '@/components/source-ref'
 import { Button } from '@/components/ui/button'
 import { FEATURES } from '@/lib/features'
@@ -143,7 +143,7 @@ export function NodePanel({ concept, map, onClose }: NodePanelProps) {
       </div>
 
       <div className="space-y-1.5">
-        <MasteryBadge
+        <MasteryBadgeTransition
           state={concept.mastery.state}
           confidentMistake={concept.mastery.confidentMistake}
         />

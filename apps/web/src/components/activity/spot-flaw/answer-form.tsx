@@ -24,9 +24,9 @@ const VERDICTS: readonly { value: Verdict; label: string; icon: LucideIcon }[] =
 
 const choiceClass = (checked: boolean) =>
   cn(
-    'border-border bg-card cursor-pointer border transition-colors outline-hidden',
-    'hover:border-foreground/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-    'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-background',
+    'border-border bg-card cursor-pointer border transition-colors',
+    'hover:border-foreground/30',
+    'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring',
     checked && 'border-primary bg-primary/5 text-primary hover:border-primary',
   )
 

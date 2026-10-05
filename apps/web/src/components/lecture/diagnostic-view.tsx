@@ -84,7 +84,7 @@ function Note({ children }: { children: string }) {
 function FinishedState({ lectureId, courseId }: { lectureId: string; courseId: string }) {
   return (
     <section className="bg-card space-y-4 rounded-xl border p-6 text-center shadow-sm">
-      <Check aria-hidden className="mx-auto size-5 text-emerald-600" />
+      <Check aria-hidden className="text-mastery-green mx-auto size-5" />
       <h2 className="text-xl font-semibold">You&apos;ve finished this diagnostic</h2>
       <p className="text-muted-foreground text-sm">
         You&apos;ve answered every question we have for this lecture. Keep going with practice on
@@ -342,7 +342,7 @@ function OptionList({
     <ul
       ref={list}
       tabIndex={-1}
-      className="space-y-2 rounded-lg outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      className="space-y-2 rounded-lg"
       aria-label="Answer options"
     >
       {options.map((option, i) => {
@@ -357,16 +357,16 @@ function OptionList({
               aria-pressed={chosen === option.id}
               className={cn(
                 'hover:border-primary/50 flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-colors',
-                'outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-default',
+                'disabled:cursor-default',
                 chosen === option.id && !correctOptionId && 'border-primary bg-accent',
-                isCorrect && 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40',
+                isCorrect && 'border-mastery-green-solid bg-mastery-green-bg',
                 isWrongPick && 'border-destructive bg-destructive/10',
               )}
             >
               <KeyHint className="mt-0.5">{LETTERS[i]}</KeyHint>
               <span className="flex-1">{option.text}</span>
               {isCorrect && (
-                <Check aria-label="Correct answer" className="size-5 text-emerald-600" />
+                <Check aria-label="Correct answer" className="text-mastery-green size-5" />
               )}
               {isWrongPick && (
                 <CircleX aria-label="Your answer" className="text-destructive size-5" />
@@ -398,7 +398,7 @@ function FeedbackCard({ feedback, isLast, onNext }: FeedbackCardProps) {
       <p className="flex items-center gap-2 font-semibold">
         <Icon
           aria-hidden
-          className={cn('size-5', feedback.correct ? 'text-emerald-600' : 'text-destructive')}
+          className={cn('size-5', feedback.correct ? 'text-mastery-green' : 'text-destructive')}
         />
         {feedback.correct ? 'Correct' : 'Not quite'} · {FINDING_LABEL[feedback.finding]}
       </p>

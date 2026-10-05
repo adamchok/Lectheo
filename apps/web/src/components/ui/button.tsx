@@ -6,7 +6,7 @@ import { Slot } from "radix-ui"
 import { Spinner } from "@/components/ui/spinner"
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-all outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive data-pending:cursor-progress data-pending:[&>svg:not([data-slot=spinner])]:hidden [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-all disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-disabled:opacity-50 data-pending:cursor-progress [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -42,17 +42,30 @@ const ignoreClick = (event: React.MouseEvent) => event.preventDefault()
 
 const stackItem = "col-start-1 row-start-1 inline-flex items-center gap-[inherit]"
 
+/** A leading icon is an element (not text) followed by more content, e.g. `<Play /> Watch`. */
+function swapLeadingIcon(children: React.ReactNode): React.ReactNode {
+  const items = React.Children.toArray(children)
+  const [first, ...rest] = items
+  const hasLeadingIcon =
+    rest.length > 0 && React.isValidElement(first) && typeof first.type !== "string"
+  return [<Spinner key="spinner" />, ...(hasLeadingIcon ? rest : items)]
+}
+
 /**
- * Pending (Design System §6 Button): a spinner replaces the leading icon, `aria-busy` is set and
- * clicks are ignored while focus stays put. Pass `pendingLabel` ("Grading…") to swap the label;
- * both labels share one grid cell, so the button keeps its width.
+ * Pending (Design System §6 Button): `aria-busy`, clicks ignored, focus stays put, and a spinner
+ * replaces the leading icon (or leads, when there is none). Trailing icons stay.
+ * - Pass `pendingLabel` ("Grading…") to swap the label: both labels share one grid cell, so the
+ *   width holds, and a polite status region announces the label. That region is a sibling of the
+ *   button, so don't use `pendingLabel` on a Button that is itself an `asChild` target.
+ * - Without `pendingLabel` the width holds only when there is a leading icon to replace.
+ * - Ignored with `asChild` (the child, usually a link, owns its content).
  */
 function Button({
   className,
   variant = "default",
   size = "default",
   asChild = false,
-  pending = false,
+  pending: pendingProp = false,
   pendingLabel,
   onClick,
   children,
@@ -64,28 +77,24 @@ function Button({
     pendingLabel?: React.ReactNode
   }) {
   const Comp = asChild ? Slot.Root : "button"
+  const pending = pendingProp && !asChild
+  const hasPendingLabel = !asChild && pendingLabel !== undefined
 
   let content = children
-  if (!asChild && pendingLabel !== undefined) {
+  if (hasPendingLabel) {
     content = (
       <span className="grid gap-[inherit]">
         <span className={cn(stackItem, pending && "invisible")}>{children}</span>
         <span className={cn(stackItem, !pending && "invisible")}>
-          <Spinner />
-          {pendingLabel}
+          {swapLeadingIcon(pendingLabel)}
         </span>
       </span>
     )
-  } else if (!asChild && pending) {
-    content = (
-      <>
-        <Spinner />
-        {children}
-      </>
-    )
+  } else if (pending) {
+    content = swapLeadingIcon(children)
   }
 
-  return (
+  const button = (
     <Comp
       data-slot="button"
       data-variant={variant}
@@ -98,6 +107,16 @@ function Button({
     >
       {content}
     </Comp>
+  )
+
+  if (!hasPendingLabel) return button
+  return (
+    <>
+      {button}
+      <span role="status" className="sr-only">
+        {pending ? pendingLabel : null}
+      </span>
+    </>
   )
 }
 

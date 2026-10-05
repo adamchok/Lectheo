@@ -8,6 +8,8 @@ const loadFeatures = () => import('@/lib/motion-features').then((mod) => mod.def
 /**
  * Motion setup (Design System §3 Motion): `domAnimation` loads asynchronously, `strict` rejects the
  * heavy `motion.*` components (use `m.*`), and every animation follows the OS reduced-motion setting.
+ * Wrap only the subtree that animates: even this lean setup is ~12 kB gzip, so it must not sit in
+ * the root providers where every route would pay for it.
  */
 export function MotionProvider({ children }: { children: ReactNode }) {
   return (

@@ -1,9 +1,7 @@
 'use client'
 
 import type { MasteryState } from '@lectheo/contracts'
-import { AnimatePresence, m } from 'motion/react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { duration, ease } from '@/lib/motion'
 import { cn } from '@/lib/utils'
 import { MASTERY_META } from './mastery-meta'
 
@@ -36,6 +34,7 @@ export function MasteryBadge({
         size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-2.5 py-1 text-[0.8125rem]',
         meta.badgeClass,
         hasReasons && 'cursor-help',
+        className,
       )}
       tabIndex={hasReasons ? 0 : undefined}
     >
@@ -52,32 +51,18 @@ export function MasteryBadge({
     </span>
   )
 
-  // Signature moment (Design System §3 Motion): a state change cross-fades over duration-emphasis.
-  // `initial={false}` keeps the first render static.
+  if (!hasReasons) return badge
+
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      <m.span
-        key={`${state}:${confidentMistake}`}
-        className={cn('inline-flex shrink-0', className)}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1, transition: { duration: duration.emphasis * 0.6, ease: ease.out } }}
-        exit={{ opacity: 0, transition: { duration: duration.emphasis * 0.4, ease: ease.in } }}
-      >
-        {hasReasons ? (
-          <Tooltip>
-            <TooltipTrigger asChild>{badge}</TooltipTrigger>
-            <TooltipContent className="max-w-xs">
-              <ul className="space-y-0.5">
-                {reasons!.map((reason) => (
-                  <li key={reason}>{reason}</li>
-                ))}
-              </ul>
-            </TooltipContent>
-          </Tooltip>
-        ) : (
-          badge
-        )}
-      </m.span>
-    </AnimatePresence>
+    <Tooltip>
+      <TooltipTrigger asChild>{badge}</TooltipTrigger>
+      <TooltipContent className="max-w-xs">
+        <ul className="space-y-0.5">
+          {reasons!.map((reason) => (
+            <li key={reason}>{reason}</li>
+          ))}
+        </ul>
+      </TooltipContent>
+    </Tooltip>
   )
 }

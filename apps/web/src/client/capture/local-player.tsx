@@ -137,7 +137,7 @@ function RepickMedia({
         <Button
           asChild
           variant="outline"
-          className="has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-background"
+          className="has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring"
         >
           <label className="cursor-pointer">
             {problem ? 'Choose another file' : 'Choose file'}
