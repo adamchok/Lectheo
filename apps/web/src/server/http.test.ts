@@ -141,4 +141,34 @@ describe('route()', () => {
     expect(line).toMatchObject({ userId: ACTOR.userId, route: 'POST /api/v1/me', status: 204 })
     expect(typeof line.latencyMs).toBe('number')
   })
+
+  it('never logs SQL params from a failed query (student text, transcripts, answer keys)', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    // Shape of drizzle-orm's DrizzleQueryError: `name` stays "Error"; the message embeds the
+    // query and its params.
+    const cause = new Error('duplicate key value violates unique constraint "attempts_pkey"')
+    const failed = new Error(
+      'Failed query: insert into "attempts" ... params: SECRET-STUDENT-ANSWER',
+      {
+        cause,
+      },
+    )
+    const handler = route({ auth: 'required', status: 204 }, async () => {
+      throw failed
+    })
+    const res = await handler(post(''), noParams)
+    expect(res.status).toBe(500)
+    const line = String(log.mock.calls[0]?.[0])
+    expect(line).not.toContain('SECRET-STUDENT-ANSWER')
+    expect(JSON.parse(line).error).toContain('duplicate key value')
+  })
+
+  it('logs its own message for other errors that carry a cause', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const handler = route({ auth: 'required', status: 204 }, async () => {
+      throw new Error('storage upload failed', { cause: new Error('socket hang up') })
+    })
+    await handler(post(''), noParams)
+    expect(JSON.parse(String(log.mock.calls[0]?.[0])).error).toBe('Error: storage upload failed')
+  })
 })

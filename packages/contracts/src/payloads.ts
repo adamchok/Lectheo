@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { SourceRef } from './common'
 
 /**
  * Shapes of jsonb columns (Data Model §2). Every jsonb column is validated with these.
@@ -156,6 +157,8 @@ export const AttemptGrading = z.object({
   guidingQuestion: z.string().nullable().optional(),
   /** Stump only. */
   stump: StumpResult.optional(),
+  /** The try's own grounding (e.g. stump referee citations), so a replay returns the same links. */
+  sources: z.array(SourceRef).optional(),
 })
 export type AttemptGrading = z.infer<typeof AttemptGrading>
 

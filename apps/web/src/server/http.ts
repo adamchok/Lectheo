@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { v7 as uuidv7 } from 'uuid'
 import { z } from 'zod'
 import { requireActor, type Actor } from './auth'
-import { ApiError } from './errors'
+import { ApiError, safeErrorMessage } from './errors'
 
 export { ApiError, invalidState, notFound } from './errors'
 
@@ -90,7 +90,7 @@ export function route<
       status: response.status,
       latencyMs: Math.round(performance.now() - started),
       ...(failure instanceof ApiError ? { code: failure.code } : {}),
-      ...(failure && !(failure instanceof ApiError) ? { error: describe(failure) } : {}),
+      ...(failure && !(failure instanceof ApiError) ? { error: safeErrorMessage(failure) } : {}),
     })
     return response
   }
@@ -150,10 +150,6 @@ export function errorResponse(err: unknown, requestId: string): Response {
     status: apiError.status,
     headers: { 'x-request-id': requestId },
   })
-}
-
-function describe(err: unknown): string {
-  return err instanceof Error ? `${err.name}: ${err.message}` : String(err)
 }
 
 function logRequest(line: Record<string, unknown>): void {

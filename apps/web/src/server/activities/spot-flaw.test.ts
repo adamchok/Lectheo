@@ -10,10 +10,34 @@ import { ALICE, IDS, newId, seedFixture } from './test-fixture'
 
 vi.mock('server-only', () => ({}))
 
+/** Real runTask (AI_FAKE=1); a test can patch the correction judge's fake per-criterion score. */
+const ai = vi.hoisted(() => ({ judgeScore: null as number | null }))
+vi.mock('@lectheo/ai', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('@lectheo/ai')>()
+  return {
+    ...mod,
+    runTask: (task: { name: string; fake: (i: never) => unknown }, input: never, ctx: never) => {
+      const score = task.name === 'judge-correction' ? ai.judgeScore : null
+      const patched =
+        score === null
+          ? task
+          : {
+              ...task,
+              fake: (i: never) => {
+                const out = task.fake(i) as { criteria: { score: number }[] }
+                return { ...out, criteria: out.criteria.map((c) => ({ ...c, score })) }
+              },
+            }
+      return mod.runTask(patched as never, input, ctx)
+    },
+  }
+})
+
 let db: DbLike
 
 beforeEach(async () => {
   db = await seedFixture()
+  ai.judgeScore = null
   vi.spyOn(console, 'log').mockImplementation(() => {})
 })
 
@@ -59,6 +83,17 @@ describe('spot_flaw handler', () => {
     const missed = await submitActivity(ALICE, id, { verdict: 'correct' }, db)
     expect(missed.final).toBe(true)
     expect(JSON.stringify(missed.rubric)).toContain(rubricLabel)
+  })
+
+  it('a partial correction (judge ran, not final) shows no rubric label before the reveal', async () => {
+    ai.judgeScore = 0
+    const { id } = await start()
+    const body = { verdict: 'flawed', flawSentenceIdx: 2, correction: 'They can happen.' }
+    const res = await submitActivity(ALICE, id, body, db)
+    expect(await judgeCalls()).toBe(1)
+    expect(res).toMatchObject({ final: false, outcome: 'partial' })
+    expect(res.criteria).toEqual([{ id: 'correction', label: 'Criterion 1', score: 0, max: 2 }])
+    expect(JSON.stringify(res)).not.toContain('Correction is right')
   })
 
   it('a wrong verdict on a flawed item shows only the generic correction row', async () => {

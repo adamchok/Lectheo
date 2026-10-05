@@ -1,10 +1,11 @@
-import { uuidv7 } from '@lectheo/db'
+import { lectures, uuidv7 } from '@lectheo/db'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ACTOR_A, ACTOR_B, ID } from '../courses/test-fixtures'
 import type { DbLike } from '../db'
 import { claimLecture } from './claim'
 import { extractConceptsStep, validateGraphStep } from './graph'
 import { draftItemsStep, verifyItemsStep } from './items'
+import { runStep } from './state'
 import { addLecture, createPipelineFixture, rows, type PipelineFixture } from './test-fixture'
 import { processLecture } from './workflow'
 
@@ -224,5 +225,24 @@ describe('claim (POST /process)', () => {
     await expect(
       claimLecture(ACTOR_A, f.lectureId, 'submitTranscription', f.db),
     ).rejects.toMatchObject({ code: 'invalid_state' })
+  })
+})
+
+describe('runStep errors', () => {
+  it('never re-throws a failed query with its params (the workflow runtime logs it)', async () => {
+    const secret = 'SECRET-TRANSCRIPT-LINE'
+    // A real DrizzleQueryError: a duplicate lecture id, with the secret among the params.
+    const failing = () =>
+      f.db.insert(lectures).values({
+        id: f.lectureId,
+        courseId: ID.P,
+        title: secret,
+        seq: 9,
+        source: 'transcript',
+      })
+    const thrown = await runStep(f.db, f.lectureId, 'parseTranscript', failing).catch((e) => e)
+    expect(thrown).toBeInstanceOf(Error)
+    expect(String(thrown.message)).not.toContain(secret)
+    expect(String(thrown.message)).toContain('duplicate key')
   })
 })
