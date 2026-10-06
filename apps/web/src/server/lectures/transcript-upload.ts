@@ -8,6 +8,7 @@ import { NOT_TEAMS_DOCX, parseDocxTranscript } from '../docx'
 import { ApiError, invalidState } from '../errors'
 import { loadLectureForWrite } from '../ownership'
 import { MEDIA_LIMITS, tierOf, type Tier } from '../quota'
+import { takeRateLimit, TRANSCRIPT_UPLOAD_LIMIT } from '../rate-limit'
 
 /*
  * POST /lectures/{id}/transcript (API Spec §5, F1.5, F1.7). Parsed at upload time: segments,
@@ -55,6 +56,13 @@ const tooLarge = (details: Record<string, unknown>): ApiError =>
     maxBytes: MAX_TRANSCRIPT_BYTES,
     ...details,
   })
+
+/** Counts one upload for the actor; 429 `rate_limited` past the limit. Call before the body. */
+export async function takeTranscriptUpload(actor: Actor, db: DbLike = appDb()): Promise<void> {
+  if (!(await takeRateLimit(db, `transcript:${actor.userId}`, TRANSCRIPT_UPLOAD_LIMIT))) {
+    throw new ApiError('rate_limited')
+  }
+}
 
 export async function uploadTranscript(
   actor: Actor,

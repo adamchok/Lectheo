@@ -2,7 +2,13 @@ import { asc, eq, lectures, transcriptSegments } from '@lectheo/db'
 import { strToU8, zipSync } from 'fflate'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ACTOR_A, ACTOR_B, ACTOR_S, createFixture, type Fixture, ID } from '../courses/test-fixtures'
-import { readTranscriptRequest, type StoreTranscript, uploadTranscript } from './transcript-upload'
+import { TRANSCRIPT_UPLOAD_LIMIT } from '../rate-limit'
+import {
+  readTranscriptRequest,
+  type StoreTranscript,
+  takeTranscriptUpload,
+  uploadTranscript,
+} from './transcript-upload'
 
 vi.mock('server-only', () => ({}))
 
@@ -175,6 +181,19 @@ describe('POST /lectures/{id}/transcript', () => {
       code: 'invalid_state',
       status: 409,
     })
+  })
+})
+
+describe('takeTranscriptUpload', () => {
+  it('allows the per-user limit, then 429s that user only', async () => {
+    for (let i = 0; i < TRANSCRIPT_UPLOAD_LIMIT.limit; i++) {
+      await takeTranscriptUpload(ACTOR_A, f.db)
+    }
+    await expect(takeTranscriptUpload(ACTOR_A, f.db)).rejects.toMatchObject({
+      code: 'rate_limited',
+      status: 429,
+    })
+    await expect(takeTranscriptUpload(ACTOR_B, f.db)).resolves.toBeUndefined()
   })
 })
 

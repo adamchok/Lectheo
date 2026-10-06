@@ -212,7 +212,7 @@ Library media also carries `startMs`/`endMs` (the core window) and `fallbackAudi
 ### `POST /lectures/{id}/transcript` (sources `import`, `transcript`)
 `multipart/form-data`: one file `.vtt` | `.srt` | `.txt` (≤ 2 MB), `.docx` (Teams format, ≤ 2 MB; a `.docx` that isn't a Teams transcript → `422`), **or** JSON `{ text }`.
 The server parses it, **strips speaker names**, stores segments, and sets `hasTimestamps`. Size is capped in tokens by tier (sample ≈ 20 min of speech, Google ≈ 2 h).
-→ `201 { segments: n, hasTimestamps: true, durationMs }` · `422 unprocessable_input`.
+→ `201 { segments: n, hasTimestamps: true, durationMs }` · `422 unprocessable_input` · `429 rate_limited` (10 uploads per user per 10 minutes, counted before the body is read).
 
 ### `GET /lectures/{id}/transcript?fromMs=&toMs=`
 `200 { segments: [{ idx, startMs, endMs, text, edited }] }`

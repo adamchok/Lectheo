@@ -456,7 +456,7 @@ Signed-in pages share one layout (`app/(app)/layout.tsx`) with `error.tsx` and `
 ### 9.2 Abuse and cost
 | Layer | Control |
 |---|---|
-| Bots | Turnstile on the sample button. Per-IP limit (5 / 10 min, `rate_limits`). Sign-in only on click. Vercel DDoS protection |
+| Bots | Turnstile on the sample button. Per-IP limit (5 / 10 min, `rate_limits`). Sign-in only on click. Per-user transcript upload limit (10 / 10 min). Vercel DDoS protection |
 | Browser hardening | Enforced CSP `frame-ancestors 'none'; object-src 'none'; base-uri 'self'`, plus a full CSP in report-only mode (Supabase, Turnstile and YouTube origins) until it runs clean |
 | Per-user quotas (daily) | Lectures: sample 1 (≤ 20 min / 20 MB), Google 3 (≤ 2 h / 50 MB). Re-processing: 2. LLM tasks: 60. Activities: 30 |
 | Inputs | Upload size enforced when the signed URL is created. Transcripts capped in tokens by tier. Messages ≤ 2,000 chars. 1 slides PDF ≤ 20 MB / 60 pages. Duration measured server-side and truncated to the tier limit |
