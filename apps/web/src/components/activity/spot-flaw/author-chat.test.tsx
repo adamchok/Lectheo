@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import type { MarkerKind } from '@lectheo/contracts'
-import { act } from 'react'
+import { act, useRef } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useMarkerHotkeys } from '@/client/capture/use-marker-hotkeys'
@@ -18,9 +18,19 @@ interface HarnessProps {
 }
 
 function Harness({ onAsk, onMarker, turnsLeft = 6 }: HarnessProps) {
-  useMarkerHotkeys(onMarker)
+  // Worst case: the chat sits inside the region the marker hotkeys listen on.
+  const scope = useRef<HTMLDivElement>(null)
+  useMarkerHotkeys(onMarker, { scope })
   return (
-    <AuthorChat messages={[]} turnsLeft={turnsLeft} turnBudget={6} onAsk={onAsk} pending={false} />
+    <div ref={scope}>
+      <AuthorChat
+        messages={[]}
+        turnsLeft={turnsLeft}
+        turnBudget={6}
+        onAsk={onAsk}
+        pending={false}
+      />
+    </div>
   )
 }
 
@@ -76,7 +86,7 @@ describe('AuthorChat', () => {
     expect(onMarker).not.toHaveBeenCalled()
   })
 
-  it('restores the draft when asking fails, and disables input with no turns left', async () => {
+  it('restores the draft when asking fails, and makes the input read-only with no turns left', async () => {
     onAsk.mockRejectedValueOnce(new Error('boom'))
     act(() => root.render(<Harness onAsk={onAsk} onMarker={onMarker} />))
     type('Is 3 right?')
@@ -84,7 +94,9 @@ describe('AuthorChat', () => {
     expect(input().value).toBe('Is 3 right?')
 
     act(() => root.render(<Harness onAsk={onAsk} onMarker={onMarker} turnsLeft={0} />))
-    expect(input().disabled).toBe(true)
+    // Read-only, not disabled: a disabled focused field would drop focus to <body>.
+    expect(input().readOnly).toBe(true)
+    expect(input().getAttribute('aria-disabled')).toBe('true')
     expect(container.textContent).toContain('No questions left')
   })
 })

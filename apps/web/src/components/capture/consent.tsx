@@ -3,6 +3,7 @@
 import { useState, useSyncExternalStore } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
+import { RequiredMark } from './form-parts'
 
 const CONSENT_KEY = 'lectheo:capture-consent'
 
@@ -47,12 +48,13 @@ export function ConsentCheckbox({ consent }: { consent: Consent }) {
     <div className="flex items-start gap-3 rounded-lg border p-4">
       <Checkbox
         id="capture-consent"
+        required
         checked={consent.given}
         onCheckedChange={(value) => consent.set(value === true)}
         className="mt-0.5"
       />
       <Label htmlFor="capture-consent" className="leading-snug font-normal">
-        I have permission to record or use this lecture.
+        I have permission to record or use this lecture. <RequiredMark />
       </Label>
     </div>
   )

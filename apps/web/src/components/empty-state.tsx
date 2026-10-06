@@ -7,10 +7,20 @@ export interface EmptyStateProps {
   title: ReactNode
   description?: ReactNode
   action?: ReactNode
+  /** The whole page is empty (not found): the title is its h1. */
+  pageTitle?: boolean
   className?: string
 }
 
-export function EmptyState({ icon: Icon, title, description, action, className }: EmptyStateProps) {
+export function EmptyState({
+  icon: Icon,
+  title,
+  description,
+  action,
+  pageTitle = false,
+  className,
+}: EmptyStateProps) {
+  const Title = pageTitle ? 'h1' : 'p'
   return (
     <div
       className={cn(
@@ -24,7 +34,7 @@ export function EmptyState({ icon: Icon, title, description, action, className }
         </span>
       )}
       <div className="max-w-sm space-y-1">
-        <p className="font-medium">{title}</p>
+        <Title className="font-medium">{title}</Title>
         {description && <p className="text-muted-foreground text-sm text-pretty">{description}</p>}
       </div>
       {action && <div className="pt-1">{action}</div>}

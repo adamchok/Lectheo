@@ -28,7 +28,7 @@ async function spotFlawWrongThenRight(page: Page): Promise<void> {
   const submit = page.getByRole('button', { name: 'Submit' })
 
   if (key.hasFlaw) {
-    await page.getByRole('radio', { name: 'Correct' }).check({ force: true })
+    await page.getByRole('radio', { name: 'No flaw' }).check({ force: true })
   } else {
     await page.getByRole('radio', { name: 'Flawed' }).check({ force: true })
     await page.getByRole('radio', { name: 'Sentence 1' }).check({ force: true })
@@ -47,7 +47,7 @@ async function spotFlawWrongThenRight(page: Page): Promise<void> {
       .getByRole('textbox', { name: /what should it say instead/i })
       .fill('The pointer holds an address; dereferencing it reaches the value stored there.')
   } else {
-    await page.getByRole('radio', { name: 'Correct' }).check({ force: true })
+    await page.getByRole('radio', { name: 'No flaw' }).check({ force: true })
   }
   await submit.click()
   await expect(result.getByText(/try 2 of 2/i)).toBeVisible()

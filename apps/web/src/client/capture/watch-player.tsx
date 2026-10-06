@@ -179,6 +179,14 @@ function YouTubePlayer({
 
 function AudioPlayer({ src, startMs, endMs, events }: PlayerProps & { src: string }) {
   const startApplied = useRef(false)
+  // Reaching endMs pauses (timeupdate) and may also fire the native `ended`: report it once per
+  // playthrough.
+  const ended = useRef(false)
+  const end = () => {
+    if (ended.current) return
+    ended.current = true
+    events.current.onEnded()
+  }
 
   useEffect(() => {
     const unready = () => events.current.onReady(null)
@@ -186,13 +194,16 @@ function AudioPlayer({ src, startMs, endMs, events }: PlayerProps & { src: strin
   }, [events])
 
   return (
-    <div className={`${frameClass} flex flex-col items-center justify-center gap-4 p-6 text-center`}>
+    <div
+      className={`${frameClass} flex flex-col items-center justify-center gap-4 p-6 text-center`}
+    >
       <Headphones aria-hidden className="text-muted-foreground size-5" />
       <p className="text-muted-foreground max-w-sm text-sm">
         The video can&apos;t play here, so here&apos;s the official lecture audio on the same
         timeline. Markers work the same way.
       </p>
       <audio
+        aria-label="Lecture audio"
         controls
         preload="metadata"
         src={src}
@@ -212,15 +223,18 @@ function AudioPlayer({ src, startMs, endMs, events }: PlayerProps & { src: strin
             pause: () => el.pause(),
           })
         }}
-        onPlay={() => events.current.onPlayingChange(true)}
+        onPlay={() => {
+          ended.current = false
+          events.current.onPlayingChange(true)
+        }}
         onPause={() => events.current.onPlayingChange(false)}
         onTimeUpdate={(e) => {
           if (endMs !== null && e.currentTarget.currentTime * 1000 >= endMs) {
             e.currentTarget.pause()
-            events.current.onEnded()
+            end()
           }
         }}
-        onEnded={() => events.current.onEnded()}
+        onEnded={end}
       />
     </div>
   )

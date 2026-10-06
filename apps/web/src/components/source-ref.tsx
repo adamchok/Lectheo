@@ -4,7 +4,7 @@ import type { SourceRef as SourceRefData } from '@lectheo/contracts'
 import { Play } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
-import { formatTimestamp, formatTimestampLong } from '@/client/format'
+import { formatTimestamp } from '@/client/format'
 import { cn } from '@/lib/utils'
 import { usePlayer } from './player-context'
 
@@ -27,11 +27,13 @@ const baseClass =
 export function SourceRef({ source, onSeek, compact = false, className }: SourceRefProps) {
   const player = usePlayer()
   const seek = onSeek ?? player.seek
-  const label = `${seek ? 'Play from' : 'Open transcript at'} ${formatTimestampLong(source.startMs)}`
+  // WCAG 2.5.3: the accessible name contains the visible "12:41" (no aria-label override).
+  const verb = seek ? 'Play from ' : 'Open transcript at '
 
   const content = (
     <>
       <Play aria-hidden className="text-primary size-3.5 shrink-0 translate-y-px fill-current" />
+      <span className="sr-only">{verb}</span>
       <span className="text-primary font-mono text-[0.8125rem] font-medium tabular-nums">
         {formatTimestamp(source.startMs)}
       </span>
@@ -52,7 +54,6 @@ export function SourceRef({ source, onSeek, compact = false, className }: Source
     return (
       <button
         type="button"
-        aria-label={`${label}: ${source.excerpt}`}
         className={cn(baseClass, className)}
         onClick={() => seek(source.startMs)}
       >
@@ -64,12 +65,7 @@ export function SourceRef({ source, onSeek, compact = false, className }: Source
   if (player.openTranscript) {
     const open = player.openTranscript
     return (
-      <button
-        type="button"
-        aria-label={`${label}: ${source.excerpt}`}
-        className={cn(baseClass, className)}
-        onClick={() => open(source)}
-      >
+      <button type="button" className={cn(baseClass, className)} onClick={() => open(source)}>
         {content}
       </button>
     )
@@ -77,7 +73,7 @@ export function SourceRef({ source, onSeek, compact = false, className }: Source
 
   const href = `/lectures/${source.lectureId}?t=${source.startMs}#transcript` as Route
   return (
-    <Link href={href} aria-label={`${label}: ${source.excerpt}`} className={cn(baseClass, className)}>
+    <Link href={href} className={cn(baseClass, className)}>
       {content}
     </Link>
   )

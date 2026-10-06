@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import type { MarkerKind } from '@lectheo/contracts'
-import { act } from 'react'
+import { act, useRef } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useMarkerHotkeys } from './use-marker-hotkeys'
@@ -11,21 +11,27 @@ declare global {
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 function Harness({ onMarker, enabled }: { onMarker: (k: MarkerKind) => void; enabled?: boolean }) {
-  useMarkerHotkeys(onMarker, { enabled })
+  const scope = useRef<HTMLDivElement>(null)
+  useMarkerHotkeys(onMarker, { scope, enabled })
   return (
-    <div>
-      <input aria-label="text" />
-      <textarea aria-label="notes" />
-      <div aria-label="editor" contentEditable suppressContentEditableWarning />
-      <button type="button">Play</button>
-    </div>
+    <>
+      <div ref={scope}>
+        <input aria-label="text" />
+        <textarea aria-label="notes" />
+        <div aria-label="editor" contentEditable suppressContentEditableWarning />
+        <button type="button">Play</button>
+      </div>
+      <button type="button">Outside</button>
+    </>
   )
 }
 
-function press(key: string, init: KeyboardEventInit = {}, target: EventTarget = window) {
+function press(key: string, init: KeyboardEventInit = {}, target?: EventTarget) {
   const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init })
+  // Default: a button inside the watch region (the hook listens on the region).
+  const el = target ?? document.querySelector('button')!
   act(() => {
-    target.dispatchEvent(event)
+    el.dispatchEvent(event)
   })
   return event
 }
@@ -81,6 +87,20 @@ describe('useMarkerHotkeys', () => {
     const button = container.querySelector('button')!
     button.focus()
     press('l', {}, button)
+    expect(onMarker).toHaveBeenCalledWith('lost')
+  })
+
+  it('does nothing while another control outside the watch region has focus', () => {
+    mount()
+    const outside = [...container.querySelectorAll('button')].at(-1)!
+    outside.focus()
+    press('i', {}, outside)
+    expect(onMarker).not.toHaveBeenCalled()
+  })
+
+  it('works while nothing is focused yet (body), as right after navigating to the page', () => {
+    mount()
+    press('l', {}, document.body)
     expect(onMarker).toHaveBeenCalledWith('lost')
   })
 

@@ -3,10 +3,11 @@
 import { CircleCheck, SearchX, type LucideIcon } from 'lucide-react'
 import type { FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
+import { CharCount } from '../shared'
 import { CORRECTION_MAX, pickVerdict, submitBlocker, type Answer, type Verdict } from './logic'
-import { Spinner } from '@/components/ui/spinner'
 
 export interface AnswerFormProps {
   answer: Answer
@@ -19,7 +20,8 @@ export interface AnswerFormProps {
 
 const VERDICTS: readonly { value: Verdict; label: string; icon: LucideIcon }[] = [
   { value: 'flawed', label: 'Flawed', icon: SearchX },
-  { value: 'correct', label: 'Correct', icon: CircleCheck },
+  // "No flaw", not "Correct": that word is the score label of a graded try.
+  { value: 'correct', label: 'No flaw', icon: CircleCheck },
 ]
 
 const choiceClass = (checked: boolean) =>
@@ -47,12 +49,12 @@ export function AnswerForm({
 
   return (
     <form onSubmit={submit} className="space-y-5" aria-labelledby="answer-title">
-      <h3 id="answer-title" tabIndex={-1} className="font-medium outline-none">
+      <h3 id="answer-title" tabIndex={-1} className="text-heading">
         {tryNo === 1 ? 'Your answer' : 'Your second try'}
       </h3>
 
       <fieldset>
-        <legend className="text-muted-foreground mb-2 text-sm">
+        <legend className="text-muted-foreground text-body-sm mb-2">
           Does the explanation hold up?
         </legend>
         <div className="grid grid-cols-2 gap-2">
@@ -82,7 +84,7 @@ export function AnswerForm({
       {answer.verdict === 'flawed' && (
         <>
           <fieldset>
-            <legend className="mb-2 text-sm font-medium">Which sentence?</legend>
+            <legend className="text-label mb-2">Which sentence?</legend>
             <div className="flex flex-wrap gap-2">
               {Array.from({ length: sentenceCount }, (_, idx) => (
                 <label
@@ -107,13 +109,18 @@ export function AnswerForm({
                 </label>
               ))}
             </div>
-            <p className="text-muted-foreground mt-1.5 text-xs">Or click the sentence itself.</p>
+            <p className="text-caption text-muted-foreground mt-1.5">
+              Or click the sentence itself.
+            </p>
           </fieldset>
 
           <div className="space-y-2">
-            <label htmlFor="correction" className="text-sm font-medium">
-              What should it say instead?
-            </label>
+            <div className="flex items-baseline justify-between gap-3">
+              <label htmlFor="correction" className="text-label">
+                What should it say instead?
+              </label>
+              <CharCount length={answer.correction.length} max={CORRECTION_MAX} />
+            </div>
             <Textarea
               id="correction"
               value={answer.correction}

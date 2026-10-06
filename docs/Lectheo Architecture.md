@@ -52,7 +52,7 @@ Ranked. When two goals conflict, the higher one wins.
 | Item validity | ≥ 95% correct on manual review of the library bank. Verifier rejection rate reported |
 | Cost | Judge path ≈ **$0.15** per visitor. Global hard stops via gateway budgets and the app governor |
 | Accessibility | Keyboard-only use, list view of the map, state shown by icon + label, not only color |
-| Browser | Desktop Chrome (current and previous major version). Phones: landing fully responsive; app usable but desktop-first: no sideways scroll, list view and on-screen marker buttons; the sidebar sheet comes with the planned product shell (to be built) |
+| Browser | Desktop Chrome (current and previous major version). Phones: landing fully responsive; app usable but desktop-first: no sideways scroll at 375px, the sidebar becomes an off-canvas sheet below 1024px, the course page opens in list view, and watch mode shows on-screen marker buttons on touch devices |
 
 ---
 

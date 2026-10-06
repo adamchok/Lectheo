@@ -19,7 +19,7 @@ test('spot the flaw: map link, license notice and the rubric after reload', asyn
 
   // Try 1, and a different try 2 if the first wasn't final (an identical body would replay
   // try 1): closes the activity either way.
-  await page.getByRole('radio', { name: 'Correct' }).check({ force: true })
+  await page.getByRole('radio', { name: 'No flaw' }).check({ force: true })
   await page.getByRole('button', { name: 'Submit' }).click()
   const retry = page.getByRole('button', { name: 'Retry' })
   const graded = page.getByRole('heading', { name: 'How it was graded' })

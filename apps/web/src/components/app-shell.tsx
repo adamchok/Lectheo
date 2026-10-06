@@ -1,42 +1,77 @@
 'use client'
 
-import type { Route } from 'next'
-import Link from 'next/link'
+import { Menu } from 'lucide-react'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { Dialog as DialogPrimitive } from 'radix-ui'
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { isApiClientError } from '@/client/api'
-import { useCourses, useMe, useSignOut } from '@/client/queries'
-import { Skeleton } from '@/components/ui/skeleton'
+import { useMe, useSignOut } from '@/client/queries'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { AccountMenu } from './account-menu'
+import { ShellProvider, useShell } from './shell/shell-context'
+import { Sidebar } from './shell/sidebar'
+import { SIDEBAR_COOKIE } from './shell/sidebar-cookie'
 import { SkipLink } from './skip-link'
-import { Wordmark } from './wordmark'
 
-interface NavItem {
-  href: Route
-  label: string
-  isActive: (pathname: string) => boolean
+const ONE_YEAR_S = 60 * 60 * 24 * 365
+/** Where the sidebar stops being a sheet (Tailwind `lg`). */
+const DESKTOP_QUERY = '(min-width: 1024px)'
+
+function rememberCollapsed(collapsed: boolean) {
+  document.cookie = `${SIDEBAR_COOKIE}=${collapsed ? 'rail' : 'full'}; path=/; max-age=${ONE_YEAR_S}; samesite=lax`
 }
 
-function useNavItems(): NavItem[] {
-  const courses = useCourses()
-  const library = courses.data?.find((course) => course.kind === 'library')
-  const items: NavItem[] = [
-    { href: '/dashboard', label: 'Dashboard', isActive: (p) => p === '/dashboard' },
-  ]
-  if (library) {
-    const href = `/courses/${library.id}` as Route
-    items.push({ href, label: 'Library', isActive: (p) => p.startsWith(href) })
-  }
-  return items
+function subscribeDesktop(onChange: () => void) {
+  const query = window.matchMedia(DESKTOP_QUERY)
+  query.addEventListener('change', onChange)
+  return () => query.removeEventListener('change', onChange)
+}
+const isDesktopNow = () => window.matchMedia(DESKTOP_QUERY).matches
+
+function TopBar() {
+  const shell = useShell()
+  return (
+    <header className="bg-background/85 border-border sticky top-0 z-sticky border-b backdrop-blur">
+      <div className="mx-auto flex h-topbar w-full max-w-content items-center gap-2 px-4 sm:px-6">
+        {/* A real Trigger: Radix sets aria-expanded and returns focus here on close (2.4.3). */}
+        <DialogPrimitive.Trigger asChild>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="-ml-1.5 lg:hidden"
+            aria-label="Open navigation"
+          >
+            <Menu aria-hidden />
+          </Button>
+        </DialogPrimitive.Trigger>
+        <div ref={shell?.setCrumbsSlot} className="flex min-w-0 flex-1 items-center" />
+        <div ref={shell?.setActionsSlot} className="flex shrink-0 items-center gap-2" />
+      </div>
+    </header>
+  )
 }
 
-/** Signed-in chrome: skip link, top bar (wordmark, nav, account menu) and <main>. */
-export function AppShell({ children }: { children: ReactNode }) {
+/**
+ * Signed-in chrome (Design System §4): skip link, sidebar (a rail when collapsed, an off-canvas
+ * sheet below 1024px), sticky top bar with breadcrumbs and page actions, and <main>.
+ */
+export function AppShell({
+  children,
+  initialCollapsed = false,
+}: {
+  children: ReactNode
+  initialCollapsed?: boolean
+}) {
   const pathname = usePathname()
   const router = useRouter()
   const me = useMe()
-  const navItems = useNavItems()
+  const [collapsed, setCollapsed] = useState(initialCollapsed)
+  // The sheet belongs to the page it was opened on: any route change (a link, Reset sample's
+  // replace, browser back) closes it, and so does widening past 1024px, where it would otherwise
+  // stay modal while hidden.
+  const [sheetPath, setSheetPath] = useState<string | null>(null)
+  const isDesktop = useSyncExternalStore(subscribeDesktop, isDesktopNow, () => false)
+  const sheetOpen = sheetPath === pathname && !isDesktop
 
   const { mutate: endSession } = useSignOut()
   const unauthenticated = isApiClientError(me.error) && me.error.status === 401
@@ -58,51 +93,71 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (document.activeElement === document.body) main.current?.focus({ preventScroll: true })
   }, [pathname])
 
+  const toggleCollapsed = () => {
+    const next = !collapsed
+    setCollapsed(next)
+    rememberCollapsed(next)
+  }
+
+  /**
+   * Closing returns focus to the menu button, except after a navigation (the new page starts at
+   * <main>) and on the watch page, where focus on <main> keeps the L / I shortcuts live.
+   */
+  const followedLink = useRef(false)
+  const onCloseAutoFocus = (event: Event) => {
+    const navigated = followedLink.current || window.location.pathname !== pathname
+    followedLink.current = false
+    if (!navigated && !pathname.endsWith('/watch')) return
+    event.preventDefault()
+    main.current?.focus({ preventScroll: true })
+  }
+  const closeForLink = () => {
+    followedLink.current = true
+    setSheetPath(null)
+  }
+
   return (
-    <div className="flex min-h-dvh flex-col">
+    <ShellProvider>
       <SkipLink />
-      <header className="border-border/80 bg-background/85 supports-[backdrop-filter]:bg-background/70 sticky top-0 z-40 border-b backdrop-blur">
-        <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-6 px-4 sm:px-6">
-          <Link href="/dashboard" className="rounded-md" aria-label="Lectheo, go to dashboard">
-            <Wordmark />
-          </Link>
-          <nav aria-label="Main" className="flex items-center gap-1">
-            {navItems.map((item) => {
-              const active = item.isActive(pathname)
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-current={active ? 'page' : undefined}
-                  className={cn(
-                    'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                    active
-                      ? 'bg-accent text-accent-foreground inset-shadow-[0_-2px_0_0_var(--primary)]'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                  )}
-                >
-                  {item.label}
-                </Link>
-              )
-            })}
-          </nav>
-          <div className="ml-auto flex items-center gap-2">
-            {me.data ? (
-              <AccountMenu me={me.data} />
-            ) : (
-              <Skeleton className="h-8 w-32 rounded-full" label="Loading account" />
+      <DialogPrimitive.Root
+        open={sheetOpen}
+        onOpenChange={(open) => setSheetPath(open ? pathname : null)}
+      >
+        <div className="flex min-h-dvh">
+          <div
+            className={cn(
+              'bg-sidebar border-border sticky top-0 hidden h-dvh shrink-0 border-r lg:block',
+              collapsed ? 'w-sidebar-rail' : 'w-sidebar',
             )}
+          >
+            <Sidebar me={me.data} collapsed={collapsed} onToggleCollapsed={toggleCollapsed} />
+          </div>
+
+          <DialogPrimitive.Portal>
+            <DialogPrimitive.Overlay className="bg-background/80 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 fixed inset-0 z-overlay lg:hidden" />
+            <DialogPrimitive.Content
+              aria-describedby={undefined}
+              onCloseAutoFocus={onCloseAutoFocus}
+              className="bg-sidebar border-border shadow-popover data-[state=open]:animate-in data-[state=open]:slide-in-from-left data-[state=closed]:animate-out data-[state=closed]:slide-out-to-left duration-slow fixed inset-y-0 left-0 z-overlay w-sidebar max-w-[85vw] border-r lg:hidden"
+            >
+              <DialogPrimitive.Title className="sr-only">Navigation</DialogPrimitive.Title>
+              <Sidebar me={me.data} collapsed={false} onNavigate={closeForLink} />
+            </DialogPrimitive.Content>
+          </DialogPrimitive.Portal>
+
+          <div className="flex min-w-0 flex-1 flex-col">
+            <TopBar />
+            <main
+              ref={main}
+              id="main"
+              tabIndex={-1}
+              className="mx-auto w-full max-w-content flex-1 px-4 py-6 sm:px-6 lg:py-8"
+            >
+              {children}
+            </main>
           </div>
         </div>
-      </header>
-      <main
-        ref={main}
-        id="main"
-        tabIndex={-1}
-        className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 outline-none sm:px-6 lg:py-10"
-      >
-        {children}
-      </main>
-    </div>
+      </DialogPrimitive.Root>
+    </ShellProvider>
   )
 }

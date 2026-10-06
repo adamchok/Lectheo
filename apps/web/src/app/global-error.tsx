@@ -1,36 +1,29 @@
 'use client'
 
-/** Last-resort boundary when the root layout itself fails; renders its own <html>. */
-export default function GlobalError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+import './globals.css'
+
+/**
+ * Last-resort boundary when the root layout itself fails; renders its own <html>. It imports the
+ * tokens itself, so it follows the OS theme (prefers-color-scheme) without the theme script.
+ */
+export default function GlobalError({
+  reset,
+}: {
+  error: Error & { digest?: string }
+  reset: () => void
+}) {
   return (
     <html lang="en">
-      <body
-        style={{
-          fontFamily: 'system-ui, sans-serif',
-          display: 'grid',
-          placeItems: 'center',
-          minHeight: '100dvh',
-          margin: 0,
-          background: '#fbfaf7',
-          color: '#1c1d22',
-        }}
-      >
-        <main style={{ textAlign: 'center', maxWidth: 420, padding: 16 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 500 }}>Lectheo hit a problem</h1>
-          <p style={{ color: '#5d5f68' }}>
+      <body className="bg-background text-foreground grid min-h-dvh place-items-center p-4 font-sans">
+        <main className="max-w-[26rem] space-y-3 text-center">
+          <h1 className="text-title-lg">Lectheo hit a problem</h1>
+          <p className="text-body text-muted-foreground">
             Please reload the page. If it keeps happening, try again in a few minutes.
           </p>
           <button
             type="button"
             onClick={reset}
-            style={{
-              marginTop: 12,
-              padding: '8px 16px',
-              borderRadius: 8,
-              border: '1px solid #d6d3cb',
-              background: '#fff',
-              cursor: 'pointer',
-            }}
+            className="border-input bg-card text-body-sm h-9 rounded-md border px-4 font-semibold shadow-xs"
           >
             Try again
           </button>

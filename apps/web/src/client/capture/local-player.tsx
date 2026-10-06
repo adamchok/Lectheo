@@ -55,6 +55,7 @@ export function LocalPlayer({ lectureId, media, ...events }: LocalPlayerProps) {
         <video
           key={entry.url}
           src={entry.url}
+          aria-label={`Your recording: ${entry.file.name}`}
           controls
           playsInline
           preload="metadata"
@@ -109,7 +110,9 @@ function RepickMedia({
 }) {
   const [mismatch, setMismatch] = useState<File | null>(null)
   return (
-    <div className={`${frameClass} flex flex-col items-center justify-center gap-4 p-6 text-center`}>
+    <div
+      className={`${frameClass} flex flex-col items-center justify-center gap-4 p-6 text-center`}
+    >
       <FileVideo aria-hidden className="text-muted-foreground size-5" />
       <p role={problem ? 'alert' : undefined} className="text-muted-foreground max-w-sm text-sm">
         {problem ?? 'Your recording stays on this device, so after a reload we need it again.'}

@@ -110,7 +110,7 @@ test('spot the flaw: submit focuses the result, retry focuses the form', async (
   // A wrong first try (from the answer key), so the Socratic retry always follows.
   const key = await flawKeyOf(new URL(page.url()).pathname.split('/').at(-1) ?? '')
   if (key.hasFlaw) {
-    await page.getByRole('radio', { name: 'Correct' }).check({ force: true })
+    await page.getByRole('radio', { name: 'No flaw' }).check({ force: true })
   } else {
     await page.getByRole('radio', { name: 'Flawed' }).check({ force: true })
     await page.getByRole('radio', { name: 'Sentence 1' }).check({ force: true })
@@ -181,7 +181,7 @@ test('teach-back: the input keeps focus while Sam replies; results take focus on
 test('a missing lecture offers a way back instead of a retry', async ({ page }) => {
   await signInSample(page)
   await page.goto('/lectures/01900000-0000-7000-8000-000000000000')
-  await expect(page.getByRole('link', { name: 'Back to dashboard' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Back to Home' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Try again' })).toHaveCount(0)
 })
 

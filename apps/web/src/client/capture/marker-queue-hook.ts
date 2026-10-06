@@ -81,10 +81,18 @@ export function useMarkerQueue(lectureId: string, userId: string | undefined): M
   /** Each marker's queue, so undo from a toast still works after the page unmounts. */
   const owners = useRef(new Map<string, Promise<MarkerQueue>>())
   const queryClient = useQueryClient()
-  // Course map and next step show marker counts / unlinked markers.
-  const refreshCourses = useCallback(
-    () => void queryClient.invalidateQueries({ queryKey: queryKeys.courses }),
-    [queryClient],
+  // Course map, next step and the lecture page show marker counts / unlinked markers.
+  const refresh = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.courses })
+    // exact: the transcript under the lecture key didn't change.
+    void queryClient.invalidateQueries({ queryKey: queryKeys.lecture(lectureId), exact: true })
+  }, [queryClient, lectureId])
+  /** Refreshes only when the flush actually sent markers. */
+  const refreshIfSent = useCallback(
+    (sent: number) => {
+      if (sent > 0) refresh()
+    },
+    [refresh],
   )
 
   useEffect(() => {
@@ -95,9 +103,7 @@ export function useMarkerQueue(lectureId: string, userId: string | undefined): M
     const flush = (keepalive = false) =>
       void q
         .then((x) => x.flush({ keepalive }))
-        .then((sent) => {
-          if (sent > 0) refreshCourses()
-        })
+        .then(refreshIfSent)
         .catch(() => undefined)
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') flush(true)
@@ -114,9 +120,8 @@ export function useMarkerQueue(lectureId: string, userId: string | undefined): M
       document.removeEventListener('visibilitychange', onVisibility)
       queue.current = null
       flush(true)
-      refreshCourses()
     }
-  }, [lectureId, userId, refreshCourses])
+  }, [lectureId, userId, refreshIfSent])
 
   const add = useCallback<MarkerQueueApi['add']>((kind, tMs) => {
     const q = queue.current
@@ -128,21 +133,23 @@ export function useMarkerQueue(lectureId: string, userId: string | undefined): M
     return id
   }, [])
 
-  const undo = useCallback<MarkerQueueApi['undo']>(async (markerId) => {
-    const q = owners.current.get(markerId)
-    if (!q) throw new Error('That marker can’t be undone anymore.')
-    await (await q).undo(markerId)
-    owners.current.delete(markerId)
-  }, [])
+  const undo = useCallback<MarkerQueueApi['undo']>(
+    async (markerId) => {
+      const q = owners.current.get(markerId)
+      if (!q) throw new Error('That marker can’t be undone anymore.')
+      await (await q).undo(markerId)
+      owners.current.delete(markerId)
+      refresh() // A sent marker was deleted on the server.
+    },
+    [refresh],
+  )
 
   const flush = useCallback(() => {
     void queue.current
       ?.then((q) => q.flush())
-      .then((sent) => {
-        if (sent > 0) refreshCourses()
-      })
+      .then(refreshIfSent)
       .catch(() => undefined)
-  }, [refreshCourses])
+  }, [refreshIfSent])
 
   return { add, undo, flush }
 }

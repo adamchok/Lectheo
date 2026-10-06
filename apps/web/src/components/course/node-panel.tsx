@@ -1,60 +1,22 @@
 'use client'
 
-import type { ActivityType, CourseMapResponse, MapNode, MasteryState } from '@lectheo/contracts'
+import type { CourseMapResponse, MapNode } from '@lectheo/contracts'
 import { Flag, Star, X } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
 import { useEffect, useRef, type ReactNode } from 'react'
-import { useStartPractice } from '@/client/practice'
 import { MasteryBadgeTransition } from '@/components/mastery-badge-transition'
 import { SourceRef } from '@/components/source-ref'
 import { Button } from '@/components/ui/button'
-import { FEATURES } from '@/lib/features'
-import { ACTIVITY_LABELS, RELATION_LABELS } from '@/lib/labels'
-
-/** Practice entry points, each hidden until its activity flow ships (Spec §3). */
-const PRACTICE: readonly { type: ActivityType; label: string; enabled: boolean }[] = [
-  { type: 'spot_flaw', label: ACTIVITY_LABELS.spot_flaw, enabled: FEATURES.practiceSpotFlaw },
-  { type: 'teach_back', label: ACTIVITY_LABELS.teach_back, enabled: FEATURES.practiceTeachBack },
-  { type: 'transfer', label: ACTIVITY_LABELS.transfer, enabled: FEATURES.practiceTransfer },
-  { type: 'stump', label: ACTIVITY_LABELS.stump, enabled: FEATURES.stump },
-]
+import { RELATION_LABELS } from '@/lib/labels'
+import { PracticeButtons } from './practice-buttons'
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="space-y-1.5">
-      <h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">{title}</h3>
+      <h3 className="text-overline text-muted-foreground">{title}</h3>
       {children}
     </section>
-  )
-}
-
-interface PracticeButtonsProps {
-  conceptId: string
-  mastery: MasteryState
-  transfer?: boolean
-}
-
-function PracticeButtons({ conceptId, mastery, transfer }: PracticeButtonsProps) {
-  const { startPractice, isPending } = useStartPractice()
-  // Transfer only while the bank has an unseen item for this concept (F4b; map payload).
-  const enabled = PRACTICE.filter((p) => p.enabled && (p.type !== 'transfer' || transfer))
-  if (enabled.length === 0) return null
-  return (
-    <Section title="Practice">
-      <div className="flex flex-wrap gap-2">
-        {enabled.map((p) => (
-          <Button
-            key={p.type}
-            size="sm"
-            disabled={isPending}
-            onClick={() => startPractice({ conceptId, type: p.type, mastery })}
-          >
-            {p.label}
-          </Button>
-        ))}
-      </div>
-    </Section>
   )
 }
 
@@ -64,9 +26,10 @@ function MomentRow({ moment, lectureTitle }: { moment: Moment; lectureTitle?: st
   const lost = moment.kind === 'lost'
   const Icon = lost ? Flag : Star
   return (
-    <li className="flex items-center gap-2 text-sm">
+    <li className="flex items-center gap-2 text-body-sm">
       <Icon
-        aria-label={lost ? 'Lost' : 'Important'}
+        role="img"
+        aria-label={lost ? "I'm lost" : 'Important'}
         className={`size-3.5 shrink-0 fill-current ${lost ? 'text-marker-lost' : 'text-marker-important'}`}
       />
       {/* ponytail: markers carry no transcript excerpt in the map payload, so the ref is compact. */}
@@ -126,14 +89,14 @@ export function NodePanel({ concept, map, onClose }: NodePanelProps) {
     <aside
       aria-labelledby="node-panel-heading"
       onKeyDown={(e) => e.key === 'Escape' && onClose()}
-      className="bg-card border-border max-h-full w-full space-y-4 overflow-y-auto rounded-xl border p-5 shadow-lg"
+      className="bg-card border-border w-full space-y-4 rounded-lg border p-5"
     >
       <div className="flex items-start justify-between gap-3">
         <h2
           id="node-panel-heading"
           ref={headingRef}
           tabIndex={-1}
-          className="font-serif text-lg font-medium outline-none"
+          className="text-title-md"
         >
           {concept.name}
         </h2>
@@ -148,7 +111,7 @@ export function NodePanel({ concept, map, onClose }: NodePanelProps) {
           confidentMistake={concept.mastery.confidentMistake}
         />
         {concept.mastery.reasons.length > 0 && (
-          <ul className="text-muted-foreground list-disc pl-5 text-sm">
+          <ul className="text-muted-foreground list-disc pl-5 text-body-sm">
             {concept.mastery.reasons.map((reason) => (
               <li key={reason}>{reason}</li>
             ))}
@@ -156,17 +119,19 @@ export function NodePanel({ concept, map, onClose }: NodePanelProps) {
         )}
       </div>
 
-      {concept.summary && <p className="text-sm text-pretty">{concept.summary}</p>}
+      {concept.summary && <p className="text-body-sm text-pretty">{concept.summary}</p>}
 
-      <PracticeButtons
-        conceptId={concept.id}
-        mastery={concept.mastery.state}
-        transfer={concept.transferAvailable}
-      />
+      <Section title="Practice">
+        <PracticeButtons
+          conceptId={concept.id}
+          mastery={concept.mastery.state}
+          transfer={concept.transferAvailable}
+        />
+      </Section>
 
       {concept.lectureIds.length > 0 && (
         <Section title="Appears in">
-          <ul className="space-y-1 text-sm">
+          <ul className="space-y-1 text-body-sm">
             {concept.lectureIds.map((id) => (
               <li key={id}>
                 <Link href={`/lectures/${id}` as Route} className="underline underline-offset-2">
@@ -182,7 +147,7 @@ export function NodePanel({ concept, map, onClose }: NodePanelProps) {
 
       {links.length > 0 && (
         <Section title="Links">
-          <ul className="text-muted-foreground space-y-0.5 text-sm">
+          <ul className="text-muted-foreground space-y-0.5 text-body-sm">
             {links.map((link) => (
               <li key={link.id}>{link.text}</li>
             ))}
@@ -192,7 +157,7 @@ export function NodePanel({ concept, map, onClose }: NodePanelProps) {
 
       <Section title="Your markers">
         {moments.length === 0 ? (
-          <p className="text-muted-foreground text-sm">You haven&apos;t marked this concept yet.</p>
+          <p className="text-muted-foreground text-body-sm">You haven&apos;t marked this concept yet.</p>
         ) : (
           <ul className="space-y-1">
             {moments.map((m) => (

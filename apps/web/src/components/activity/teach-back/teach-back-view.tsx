@@ -3,6 +3,7 @@
 import type { ActivityResponse, MasterySummary, SubmitResponse } from '@lectheo/contracts'
 import { CircleX, SendHorizontal } from 'lucide-react'
 import type { ChatStatus } from 'ai'
+import { useSearchParams } from 'next/navigation'
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { isApiClientError } from '@/client/api'
 import { useActivity } from '@/client/queries'
@@ -11,6 +12,8 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
+import { CharCount } from '../shared'
+import { parseMasteryState } from '../spot-flaw/logic'
 import { FinalReveal, TryFeedback } from './teach-back-result'
 import {
   LOST_THREAD,
@@ -53,7 +56,7 @@ function Bubble({ message }: { message: TeachBackMessage }) {
     <li className={cn('flex', student ? 'justify-end' : 'justify-start')}>
       <div
         className={cn(
-          'max-w-[85%] rounded-2xl px-4 py-2.5 text-[0.9375rem] leading-relaxed whitespace-pre-wrap',
+          'max-w-[85%] rounded-2xl px-4 py-2.5 text-body whitespace-pre-wrap',
           student ? 'bg-primary text-primary-foreground rounded-br-md' : 'bg-accent rounded-bl-md',
         )}
       >
@@ -67,9 +70,10 @@ function Bubble({ message }: { message: TeachBackMessage }) {
 function Transcript({ messages, status }: { messages: TeachBackMessage[]; status: ChatStatus }) {
   const end = useRef<HTMLLIElement>(null)
   const thinking = status === 'submitted'
+  // A new message or a status change, not every streamed token.
   useEffect(() => {
     end.current?.scrollIntoView({ block: 'nearest' })
-  }, [messages, thinking])
+  }, [messages.length, status])
   // Announce only the finished reply, not every streamed token.
   const last = messages.at(-1)
   const announcement = status === 'ready' && last?.role === 'assistant' ? textOf(last) : ''
@@ -105,6 +109,7 @@ function Notice({ children }: { children: string }) {
 
 /** Teach-back (F4a): explain to Sam (≤ 6 turns), submit, one Socratic retry, final reveal. */
 export function TeachBackView({ activity }: { activity: ActivityResponse }) {
+  const startState = parseMasteryState(useSearchParams().get('from'))
   const activityQuery = useActivity(activity.id)
   const chat = useTeachBackChat(activity)
   const submit = useSubmitTeachBack(activity.id)
@@ -186,6 +191,7 @@ export function TeachBackView({ activity }: { activity: ActivityResponse }) {
       {shownFinal ? (
         <FinalReveal
           result={shownFinal}
+          start={startState}
           before={before}
           courseId={activity.courseId}
           autoFocus={final !== null}
@@ -197,7 +203,7 @@ export function TeachBackView({ activity }: { activity: ActivityResponse }) {
       ) : (
         awaitingRetry &&
         savedQuestion && (
-          <p className="bg-accent rounded-xl p-4 text-[0.9375rem] leading-relaxed">
+          <p className="bg-accent rounded-xl p-4 text-body">
             <span className="font-medium">Think about this: </span>
             {savedQuestion}
           </p>
@@ -217,8 +223,10 @@ export function TeachBackView({ activity }: { activity: ActivityResponse }) {
               S
             </span>
             <div>
-              <p className="text-sm font-medium">{PERSONA}</p>
-              <p className="text-muted-foreground text-xs">A curious first-year. Teach them!</p>
+              <p className="text-label">{PERSONA} · AI student</p>
+              <p className="text-caption text-muted-foreground">
+                A curious first-year. Teach them!
+              </p>
             </div>
           </div>
           {!closed && (
@@ -264,16 +272,23 @@ export function TeachBackView({ activity }: { activity: ActivityResponse }) {
                 <SendHorizontal aria-hidden />
               </Button>
             </div>
+            <CharCount length={draft.length} max={MAX_MESSAGE_CHARS} />
             {notice && <Notice>{notice}</Notice>}
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-muted-foreground text-xs">
+              <p id="teach-back-submit-reason" className="text-caption text-muted-foreground">
                 {submit.isPending
                   ? 'Grading takes a few seconds.'
                   : awaitingRetry && !hasNewExplanation
                     ? `Explain a bit more to ${PERSONA} before your second try.`
                     : 'Enter to send · Shift+Enter for a new line'}
               </p>
-              <Button type="button" variant="outline" onClick={done} disabled={!canSubmit}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={done}
+                disabled={!canSubmit}
+                aria-describedby="teach-back-submit-reason"
+              >
                 {submit.isPending ? (
                   <>
                     <Spinner />

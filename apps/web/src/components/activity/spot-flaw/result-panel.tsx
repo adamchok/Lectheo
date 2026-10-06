@@ -7,23 +7,17 @@ import type {
   Outcome,
   SubmitResponse,
 } from '@lectheo/contracts'
-import {
-  ArrowRight,
-  Check,
-  Eye,
-  MessageCircleQuestion,
-  RotateCw,
-  X,
-} from 'lucide-react'
+import { ArrowRight, Check, Eye, MessageCircleQuestion, RotateCw, X } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
 import { Fragment } from 'react'
 import { MasteryBadgeTransition } from '@/components/mastery-badge-transition'
 import { SourceRef } from '@/components/source-ref'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
-import { masteryTrail, OUTCOME_LABELS, scoreRows } from './logic'
 import { Spinner } from '@/components/ui/spinner'
+import { cn } from '@/lib/utils'
+import { JudgeNote } from '../shared'
+import { masteryTrail, OUTCOME_LABELS, scoreRows } from './logic'
 
 /** POST …/explanation body, or the explanation part of a final submit. */
 export interface ExplanationData {
@@ -67,9 +61,13 @@ export function TryScore({ tryNo, outcome, result }: TryScoreProps) {
           {scoreRows(result).map((row) => (
             <li key={row.id} className="flex items-center gap-2 px-3 py-2">
               {row.ok ? (
-                <Check aria-label="Right" className="text-mastery-green size-4 shrink-0" />
+                <Check
+                  role="img"
+                  aria-label="Right"
+                  className="text-mastery-green size-4 shrink-0"
+                />
               ) : (
-                <X aria-label="Not right" className="text-mastery-red size-4 shrink-0" />
+                <X role="img" aria-label="Not right" className="text-mastery-red size-4 shrink-0" />
               )}
               <span className="flex-1">{row.label}</span>
               <span className="text-muted-foreground font-mono tabular-nums">{row.detail}</span>
@@ -77,6 +75,7 @@ export function TryScore({ tryNo, outcome, result }: TryScoreProps) {
           ))}
         </ul>
       )}
+      <JudgeNote />
     </div>
   )
 }
@@ -114,7 +113,7 @@ export function Sources({ sources }: { sources: readonly SourceRefData[] }) {
 export function Explanation({ explanation }: { explanation: ExplanationData }) {
   return (
     <section aria-labelledby="explanation-title" className="space-y-3">
-      <h3 id="explanation-title" className="font-medium">
+      <h3 id="explanation-title" className="text-heading">
         Explanation
       </h3>
       <p className="leading-relaxed text-pretty">{explanation.explanation}</p>
@@ -145,11 +144,7 @@ export function RetryActions({
       </Button>
       {!explanationShown && (
         <Button variant="ghost" onClick={onShowMe} disabled={showMePending}>
-          {showMePending ? (
-            <Spinner />
-          ) : (
-            <Eye aria-hidden />
-          )}
+          {showMePending ? <Spinner /> : <Eye aria-hidden />}
           Show me
         </Button>
       )}
@@ -165,7 +160,7 @@ export function RetryActions({
 export function RubricList({ rubric }: { rubric: NonNullable<SubmitResponse['rubric']> }) {
   return (
     <section aria-labelledby="rubric-title" className="space-y-2">
-      <h3 id="rubric-title" className="font-medium">
+      <h3 id="rubric-title" className="text-heading">
         How it was graded
       </h3>
       <dl className="space-y-2 text-sm">
@@ -184,12 +179,23 @@ export interface MasteryChangeProps {
   /** State before the activity, when the entry point passed it (?from=). */
   start: MasteryState | null
   results: readonly MasterySummary[]
-  /** Links back to the concept map, where the node now shows this state. */
-  courseId?: string
 }
 
-/** "See it on the map": the result's next step back to the course map (F6). */
-export function MapLink({ courseId }: { courseId: string }) {
+/**
+ * "See it on the map": the result's next step back to the course map (F6), where the node now
+ * shows the new state. `primary` once the activity is finished (Design System §4).
+ */
+export function MapLink({ courseId, primary = false }: { courseId: string; primary?: boolean }) {
+  if (primary) {
+    return (
+      <Button asChild size="lg">
+        <Link href={`/courses/${courseId}` as Route}>
+          See it on the map
+          <ArrowRight aria-hidden />
+        </Link>
+      </Button>
+    )
+  }
   return (
     <Link
       href={`/courses/${courseId}` as Route}
@@ -202,7 +208,7 @@ export function MapLink({ courseId }: { courseId: string }) {
 }
 
 /** Mastery before → after (F6), each step an icon + label badge; reasons for the latest. */
-export function MasteryChange({ start, results, courseId }: MasteryChangeProps) {
+export function MasteryChange({ start, results }: MasteryChangeProps) {
   const latest = results.at(-1)
   if (!latest) return null
   const trail = masteryTrail(
@@ -211,13 +217,15 @@ export function MasteryChange({ start, results, courseId }: MasteryChangeProps) 
   )
   return (
     <section aria-labelledby="mastery-title" className="space-y-2">
-      <h3 id="mastery-title" className="font-medium">
+      <h3 id="mastery-title" className="text-heading">
         Your mastery of this concept
       </h3>
       <div className="flex flex-wrap items-center gap-2">
         {trail.map((state, i) => (
           <Fragment key={`${state}-${i}`}>
-            {i > 0 && <ArrowRight aria-label="then" className="text-muted-foreground size-4" />}
+            {i > 0 && (
+              <ArrowRight role="img" aria-label="then" className="text-muted-foreground size-4" />
+            )}
             <MasteryBadgeTransition
               state={state}
               reasons={i === trail.length - 1 ? latest.reasons : undefined}
@@ -233,7 +241,6 @@ export function MasteryChange({ start, results, courseId }: MasteryChangeProps) 
           ))}
         </ul>
       )}
-      {courseId && <MapLink courseId={courseId} />}
     </section>
   )
 }

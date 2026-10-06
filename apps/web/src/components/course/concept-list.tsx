@@ -1,10 +1,10 @@
 import type { CourseMapResponse, MapEdge, MapNode } from '@lectheo/contracts'
 import { Network } from 'lucide-react'
-import { PracticeButton } from '@/components/activity/spot-flaw/practice-button'
 import { EmptyState } from '@/components/empty-state'
 import { MarkerCounts } from '@/components/marker-counts'
 import { MasteryBadge } from '@/components/mastery-badge'
 import { RELATION_LABELS } from '@/lib/labels'
+import { PracticeButtons } from './practice-buttons'
 
 export function conceptAnchor(conceptId: string): string {
   return `concept-${conceptId}`
@@ -14,7 +14,7 @@ function ConceptLinks({ node, edges, byId }: { node: MapNode; edges: readonly Ma
   const outgoing = edges.filter((edge) => edge.from === node.id && byId.has(edge.to))
   if (outgoing.length === 0) return null
   return (
-    <ul className="text-muted-foreground flex flex-wrap gap-x-3 gap-y-1 text-sm">
+    <ul className="text-body-sm text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
       {outgoing.map((edge) => {
         const target = byId.get(edge.to)!
         return (
@@ -35,14 +35,16 @@ function ConceptLinks({ node, edges, byId }: { node: MapNode; edges: readonly Ma
 
 function ConceptRow({ node, edges, byId }: { node: MapNode; edges: readonly MapEdge[]; byId: Map<string, MapNode> }) {
   return (
-    <li id={conceptAnchor(node.id)} className="scroll-mt-24 py-4">
+    <li id={conceptAnchor(node.id)} className="scroll-mt-[calc(var(--topbar-height)+1rem)] space-y-3 py-4">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h4 className="font-medium">{node.name}</h4>
+            <h3 className="text-heading">{node.name}</h3>
             <MarkerCounts lost={node.markers.lost} important={node.markers.important} />
           </div>
-          {node.summary && <p className="text-muted-foreground max-w-2xl text-sm text-pretty">{node.summary}</p>}
+          {node.summary && (
+            <p className="text-body-sm text-muted-foreground max-w-2xl text-pretty">{node.summary}</p>
+          )}
           <ConceptLinks node={node} edges={edges} byId={byId} />
         </div>
         <MasteryBadge
@@ -50,8 +52,13 @@ function ConceptRow({ node, edges, byId }: { node: MapNode; edges: readonly MapE
           reasons={node.mastery.reasons}
           confidentMistake={node.mastery.confidentMistake}
         />
-        <PracticeButton conceptId={node.id} conceptName={node.name} mastery={node.mastery.state} />
       </div>
+      <PracticeButtons
+        conceptId={node.id}
+        conceptName={node.name}
+        mastery={node.mastery.state}
+        transfer={node.transferAvailable}
+      />
     </li>
   )
 }
@@ -88,12 +95,10 @@ export function ConceptList({ map }: { map: CourseMapResponse }) {
     <div className="space-y-8">
       {groups.map(({ lecture, nodes }) => (
         <section key={lecture.id} aria-labelledby={`lecture-${lecture.id}`}>
-          <h3 id={`lecture-${lecture.id}`} className="border-border flex items-baseline gap-3 border-b pb-2">
-            <span className="text-muted-foreground font-mono text-xs tabular-nums">
-              L{String(lecture.seq).padStart(2, '0')}
-            </span>
-            <span className="font-serif text-lg font-medium">{lecture.title}</span>
-          </h3>
+          <h2 id={`lecture-${lecture.id}`} className="border-border flex items-baseline gap-3 border-b pb-2">
+            <span className="text-mono-sm text-muted-foreground">Lec {lecture.seq}</span>
+            <span className="text-title-md">{lecture.title}</span>
+          </h2>
           <ul className="divide-border divide-y">
             {nodes.map((node) => (
               <ConceptRow key={node.id} node={node} edges={map.edges} byId={byId} />
@@ -103,9 +108,9 @@ export function ConceptList({ map }: { map: CourseMapResponse }) {
       ))}
       {orphans.length > 0 && (
         <section aria-labelledby="other-concepts">
-          <h3 id="other-concepts" className="border-border border-b pb-2 font-serif text-lg font-medium">
+          <h2 id="other-concepts" className="text-title-md border-border border-b pb-2">
             Other concepts
-          </h3>
+          </h2>
           <ul className="divide-border divide-y">
             {orphans.map((node) => (
               <ConceptRow key={node.id} node={node} edges={map.edges} byId={byId} />

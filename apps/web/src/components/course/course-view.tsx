@@ -2,6 +2,8 @@
 
 import type { CourseMapResponse } from '@lectheo/contracts'
 import { Info, List, Network } from 'lucide-react'
+import type { Route } from 'next'
+import dynamic from 'next/dynamic'
 import { useState } from 'react'
 import { pluralize } from '@/client/format'
 import { useCourseMap } from '@/client/queries'
@@ -10,13 +12,21 @@ import { LicenseNotice } from '@/components/license-notice'
 import { MasteryBar } from '@/components/mastery-bar'
 import { countMastery } from '@/components/mastery-meta'
 import { PageHeader } from '@/components/page-header'
+import { PageChrome } from '@/components/shell/page-chrome'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { FEATURES } from '@/lib/features'
 import { ConceptList } from './concept-list'
-import { ConceptMap } from './concept-map'
 import { LectureTimeline } from './lecture-timeline'
 import { NodePanel } from './node-panel'
+
+// React Flow and its CSS load only when the map view is shown, never for the list.
+const ConceptMap = dynamic(() => import('./concept-map').then((m) => m.ConceptMap), {
+  ssr: false,
+  loading: () => (
+    <Skeleton label="Loading your concept map" className="h-[36rem] w-full rounded-lg" />
+  ),
+})
 
 type View = 'map' | 'list'
 
@@ -44,51 +54,66 @@ function rememberView(view: View) {
   }
 }
 
-/** Canvas + node panel overlay. Closing the panel returns focus to the node (F2.8). */
-function MapView({ map }: { map: CourseMapResponse }) {
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const selected = map.nodes.find((n) => n.id === selectedId)
-
-  if (map.nodes.length === 0) return <ConceptList map={map} />
-
-  const close = () => {
-    const id = selectedId
-    setSelectedId(null)
-    document.querySelector<HTMLElement>(`.react-flow__node[data-id="${id}"]`)?.focus()
-  }
-
+function SmallMapNote() {
   return (
-    <div className="space-y-3">
-      {map.nodes.length < SMALL_MAP && (
-        <p className="text-muted-foreground flex items-start gap-2 text-sm">
-          <Info aria-hidden className="mt-0.5 size-4 shrink-0" />
-          Only a few concepts so far. Lectures with little conceptual content, like an admin
-          session, produce short maps; more appear as you add lectures.
-        </p>
-      )}
-      <div className="relative">
-        <ConceptMap map={map} selectedId={selectedId} onOpen={setSelectedId} />
-        {selected && (
-          <div className="absolute inset-y-3 right-3 flex items-start w-[min(22rem,calc(100%-1.5rem))]">
-            <NodePanel concept={selected} map={map} onClose={close} />
-          </div>
-        )}
-      </div>
-    </div>
+    <p className="text-body-sm text-muted-foreground flex items-start gap-2">
+      <Info aria-hidden className="mt-0.5 size-4 shrink-0" />
+      Only a few concepts so far. Lectures with little conceptual content, like an admin session,
+      produce short maps; more appear as you add lectures.
+    </p>
   )
 }
 
 function CourseSkeleton() {
   return (
-    <div aria-busy aria-label="Loading concept map" className="space-y-6">
-      <Skeleton className="h-4 w-28" />
-      <Skeleton className="h-9 w-80" />
+    <Skeleton label="Loading your concept map" className="space-y-6">
+      <Skeleton className="h-3 w-28" />
+      <Skeleton className="h-7 w-80 max-w-full" />
       <Skeleton className="h-2 w-full max-w-md" />
-      <div className="space-y-3 pt-6">
-        {[0, 1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-16 w-full" />
-        ))}
-      </div>
+      <Skeleton className="h-[36rem] w-full rounded-lg" />
+    </Skeleton>
+  )
+}
+
+function ViewToggle({ view, onChange }: { view: View; onChange: (view: View) => void }) {
+  return (
+    <ToggleGroup
+      type="single"
+      variant="outline"
+      size="sm"
+      value={view}
+      onValueChange={(next) => next && onChange(next as View)}
+      aria-label="View"
+    >
+      <ToggleGroupItem value="map" className="px-3">
+        <Network aria-hidden />
+        Map
+      </ToggleGroupItem>
+      <ToggleGroupItem value="list" className="px-3">
+        <List aria-hidden />
+        List
+      </ToggleGroupItem>
+    </ToggleGroup>
+  )
+}
+
+interface SideColumnProps {
+  map: CourseMapResponse
+  selectedId: string | null
+  onClose: () => void
+}
+
+/** The right column: the open concept's panel, else the lecture timeline (Design System §4). */
+function SideColumn({ map, selectedId, onClose }: SideColumnProps) {
+  const selected = map.nodes.find((n) => n.id === selectedId)
+  return (
+    <div className="space-y-6 lg:sticky lg:top-[calc(var(--topbar-height)+1rem)]">
+      {selected ? (
+        <NodePanel concept={selected} map={map} onClose={onClose} />
+      ) : (
+        <LectureTimeline map={map} />
+      )}
+      {map.course.kind === 'library' && <LicenseNotice />}
     </div>
   )
 }
@@ -100,66 +125,81 @@ export function CourseView({ courseId }: { courseId: string }) {
   const [view, setView] = useState<View>(() =>
     FEATURES.conceptMapCanvas && typeof window !== 'undefined' ? storedView() : 'list',
   )
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
-  if (map.isPending) return <CourseSkeleton />
+  if (map.isPending) {
+    return (
+      <>
+        <PageChrome crumbs={[{ label: 'Course' }]} />
+        <CourseSkeleton />
+      </>
+    )
+  }
   if (map.isError) {
     return (
-      <ErrorState
-        title="Couldn't load this course"
-        error={map.error}
-        onRetry={() => map.refetch()}
-      />
+      <>
+        <PageChrome crumbs={[{ label: 'Course' }]} />
+        <ErrorState
+          pageTitle
+          title="Couldn't load this course"
+          error={map.error}
+          onRetry={() => map.refetch()}
+        />
+      </>
     )
   }
 
   const { course, nodes, lectures } = map.data
-  const isLibrary = course.kind === 'library'
   const counts = countMastery(nodes.map((node) => node.mastery.state))
-  const activeView: View = FEATURES.conceptMapCanvas ? view : 'list'
+  const activeView: View = FEATURES.conceptMapCanvas && nodes.length > 0 ? view : 'list'
+
+  const changeView = (next: View) => {
+    setView(next)
+    rememberView(next)
+  }
+  // Closing the panel returns focus to its node (F2.8).
+  const closePanel = () => {
+    const id = selectedId
+    setSelectedId(null)
+    document.querySelector<HTMLElement>(`.react-flow__node[data-id="${id}"]`)?.focus()
+  }
 
   return (
     <>
-      <PageHeader
-        back={{ href: '/dashboard', label: 'Dashboard' }}
-        eyebrow={isLibrary ? 'Lecture library' : 'Your course'}
-        title={course.title}
-        description={`${pluralize(nodes.length, 'concept')} across ${pluralize(lectures.length, 'lecture')}. Flags show where you were lost; stars show what you marked important.`}
+      <PageChrome
+        crumbs={[{ label: course.title, href: `/courses/${course.id}` as Route }]}
+        courseId={course.id}
         actions={
-          FEATURES.conceptMapCanvas ? (
-            <ToggleGroup
-              type="single"
-              variant="outline"
-              value={view}
-              onValueChange={(next) => {
-                if (!next) return
-                setView(next as View)
-                rememberView(next as View)
-              }}
-              aria-label="View"
-            >
-              <ToggleGroupItem value="map" className="px-3">
-                <Network aria-hidden />
-                Map
-              </ToggleGroupItem>
-              <ToggleGroupItem value="list" className="px-3">
-                <List aria-hidden />
-                List
-              </ToggleGroupItem>
-            </ToggleGroup>
-          ) : null
+          // No concepts means no map: hide the toggle rather than show "Map" pressed over a list.
+          FEATURES.conceptMapCanvas && nodes.length > 0 ? (
+            <ViewToggle view={activeView} onChange={changeView} />
+          ) : undefined
         }
       />
+      <PageHeader
+        eyebrow={course.kind === 'library' ? 'Lecture library' : 'Your course'}
+        title={course.title}
+        description={`${pluralize(nodes.length, 'concept')} across ${pluralize(lectures.length, 'lecture')}. Flags show where you were lost; stars show what you marked important.`}
+      />
 
-      <MasteryBar counts={counts} className="mb-10 max-w-xl" />
+      <MasteryBar counts={counts} className="mb-8 max-w-xl" />
 
-      <div className="grid items-start gap-8 lg:grid-cols-[1fr_18rem]">
-        <div className="min-w-0">
-          {activeView === 'map' ? <MapView map={map.data} /> : <ConceptList map={map.data} />}
+      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_var(--panel-width)]">
+        <div className="min-w-0 space-y-3">
+          {activeView === 'map' ? (
+            <>
+              {nodes.length < SMALL_MAP && <SmallMapNote />}
+              <ConceptMap map={map.data} selectedId={selectedId} onOpen={setSelectedId} />
+            </>
+          ) : (
+            <ConceptList map={map.data} />
+          )}
         </div>
-        <aside className="space-y-6 lg:sticky lg:top-24">
-          <LectureTimeline map={map.data} />
-          {isLibrary && <LicenseNotice />}
-        </aside>
+        <SideColumn
+          map={map.data}
+          selectedId={activeView === 'map' ? selectedId : null}
+          onClose={closePanel}
+        />
       </div>
     </>
   )
