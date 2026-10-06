@@ -24,9 +24,9 @@ const HEADER = /^(\S.{0,79}?)(?:\t| {2})\s*(\d{1,2}):(\d{2})(?::(\d{2}))?$/
 /**
  * One space, a `\n` from `<w:br/>`, or nothing (a name run straight into a time run) between
  * name and time, as some Teams exports may write it: only when the name has no digit and no
- * comma, which a preamble date ("6 October 2026, 14:00") always has.
- * ponytail: a text paragraph like "Back at 12:30" also matches; the monotonic guard below only
- * catches it when the time goes backwards. Check against the doc's repeat speakers if seen.
+ * comma, which a preamble date ("6 October 2026, 14:00") always has. Text like "Back at 12:30"
+ * also matches, so `headerRule` only trusts it for repeated names in documents with no strict
+ * header.
  */
 const LOOSE_HEADER = /^(?=\S)([^\d,\n]{1,80}?)\s*(\d{1,2}):(\d{2})(?::(\d{2}))?$/
 /** A repeated arrow-layout first line is a speaker only if it reads like a name. */
@@ -51,7 +51,7 @@ const NAMED_ENTITIES: Readonly<Record<string, string>> = {
   '&apos;': "'",
 }
 const MAX_CODE_POINT = 0x10ffff
-/** Speaker lines repeat; a first line seen at the top of this many blocks is a speaker. */
+/** Speakers recur: a line (arrow first line, loose header name) seen this often is a speaker. */
 const MIN_SPEAKER_REPEATS = 2
 
 /** Plain text of each `<w:p>` in a WordprocessingML body, in order. */
@@ -119,7 +119,29 @@ function parseArrowLayout(paragraphs: readonly string[]): Cue[] {
   }))
 }
 
+/**
+ * The header rule is chosen once per document. Any strict header → only strict headers count.
+ * Otherwise loose headers count, but only for names that open 2+ of them (the document's
+ * speakers), so "Office hours are at 10:30" never starts a turn.
+ * ponytail: in a loose-only document a speaker heard once (a guest's single question) isn't
+ * recognised and their header stays in the text.
+ */
+function headerRule(paragraphs: readonly string[]): (p: string) => number | null {
+  if (paragraphs.some((p) => HEADER.test(p))) return (p) => toStartMs(HEADER.exec(p))
+  const counts = new Map<string, number>()
+  for (const p of paragraphs) {
+    const name = LOOSE_HEADER.exec(p)?.[1]
+    if (name !== undefined) counts.set(name, (counts.get(name) ?? 0) + 1)
+  }
+  return (p) => {
+    const match = LOOSE_HEADER.exec(p)
+    const isSpeaker = (counts.get(match?.[1] ?? '') ?? 0) >= MIN_SPEAKER_REPEATS
+    return isSpeaker ? toStartMs(match) : null
+  }
+}
+
 function parseHeaderLayout(paragraphs: readonly string[]): Cue[] {
+  const headerStartMs = headerRule(paragraphs)
   const turns: { startMs: number; lines: string[] }[] = []
   for (const p of paragraphs) {
     const startMs = headerStartMs(p)
@@ -137,8 +159,7 @@ function parseHeaderLayout(paragraphs: readonly string[]): Cue[] {
   }))
 }
 
-function headerStartMs(paragraph: string): number | null {
-  const match = HEADER.exec(paragraph) ?? LOOSE_HEADER.exec(paragraph)
+function toStartMs(match: RegExpExecArray | null): number | null {
   if (!match) return null
   const [, , a, b, c] = match
   const [h, m, s] = c === undefined ? [0, Number(a), Number(b)] : [Number(a), Number(b), Number(c)]

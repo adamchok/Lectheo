@@ -94,20 +94,72 @@ describe('parseTeamsDocx', () => {
     expect(parsed?.cues).toEqual([{ startMs: 1_000, endMs: 2_000, text: 'Hi.' }])
   })
 
-  it('accepts a single space, a line break or no gap between name and time', () => {
-    const singleSpace = doc('Jane Doe 0:03', 'Hello there.', 'Sam Lee 0:41', 'Question?')
-    expect(parseTeamsDocx(singleSpace)?.cues).toEqual([
-      { startMs: 3_000, endMs: 41_000, text: 'Hello there.' },
-      { startMs: 41_000, endMs: 41_000, text: 'Question?' },
+  it('accepts a single space, a line break or no gap between a repeated name and the time', () => {
+    const singleSpace = doc(
+      'Jane Doe 0:03',
+      'Hello there.',
+      'Sam Lee 0:41',
+      'Question?',
+      'Jane Doe 1:02',
+      'Answer.',
+      'Sam Lee 1:30',
+      'Thanks.',
+    )
+    expect(parseTeamsDocx(singleSpace)?.cues.map((c) => [c.startMs, c.text])).toEqual([
+      [3_000, 'Hello there.'],
+      [41_000, 'Question?'],
+      [62_000, 'Answer.'],
+      [90_000, 'Thanks.'],
     ])
     const brAndRuns =
       '<w:p><w:r><w:t>Jane Doe</w:t><w:br/><w:t>0:03</w:t></w:r></w:p>' +
       '<w:p><w:r><w:t>Hello.</w:t></w:r></w:p>' +
-      '<w:p><w:r><w:t>Sam Lee</w:t></w:r><w:r><w:t>0:41</w:t></w:r></w:p>' +
+      '<w:p><w:r><w:t>Jane Doe</w:t></w:r><w:r><w:t>0:41</w:t></w:r></w:p>' +
       '<w:p><w:r><w:t>Bye.</w:t></w:r></w:p>'
     expect(parseTeamsDocx(brAndRuns)?.cues.map((c) => [c.startMs, c.text])).toEqual([
       [3_000, 'Hello.'],
       [41_000, 'Bye.'],
+    ])
+  })
+
+  it('strict headers: a sentence ending in a later time stays text', () => {
+    const parsed = parseTeamsDocx(
+      doc(
+        'Jane Doe   0:03',
+        'Hello.',
+        'Office hours are at 10:30',
+        'Sam Lee   0:41',
+        'Q?',
+        'Jane Doe   1:02',
+        'Answer.',
+      ),
+    )
+    expect(parsed?.cues.map((c) => [c.startMs, c.text])).toEqual([
+      [3_000, 'Hello. Office hours are at 10:30'],
+      [41_000, 'Q?'],
+      [62_000, 'Answer.'],
+    ])
+  })
+
+  it('loose headers: only repeated names start turns, so a one-off sentence stays text', () => {
+    const parsed = parseTeamsDocx(
+      doc(
+        'Jane Doe 0:03',
+        'Hello.',
+        'Office hours are at 10:30',
+        'Sam Lee 0:41',
+        'Q?',
+        'Jane Doe 1:02',
+        'Answer.',
+        'Sam Lee 1:30',
+        'Thanks.',
+      ),
+    )
+    expect(parsed?.cues.map((c) => [c.startMs, c.text])).toEqual([
+      [3_000, 'Hello. Office hours are at 10:30'],
+      [41_000, 'Q?'],
+      [62_000, 'Answer.'],
+      [90_000, 'Thanks.'],
     ])
   })
 
