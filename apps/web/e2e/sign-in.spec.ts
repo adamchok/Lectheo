@@ -58,3 +58,40 @@ test('a failed Google round trip shows an inline alert and cleans the URL', asyn
   )
   await expect(page).toHaveURL(/\/$/)
 })
+
+test('one sign-in at a time: the header check disables the hero buttons', async ({ page }) => {
+  // Hold the script so the header's check stays on "Checking your browser…".
+  await page.route(TURNSTILE, () => new Promise<void>(() => {}))
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  await page.waitForSelector('script[src*="challenges.cloudflare.com"]', { state: 'attached' })
+  await page
+    .getByRole('banner')
+    .getByRole('button', { name: /try the sample account/i })
+    .click()
+  await expect(page.getByRole('banner').getByText('Checking your browser…')).toBeVisible()
+  await expect(heroSampleButton(page)).toBeDisabled()
+  await expect(
+    landingHero(page).getByRole('button', { name: /continue with google/i }),
+  ).toBeDisabled()
+})
+
+test.describe('phone width', () => {
+  test.use({ viewport: { width: 375, height: 812 } })
+
+  test('the menu closes after following a link, and on Escape', async ({ page }) => {
+    await page.goto('/')
+    const menu = page.getByRole('button', { name: 'Menu' })
+    const practice = page.getByRole('navigation', { name: 'Sections, mobile' }).getByRole('link', {
+      name: 'Practice',
+    })
+    await menu.click()
+    await practice.click()
+    await expect(practice).toBeHidden()
+    await expect(page).toHaveURL(/#practice$/)
+
+    await menu.click()
+    await expect(practice).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(practice).toBeHidden()
+  })
+})

@@ -5,19 +5,23 @@ export const alt = 'Lectheo · Find what you missed. Prove what you know.'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
+/** A hung Google Fonts request must not stall the build. */
+const FONT_TIMEOUT_MS = 5_000
 const TEXT = 'LectheoFind what you missed.Prove what you know.'
 
 /**
  * Newsreader (the display face) from Google Fonts, subset to the glyphs drawn here. Rendered at
- * build time; without the network the image falls back to next/og's default sans.
+ * build time; without the network (or after 5 s) the image falls back to next/og's default sans.
  */
 async function newsreader(weight: number, italic: boolean): Promise<ArrayBuffer | null> {
   const family = `Newsreader:ital,wght@${italic ? 1 : 0},${weight}`
   const url = `https://fonts.googleapis.com/css2?family=${family}&text=${encodeURIComponent(TEXT)}`
   try {
-    const css = await (await fetch(url)).text()
+    const css = await (await fetch(url, { signal: AbortSignal.timeout(FONT_TIMEOUT_MS) })).text()
     const src = /src: url\((.+?)\) format\('(?:opentype|truetype)'\)/.exec(css)?.[1]
-    return src ? await (await fetch(src)).arrayBuffer() : null
+    return src
+      ? await (await fetch(src, { signal: AbortSignal.timeout(FONT_TIMEOUT_MS) })).arrayBuffer()
+      : null
   } catch {
     return null
   }

@@ -1,6 +1,7 @@
 import { ClipboardCheck, MessageCircleQuestion, Play } from 'lucide-react'
+import { Suspense } from 'react'
 import { KeyHint } from '@/components/key-hint'
-import { SignInActions } from '@/components/sign-in/sign-in-actions'
+import { AuthErrorAlert, SignInActions } from '@/components/sign-in/sign-in-actions'
 import { CONTAINER, Screenshot, Section } from './section'
 import diagnosticDark from './screenshots/diagnostic-result-dark.png'
 import diagnosticLight from './screenshots/diagnostic-result-light.png'
@@ -10,7 +11,7 @@ import heroLight from './screenshots/hero-map-light.png'
 /** Product words are bold; italics are kept for the hero's "Prove" (Design System §1). */
 const term = 'text-foreground font-semibold'
 
-export function Hero({ authError }: { authError: boolean }) {
+export function Hero() {
   return (
     <section aria-labelledby="hero-title" className="pt-12 pb-16 lg:pt-20 lg:pb-24">
       <div className={`${CONTAINER} space-y-12 lg:space-y-16`}>
@@ -26,7 +27,12 @@ export function Hero({ authError }: { authError: boolean }) {
               know them.
             </p>
           </div>
-          <SignInActions authError={authError} />
+          <div className="space-y-4">
+            <Suspense>
+              <AuthErrorAlert />
+            </Suspense>
+            <SignInActions />
+          </div>
           <div className="text-caption text-muted-foreground space-y-1">
             <p>
               No sign-up for the sample. It&apos;s a student partway through Harvard&apos;s CS50x,

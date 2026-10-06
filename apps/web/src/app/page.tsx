@@ -25,14 +25,13 @@ export const metadata: Metadata = {
 }
 
 /** Public landing page (Design System §5, Landing Copy). Signed-in visitors never see it (proxy). */
-export default async function LandingPage({ searchParams }: PageProps<'/'>) {
-  const { error } = await searchParams
+export default function LandingPage() {
   return (
     <div className="flex min-h-dvh flex-col">
       <SkipLink />
       <LandingHeader />
       <main id="main" tabIndex={-1} className="flex-1 outline-none">
-        <Hero authError={error === 'auth'} />
+        <Hero />
         <Problem />
         <HowItWorks />
         <Diagnosis />

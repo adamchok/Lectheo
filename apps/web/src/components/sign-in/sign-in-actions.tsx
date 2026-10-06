@@ -3,13 +3,14 @@
 import { RedirectResponse } from '@lectheo/contracts'
 import { ArrowRight } from 'lucide-react'
 import type { Route } from 'next'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Script from 'next/script'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { apiFetch, isApiClientError } from '@/client/api'
 import { Button } from '@/components/ui/button'
 import { safeRedirect } from '@/lib/safe-redirect'
 import { cn } from '@/lib/utils'
+import { signInLock, useSignInBusy, useSignInTouched } from './sign-in-lock'
 import { TURNSTILE_SCRIPT_SRC } from './turnstile'
 import { Spinner } from '@/components/ui/spinner'
 
@@ -56,7 +57,7 @@ function GoogleIcon() {
 }
 
 /** Turnstile → POST /session/sample → dashboard (F0.2). */
-function useSampleSignIn(report: ReportError) {
+function useSampleSignIn(report: ReportError, claim: () => boolean) {
   const router = useRouter()
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
   const containerRef = useRef<HTMLDivElement>(null)
@@ -136,6 +137,7 @@ function useSampleSignIn(report: ReportError) {
       report(CHECK_FAILED)
       return
     }
+    if (!claim()) return
     setSampleState('verifying')
     const container = containerRef.current
     if (window.turnstile && container && widgetIdRef.current) {
@@ -165,10 +167,11 @@ function useSampleSignIn(report: ReportError) {
   return { start, sampleState, containerRef, script }
 }
 
-function useGoogleSignIn(report: ReportError) {
+function useGoogleSignIn(report: ReportError, claim: () => boolean) {
   const [pending, setPending] = useState(false)
   const start = async () => {
     report(null)
+    if (!claim()) return
     setPending(true)
     try {
       // Loaded on click: the Supabase client (~62 kB) isn't needed to render the landing page.
@@ -188,31 +191,50 @@ export interface SignInActionsProps {
    * button, errors in a popover. `menu`: "Sign in" only, for the mobile menu.
    */
   variant?: 'hero' | 'header' | 'menu'
-  /** The Google round trip failed (`/?error=auth` from /auth/callback). Hero only. */
-  authError?: boolean
+}
+
+/**
+ * "Google sign-in didn't complete" after `/?error=auth` from /auth/callback. Reads the query on
+ * the client (inside a Suspense boundary) so `/` stays static, then drops `error` from the URL so
+ * a reload or a shared link doesn't repeat it. Hidden once any sign-in starts.
+ */
+export function AuthErrorAlert() {
+  const searchParams = useSearchParams()
+  // Latched: the URL clean-up below changes searchParams.
+  const [failed] = useState(() => searchParams.get('error') === 'auth')
+  const touched = useSignInTouched()
+  useEffect(() => {
+    if (!failed) return
+    const url = new URL(window.location.href)
+    url.searchParams.delete('error')
+    // null state: Next copies its own and syncs its URL, so `?error=auth` can't come back.
+    window.history.replaceState(null, '', url)
+  }, [failed])
+  if (!failed || touched) return null
+  return (
+    <p role="alert" className="text-destructive text-body-sm">
+      {AUTH_FAILED}
+    </p>
+  )
 }
 
 /** Sample account (Turnstile → POST /session/sample) and Google sign-in (F0.1). */
-export function SignInActions({ variant = 'hero', authError = false }: SignInActionsProps) {
+export function SignInActions({ variant = 'hero' }: SignInActionsProps) {
+  const id = useId()
   const [error, setError] = useState<string | null>(null)
-  const [showAuthError, setShowAuthError] = useState(authError)
-  const report = useCallback<ReportError>((next) => {
-    setShowAuthError(false)
-    setError(next)
-  }, [])
-  const { start: startSample, sampleState, containerRef, script } = useSampleSignIn(report)
-  const google = useGoogleSignIn(report)
+  const report = useCallback<ReportError>((next) => setError(next), [])
+  const claim = useCallback(() => signInLock.claim(id), [id])
+  const { start: startSample, sampleState, containerRef, script } = useSampleSignIn(report, claim)
+  const google = useGoogleSignIn(report, claim)
 
-  // Keep the URL clean once the message is on screen, so a reload or a shared link doesn't
-  // show a stale failure.
+  // Every instance disables while any one signs in; the lock frees when this one goes idle.
+  const signingIn = sampleState !== 'idle' || google.pending
   useEffect(() => {
-    if (!authError) return
-    const url = new URL(window.location.href)
-    url.searchParams.delete('error')
-    window.history.replaceState(window.history.state, '', url)
-  }, [authError])
-
-  const busy = sampleState !== 'idle' || google.pending
+    if (!signingIn) signInLock.release(id)
+  }, [signingIn, id])
+  // Sign-out lands back on `/` without a reload; a lock left by the old page mustn't stick.
+  useEffect(() => () => signInLock.release(id), [id])
+  const busy = useSignInBusy()
   const errorText = error ? <span className="text-destructive">{error}</span> : null
 
   if (variant === 'menu') {
@@ -263,17 +285,20 @@ export function SignInActions({ variant = 'hero', authError = false }: SignInAct
         <Button className="px-3 sm:px-4" onClick={startSample} disabled={busy}>
           {sampleLabel}
         </Button>
-        <div ref={containerRef} className="empty:hidden" />
-        <p
-          aria-live="polite"
-          role="status"
-          className={cn(
-            'text-caption bg-popover shadow-popover absolute top-full right-0 z-overlay mt-2 w-72 rounded-md p-3',
-            !error && 'sr-only',
-          )}
-        >
-          {errorText}
-        </p>
+        {/* Below the 56px bar: an interactive challenge (~300×65) and errors float here. */}
+        <div className="absolute top-full right-0 z-overlay mt-2 flex flex-col items-end gap-2">
+          <div ref={containerRef} className="empty:hidden" />
+          <p
+            aria-live="polite"
+            role="status"
+            className={cn(
+              'text-caption bg-popover shadow-popover w-72 rounded-md p-3',
+              !error && 'sr-only',
+            )}
+          >
+            {errorText}
+          </p>
+        </div>
       </div>
     )
   }
@@ -281,11 +306,6 @@ export function SignInActions({ variant = 'hero', authError = false }: SignInAct
   return (
     <div className="space-y-4">
       {script}
-      {showAuthError && (
-        <p role="alert" className="text-destructive text-body-sm">
-          {AUTH_FAILED}
-        </p>
-      )}
       <div className="flex flex-col gap-3 sm:flex-row">
         <Button size="lg" className="h-11 px-5" onClick={startSample} disabled={busy}>
           {sampleLabel}
