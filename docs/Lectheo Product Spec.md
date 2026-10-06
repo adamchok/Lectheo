@@ -388,12 +388,10 @@ These requirements are specified above but **not implemented yet**. Until they s
 | Req | Item |
 |---|---|
 | F0.4 | Dashboard follows the student's own course |
-| F0.6 | Self-serve *Delete account* (today: email the author) |
-| F0.7 | Rename and delete own courses; CS50 library visible to sample accounts only |
+| F0.7 | CS50 library visible to sample accounts only (rename and delete own courses are built) |
 | F0.8 | First-run screen for new Google accounts |
 | F0.9 | Processing steps on the dashboard |
 | F0.10–F0.12 | Next-step card: why, how long, payoff; *Also worth doing*; no dead end |
-| F8.2 | Delete course and delete account (delete lecture is built) |
 
 ### Should items: built or cut
 

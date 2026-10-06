@@ -255,6 +255,38 @@ export function useCreateCourse() {
   })
 }
 
+/** PATCH /courses/{id}: the list and this course's map carry the title. */
+export function useRenameCourse(courseId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (title: string) =>
+      apiFetch(`/courses/${courseId}`, { method: 'PATCH', body: { title }, schema: CourseSummary }),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.courses, exact: true }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.courseMap(courseId), exact: true }),
+      ]),
+  })
+}
+
+/** DELETE /courses/{id}. As with lectures, the caller leaves the page; gcTime drops its map. */
+export function useDeleteCourse() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (courseId: string) => apiFetch(`/courses/${courseId}`, { method: 'DELETE' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.courses, exact: true }),
+  })
+}
+
+/** DELETE /me: the account is gone, so nothing cached is valid any more. */
+export function useDeleteAccount() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => apiFetch('/me', { method: 'DELETE' }),
+    onSuccess: () => queryClient.clear(),
+  })
+}
+
 export interface CreateLectureInput {
   id: string
   courseId: string

@@ -151,8 +151,8 @@ const FAQ: ReadonlyArray<{ question: string; answer: ReactNode }> = [
       <>
         Video never leaves your laptop; only the transcript is uploaded. Audio you upload is deleted
         as soon as it&apos;s transcribed, and so is the transcription provider&apos;s copy. Speaker
-        names are removed from transcripts. Deleting a lecture deletes everything made from it.
-        Details are in the{' '}
+        names are removed from transcripts. Deleting a lecture deletes everything made from it. You
+        can delete your account at any time from the account menu. Details are in the{' '}
         <Link href="/privacy" className={link}>
           privacy policy
         </Link>

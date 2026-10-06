@@ -1,22 +1,14 @@
 'use client'
 
 import type { MeResponse } from '@lectheo/contracts'
-import { CircleX, LogOut, Monitor, Moon, RotateCcw, Sun } from 'lucide-react'
+import { LogOut, Monitor, Moon, RotateCcw, Sun, Trash2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
-import { useState } from 'react'
+import { useRef, useState, type RefObject } from 'react'
 import { toast } from 'sonner'
-import { useResetSample, useSignOut } from '@/client/queries'
+import { useDeleteAccount, useResetSample, useSignOut } from '@/client/queries'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,30 +26,92 @@ import { errorMessage } from './error-state'
 
 export const SAMPLE_ACCOUNT_LABEL = 'Sample account · progress resets when you leave'
 
+/** F0.6 wording: names the consequence before anything is deleted. */
+export const DELETE_ACCOUNT_CONSEQUENCE =
+  "This deletes your courses, lectures, marks and practice, and signs you out. It can't be undone."
+
+interface MenuDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  /** The account button: the menu item that opened the dialog is gone when it closes. */
+  returnFocusTo?: RefObject<HTMLElement | null>
+}
+
+/** Delete account (Google accounts, F0.6): DELETE /me, then the landing page. */
+export function DeleteAccountDialog({ open, onOpenChange, returnFocusTo }: MenuDialogProps) {
+  const router = useRouter()
+  const remove = useDeleteAccount()
+  return (
+    <ConfirmDialog
+      open={open}
+      onOpenChange={(next) => {
+        onOpenChange(next)
+        if (!next) remove.reset()
+      }}
+      title="Delete your account?"
+      description={DELETE_ACCOUNT_CONSEQUENCE}
+      confirmLabel="Delete account"
+      pendingLabel="Deleting…"
+      icon={<Trash2 aria-hidden />}
+      // Stays pending until the navigation lands: a second click would only 401.
+      pending={remove.isPending || remove.isSuccess}
+      error={remove.isError ? `Couldn't delete your account. ${errorMessage(remove.error)}` : null}
+      returnFocusTo={returnFocusTo}
+      onConfirm={() =>
+        remove.mutate(undefined, {
+          onSuccess: () => {
+            router.replace('/')
+            router.refresh()
+          },
+        })
+      }
+    />
+  )
+}
+
+function ResetSampleDialog({ open, onOpenChange, returnFocusTo }: MenuDialogProps) {
+  const reset = useResetSample()
+  return (
+    <ConfirmDialog
+      open={open}
+      onOpenChange={(next) => {
+        onOpenChange(next)
+        if (!next) reset.reset()
+      }}
+      title="Reset the sample account?"
+      description="Your markers, answers and practice in this sample will be cleared, and you'll start again from the original sample student."
+      confirmLabel="Reset sample"
+      pendingLabel="Resetting…"
+      icon={<RotateCcw aria-hidden />}
+      pending={reset.isPending || reset.isSuccess}
+      error={reset.isError ? errorMessage(reset.error) : null}
+      returnFocusTo={returnFocusTo}
+      onConfirm={() =>
+        reset.mutate(undefined, {
+          // Full navigation so every cached view re-renders from the fresh copy.
+          onSuccess: ({ redirect }) => window.location.assign(safeRedirect(redirect)),
+        })
+      }
+    />
+  )
+}
+
 function initials(name: string | null): string {
   if (!name) return '?'
   const parts = name.trim().split(/\s+/).slice(0, 2)
   return parts.map((p) => p[0]?.toUpperCase() ?? '').join('') || '?'
 }
 
-/** Account card at the bottom of the sidebar; opens theme, Reset sample and Sign out. */
+/** Account card at the bottom of the sidebar; opens theme, Reset sample, Sign out, Delete. */
 export function AccountMenu({ me, collapsed = false }: { me: MeResponse; collapsed?: boolean }) {
   const router = useRouter()
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const [confirmReset, setConfirmReset] = useState(false)
-  const resetSample = useResetSample()
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const signOut = useSignOut()
   const { theme, setTheme } = useTheme()
   const name = me.displayName ?? (me.isSample ? 'Sample student' : 'Your account')
   const meta = signOut.isPending ? 'Signing out…' : me.isSample ? 'Sample account' : null
-
-  const handleReset = () => {
-    resetSample.mutate(undefined, {
-      onSuccess: ({ redirect }) => {
-        // Full navigation so every cached view re-renders from the fresh copy.
-        window.location.assign(safeRedirect(redirect))
-      },
-    })
-  }
 
   const handleSignOut = () => {
     signOut.mutate(undefined, {
@@ -76,6 +130,7 @@ export function AccountMenu({ me, collapsed = false }: { me: MeResponse; collaps
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
+            ref={triggerRef}
             variant="ghost"
             aria-label={`Account: ${name}`}
             aria-busy={signOut.isPending || undefined}
@@ -129,49 +184,25 @@ export function AccountMenu({ me, collapsed = false }: { me: MeResponse; collaps
             <LogOut aria-hidden />
             Sign out
           </DropdownMenuItem>
+          {me.kind === 'google' && (
+            <DropdownMenuItem variant="destructive" onSelect={() => setConfirmDelete(true)}>
+              <Trash2 aria-hidden />
+              Delete account
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Dialog
+      <DeleteAccountDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        returnFocusTo={triggerRef}
+      />
+      <ResetSampleDialog
         open={confirmReset}
-        onOpenChange={(open) => {
-          if (resetSample.isPending) return
-          setConfirmReset(open)
-          if (!open) resetSample.reset()
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reset the sample account?</DialogTitle>
-            <DialogDescription>
-              Your markers, answers and practice in this sample will be cleared, and you&apos;ll
-              start again from the original sample student.
-            </DialogDescription>
-          </DialogHeader>
-          {resetSample.isError && (
-            <p role="alert" className="text-body-sm text-destructive flex items-start gap-2">
-              <CircleX aria-hidden className="mt-0.5 size-4 shrink-0" />
-              {errorMessage(resetSample.error)}
-            </p>
-          )}
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline" disabled={resetSample.isPending}>
-                Cancel
-              </Button>
-            </DialogClose>
-            <Button
-              variant="destructive"
-              onClick={handleReset}
-              pending={resetSample.isPending}
-              pendingLabel="Resetting…"
-            >
-              <RotateCcw aria-hidden />
-              Reset sample
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        onOpenChange={setConfirmReset}
+        returnFocusTo={triggerRef}
+      />
     </>
   )
 }

@@ -37,4 +37,17 @@ test('add a lecture from a pasted transcript, see its map, delete it', async ({ 
   await page.getByRole('button', { name: 'Delete lecture' }).click()
   await expect(page.getByText('Lecture deleted')).toBeVisible()
   await expect(page.getByText(/0 concepts across 0 lectures/)).toBeVisible()
+
+  // F0.7: rename the course, then delete it (also cleans up the test data).
+  await page.getByRole('button', { name: 'Rename' }).click()
+  await page.getByRole('textbox', { name: 'Course name' }).fill('E2E Renamed')
+  await page.getByRole('button', { name: 'Save' }).click()
+  await expect(page.getByRole('heading', { name: 'E2E Renamed' })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Delete course' }).click()
+  const confirm = page.getByRole('dialog')
+  await expect(confirm.getByRole('button', { name: 'Cancel' })).toBeFocused()
+  await confirm.getByRole('button', { name: 'Delete course' }).click()
+  await expect(page).toHaveURL(/\/dashboard$/)
+  await expect(page.getByText('Course deleted')).toBeVisible()
 })
