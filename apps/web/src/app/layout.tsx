@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { JetBrains_Mono, Newsreader, Source_Sans_3 } from 'next/font/google'
 import type { ReactNode } from 'react'
 import { Providers } from '@/components/providers'
+import { siteUrl } from '@/lib/site'
 import './globals.css'
 
 // UI: Source Sans 3 (humanist, highly legible at small sizes).
@@ -17,6 +18,7 @@ const display = Newsreader({
 const code = JetBrains_Mono({ subsets: ['latin'], variable: '--font-code', display: 'swap' })
 
 export const metadata: Metadata = {
+  metadataBase: siteUrl(),
   title: { default: 'Lectheo', template: '%s · Lectheo' },
   description:
     'Find what you missed. Prove what you know. Lectheo uses your lecture to find what you personally don’t understand, then makes you reason with it.',

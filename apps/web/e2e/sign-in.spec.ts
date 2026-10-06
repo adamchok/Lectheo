@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { dropProfile, signInSample } from './fixtures'
+import { dropProfile, heroSampleButton, landingHero, signInSample } from './fixtures'
 
 /*
  * Sample sign-in when Cloudflare Turnstile can't load (blocked network, ad blocker). The widget's
@@ -12,9 +12,9 @@ async function expectCheckFailed(page: Page): Promise<void> {
   // A held script can block the load event; the injected tag means the page has hydrated.
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   await page.waitForSelector('script[src*="challenges.cloudflare.com"]', { state: 'attached' })
-  const button = page.getByRole('button', { name: /explore with a sample account/i })
+  const button = heroSampleButton(page)
   await button.click()
-  await expect(page.getByRole('status')).toContainText(/security check didn't load/i)
+  await expect(landingHero(page).getByRole('status')).toContainText(/security check didn't load/i)
   await expect(button).toBeEnabled()
 }
 
@@ -43,10 +43,18 @@ test('a session whose sample profile was purged is signed out, not looped (F0.2,
   await dropProfile(me.id)
 
   await page.goto('/')
-  await expect(page.getByRole('button', { name: /explore with a sample account/i })).toBeVisible()
+  await expect(heroSampleButton(page)).toBeVisible()
   await expect(page).toHaveURL(/\/$/)
   expect((await page.request.get('/api/v1/me')).status()).toBe(401)
   // The session cookie is gone: the proxy no longer sends `/` to the dashboard.
   await page.reload()
+  await expect(page).toHaveURL(/\/$/)
+})
+
+test('a failed Google round trip shows an inline alert and cleans the URL', async ({ page }) => {
+  await page.goto('/?error=auth')
+  await expect(landingHero(page).getByRole('alert')).toHaveText(
+    "Google sign-in didn't complete. Try again.",
+  )
   await expect(page).toHaveURL(/\/$/)
 })

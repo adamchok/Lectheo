@@ -9,15 +9,18 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { apiFetch, isApiClientError } from '@/client/api'
 import { Button } from '@/components/ui/button'
 import { safeRedirect } from '@/lib/safe-redirect'
+import { cn } from '@/lib/utils'
 import { TURNSTILE_SCRIPT_SRC } from './turnstile'
 import { Spinner } from '@/components/ui/spinner'
 
 type SampleState = 'idle' | 'verifying' | 'starting'
+type ReportError = (error: string | null) => void
 
 /** How long a click waits for the Turnstile script before giving up (blocked or very slow). */
 const SCRIPT_TIMEOUT_MS = 10_000
 const CHECK_FAILED =
   "The security check didn't load. Check your connection or ad blocker, then refresh and try again."
+const AUTH_FAILED = "Google sign-in didn't complete. Try again."
 
 function sampleErrorCopy(error: unknown): string {
   if (isApiClientError(error)) {
@@ -52,8 +55,8 @@ function GoogleIcon() {
   )
 }
 
-/** "Explore with a sample account" (Turnstile → POST /session/sample) and Google sign-in (F0.1). */
-export function SignInActions() {
+/** Turnstile → POST /session/sample → dashboard (F0.2). */
+function useSampleSignIn(report: ReportError) {
   const router = useRouter()
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
   const containerRef = useRef<HTMLDivElement>(null)
@@ -61,8 +64,6 @@ export function SignInActions() {
   const pendingRef = useRef(false)
   const [scriptReady, setScriptReady] = useState(false)
   const [sampleState, setSampleState] = useState<SampleState>('idle')
-  const [googlePending, setGooglePending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const startSession = useCallback(
     async (turnstileToken: string) => {
@@ -75,12 +76,12 @@ export function SignInActions() {
         })
         router.push(safeRedirect(redirect) as Route)
       } catch (err) {
-        setError(sampleErrorCopy(err))
+        report(sampleErrorCopy(err))
         setSampleState('idle')
         window.turnstile?.reset(widgetIdRef.current)
       }
     },
-    [router],
+    [router, report],
   )
 
   // Render the widget once the script is ready. Execution waits for the click, so no
@@ -97,7 +98,7 @@ export function SignInActions() {
       theme: 'auto',
       callback: (token) => void startSession(token),
       'error-callback': () => {
-        setError(CHECK_FAILED)
+        report(CHECK_FAILED)
         setSampleState('idle')
       },
       'expired-callback': () => turnstile.reset(widgetIdRef.current),
@@ -110,7 +111,7 @@ export function SignInActions() {
       turnstile.remove(widgetIdRef.current)
       widgetIdRef.current = undefined
     }
-  }, [scriptReady, siteKey, startSession])
+  }, [scriptReady, siteKey, startSession, report])
 
   // The widget's error-callback only fires once the script has loaded. A blocked or hung script
   // would leave "Checking your browser…" spinning, so a waiting click fails on its own.
@@ -120,19 +121,19 @@ export function SignInActions() {
     window.clearTimeout(scriptTimer.current)
     if (!pendingRef.current) return
     pendingRef.current = false
-    setError(CHECK_FAILED)
+    report(CHECK_FAILED)
     setSampleState('idle')
-  }, [])
+  }, [report])
   useEffect(() => () => window.clearTimeout(scriptTimer.current), [])
 
-  const handleSample = () => {
-    setError(null)
+  const start = () => {
+    report(null)
     if (!siteKey) {
-      setError('Sample accounts are unavailable right now. Please try again later.')
+      report('Sample accounts are unavailable right now. Please try again later.')
       return
     }
     if (scriptFailed) {
-      setError(CHECK_FAILED)
+      report(CHECK_FAILED)
       return
     }
     setSampleState('verifying')
@@ -146,71 +147,163 @@ export function SignInActions() {
     }
   }
 
-  const handleGoogle = async () => {
-    setError(null)
-    setGooglePending(true)
+  // The landing page mounts several instances on one script tag; next/script tells the later
+  // ones through onLoad, not onReady.
+  const script = siteKey ? (
+    <Script
+      src={TURNSTILE_SCRIPT_SRC}
+      strategy="afterInteractive"
+      onReady={() => setScriptReady(true)}
+      onLoad={() => setScriptReady(true)}
+      onError={() => {
+        setScriptFailed(true)
+        failPendingCheck()
+      }}
+    />
+  ) : null
+
+  return { start, sampleState, containerRef, script }
+}
+
+function useGoogleSignIn(report: ReportError) {
+  const [pending, setPending] = useState(false)
+  const start = async () => {
+    report(null)
+    setPending(true)
     try {
       // Loaded on click: the Supabase client (~62 kB) isn't needed to render the landing page.
       const { signInWithGoogle } = await import('@/client/supabase')
       await signInWithGoogle()
     } catch {
-      setError("Google sign-in isn't available right now. Try the sample account instead.")
-      setGooglePending(false)
+      report("Google sign-in isn't available right now. Try the sample account instead.")
+      setPending(false)
     }
   }
+  return { start, pending }
+}
 
-  const busy = sampleState !== 'idle' || googlePending
+export interface SignInActionsProps {
+  /**
+   * `hero`: both large buttons, errors below. `header`: "Sign in" (from md) and the sample
+   * button, errors in a popover. `menu`: "Sign in" only, for the mobile menu.
+   */
+  variant?: 'hero' | 'header' | 'menu'
+  /** The Google round trip failed (`/?error=auth` from /auth/callback). Hero only. */
+  authError?: boolean
+}
+
+/** Sample account (Turnstile → POST /session/sample) and Google sign-in (F0.1). */
+export function SignInActions({ variant = 'hero', authError = false }: SignInActionsProps) {
+  const [error, setError] = useState<string | null>(null)
+  const [showAuthError, setShowAuthError] = useState(authError)
+  const report = useCallback<ReportError>((next) => {
+    setShowAuthError(false)
+    setError(next)
+  }, [])
+  const { start: startSample, sampleState, containerRef, script } = useSampleSignIn(report)
+  const google = useGoogleSignIn(report)
+
+  // Keep the URL clean once the message is on screen, so a reload or a shared link doesn't
+  // show a stale failure.
+  useEffect(() => {
+    if (!authError) return
+    const url = new URL(window.location.href)
+    url.searchParams.delete('error')
+    window.history.replaceState(window.history.state, '', url)
+  }, [authError])
+
+  const busy = sampleState !== 'idle' || google.pending
+  const errorText = error ? <span className="text-destructive">{error}</span> : null
+
+  if (variant === 'menu') {
+    return (
+      <div className="space-y-2">
+        <Button
+          variant="ghost"
+          className="w-full justify-start"
+          onClick={google.start}
+          disabled={busy}
+        >
+          {google.pending ? <Spinner /> : <GoogleIcon />}
+          Sign in
+        </Button>
+        <p aria-live="polite" role="status" className="text-caption">
+          {errorText}
+        </p>
+      </div>
+    )
+  }
+
+  const sampleLabel =
+    sampleState === 'idle' ? (
+      <>
+        Try the sample account
+        {variant === 'hero' && <ArrowRight aria-hidden />}
+      </>
+    ) : (
+      <>
+        <Spinner />
+        {sampleState === 'verifying' ? 'Checking your browser…' : 'Preparing your sample…'}
+      </>
+    )
+
+  if (variant === 'header') {
+    return (
+      <div className="relative flex items-center gap-2">
+        {script}
+        <Button
+          variant="ghost"
+          className="hidden md:inline-flex"
+          onClick={google.start}
+          disabled={busy}
+        >
+          {google.pending && <Spinner />}
+          Sign in
+        </Button>
+        <Button className="px-3 sm:px-4" onClick={startSample} disabled={busy}>
+          {sampleLabel}
+        </Button>
+        <div ref={containerRef} className="empty:hidden" />
+        <p
+          aria-live="polite"
+          role="status"
+          className={cn(
+            'text-caption bg-popover shadow-popover absolute top-full right-0 z-overlay mt-2 w-72 rounded-md p-3',
+            !error && 'sr-only',
+          )}
+        >
+          {errorText}
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">
-      {siteKey && (
-        <Script
-          src={TURNSTILE_SCRIPT_SRC}
-          strategy="afterInteractive"
-          onReady={() => setScriptReady(true)}
-          onError={() => {
-            setScriptFailed(true)
-            failPendingCheck()
-          }}
-        />
+      {script}
+      {showAuthError && (
+        <p role="alert" className="text-destructive text-body-sm">
+          {AUTH_FAILED}
+        </p>
       )}
       <div className="flex flex-col gap-3 sm:flex-row">
-        <Button
-          size="lg"
-          className="h-11 px-5 text-[0.9375rem]"
-          onClick={handleSample}
-          disabled={busy}
-        >
-          {sampleState === 'idle' ? (
-            <>
-              Explore with a sample account
-              <ArrowRight aria-hidden />
-            </>
-          ) : (
-            <>
-              <Spinner />
-              {sampleState === 'verifying' ? 'Checking your browser…' : 'Preparing your sample…'}
-            </>
-          )}
+        <Button size="lg" className="h-11 px-5" onClick={startSample} disabled={busy}>
+          {sampleLabel}
         </Button>
         <Button
           size="lg"
           variant="outline"
-          className="h-11 px-5 text-[0.9375rem]"
-          onClick={handleGoogle}
+          className="h-11 px-5"
+          onClick={google.start}
           disabled={busy}
         >
-          {googlePending ? (
-            <Spinner />
-          ) : (
-            <GoogleIcon />
-          )}
+          {google.pending ? <Spinner /> : <GoogleIcon />}
           Continue with Google
         </Button>
       </div>
       <div ref={containerRef} className="empty:hidden" />
-      <p aria-live="polite" role="status" className="min-h-5 text-sm">
-        {error ? <span className="text-destructive">{error}</span> : null}
+      <p aria-live="polite" role="status" className="text-body-sm">
+        {errorText}
       </p>
     </div>
   )
