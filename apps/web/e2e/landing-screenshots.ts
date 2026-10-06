@@ -42,7 +42,7 @@ async function answer(page: Page): Promise<void> {
   const confidence = page.waitForResponse(
     (r) => r.url().endsWith('/confidence') && r.request().method() === 'POST',
   )
-  await question.getByRole('radio', { name: /^sure/i }).click()
+  await question.getByRole('button', { name: /^sure/i }).click()
   const response = await confidence
   const itemId = new URL(response.url()).pathname.split('/').at(-2) ?? ''
   const { options } = (await response.json()) as { options: { id: string }[] }
@@ -72,7 +72,7 @@ async function spotFlawRight(page: Page, concept: RegExp): Promise<void> {
       .getByRole('textbox', { name: /what should it say instead/i })
       .fill('The corrected statement, as the lecture explains it.')
   } else {
-    await page.getByRole('radio', { name: 'Correct' }).check({ force: true })
+    await page.getByRole('radio', { name: 'No flaw' }).check({ force: true })
   }
   await page.getByRole('button', { name: 'Submit' }).click()
   await expect(page.getByRole('heading', { name: /your mastery of this concept/i })).toBeVisible()
