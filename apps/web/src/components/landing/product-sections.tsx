@@ -176,10 +176,9 @@ const SOURCES = [
     title: 'A recording with its transcript.',
     body: (
       <>
-        Pick the video or audio file and its <code className={code}>.vtt</code>,{' '}
-        <code className={code}>.srt</code> or Teams <code className={code}>.docx</code> transcript
-        (Teams, Zoom and Panopto can export them). The video plays from your laptop and is never
-        uploaded.
+        Pick the video or audio file and its <code className={code}>.vtt</code> or{' '}
+        <code className={code}>.srt</code> captions (Teams, Zoom and Panopto can export them). The
+        video plays from your laptop and is never uploaded.
       </>
     ),
   },

@@ -1,10 +1,9 @@
 import { TranscriptTextRequest, type TranscriptUploadResponse } from '@lectheo/contracts'
 import { and, eq, inArray, lectures, transcriptSegments } from '@lectheo/db'
-import { type ParsedTranscript, parseTranscript, type Segment, segmentCues } from '@lectheo/domain'
+import { parseTranscript, type Segment, segmentCues } from '@lectheo/domain'
 import type { z } from 'zod'
 import type { Actor } from '../auth'
 import { appDb, type DbLike } from '../db'
-import { NOT_TEAMS_DOCX, parseDocxTranscript } from '../docx'
 import { ApiError, invalidState } from '../errors'
 import { loadLectureForWrite } from '../ownership'
 import { MEDIA_LIMITS, tierOf, type Tier } from '../quota'
@@ -17,22 +16,18 @@ import { takeRateLimit, TRANSCRIPT_UPLOAD_LIMIT } from '../rate-limit'
  */
 
 type UploadDto = z.input<typeof TranscriptUploadResponse>
-export type TranscriptExt = 'vtt' | 'srt' | 'txt' | 'docx'
-/** Text formats arrive as a string; a Teams .docx stays bytes (it's a zip). */
-export type TranscriptInput =
-  | { raw: string; ext: Exclude<TranscriptExt, 'docx'> }
-  | { bytes: Uint8Array; ext: 'docx' }
+export type TranscriptExt = 'vtt' | 'srt' | 'txt'
+export interface TranscriptInput {
+  raw: string
+  ext: TranscriptExt
+}
 /** Injected so tests don't touch Supabase Storage. */
-export type StoreTranscript = (
-  path: string,
-  body: string | Uint8Array,
-  contentType: string,
-) => Promise<void>
+export type StoreTranscript = (path: string, raw: string, contentType: string) => Promise<void>
 
 export const MAX_TRANSCRIPT_BYTES = 2 * 1024 * 1024
 /** Multipart framing / JSON escaping on top of the 2 MB of transcript text. */
 const MULTIPART_OVERHEAD_BYTES = 64 * 1024
-const TRANSCRIPT_EXTS: readonly TranscriptExt[] = ['vtt', 'srt', 'txt', 'docx']
+const TRANSCRIPT_EXTS: readonly TranscriptExt[] = ['vtt', 'srt', 'txt']
 const MINUTE_MS = 60_000
 /** ≈150 spoken words/min × 1.33 tokens/word; tokens estimated as chars / 4. */
 const TOKENS_PER_MINUTE = 200
@@ -47,8 +42,14 @@ const CONTENT_TYPES: Record<TranscriptExt, string> = {
   vtt: 'text/vtt',
   srt: 'application/x-subrip',
   txt: 'text/plain',
-  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 }
+
+/**
+ * Teams .docx was dropped (7 Oct 2026): it has one timestamp per speaker turn, which breaks
+ * marker alignment. Teams offers the .vtt from the same menu.
+ */
+export const TEAMS_DOCX_MESSAGE =
+  'Teams: download the transcript as .vtt instead (Transcript → Download → .vtt).'
 
 const unreadable = (message: string): ApiError => new ApiError('unprocessable_input', message)
 const tooLarge = (details: Record<string, unknown>): ApiError =>
@@ -80,8 +81,7 @@ export async function uploadTranscript(
       status: lecture.status,
     })
   }
-  const body = input.ext === 'docx' ? input.bytes : input.raw
-  const sizeBytes = typeof body === 'string' ? new TextEncoder().encode(body).length : body.length
+  const sizeBytes = new TextEncoder().encode(input.raw).length
   if (sizeBytes > MAX_TRANSCRIPT_BYTES) throw tooLarge({ sizeBytes })
 
   const { segments, hasTimestamps, truncated } = toSegments(actor, input)
@@ -90,7 +90,7 @@ export async function uploadTranscript(
     ? Math.max(...segments.map((s) => s.endMs))
     : lecture.durationMs
 
-  await store(`${actor.userId}/${lecture.id}.${input.ext}`, body, CONTENT_TYPES[input.ext])
+  await store(`${actor.userId}/${lecture.id}.${input.ext}`, input.raw, CONTENT_TYPES[input.ext])
   await db.transaction(async (tx) => {
     const claimed = await tx
       .update(lectures)
@@ -112,7 +112,11 @@ export function toSegments(
   actor: Actor,
   input: TranscriptInput,
 ): { segments: Segment[]; hasTimestamps: boolean; truncated: boolean } {
-  const parsed = parseInput(input)
+  if (looksBinary(input.raw)) throw unreadable("That file isn't a text transcript.")
+  const parsed = parseTranscript(input.raw)
+  if (input.ext !== 'txt' && parsed.format === 'text') {
+    throw unreadable(`We couldn't find any timed captions in that .${input.ext} file.`)
+  }
   const all = segmentCues(parsed.cues, { hasTimestamps: parsed.hasTimestamps })
   if (all.length === 0) throw unreadable('That transcript has no readable text.')
 
@@ -134,20 +138,6 @@ export function toSegments(
   }
 }
 
-function parseInput(input: TranscriptInput): ParsedTranscript {
-  if (input.ext === 'docx') {
-    const parsed = parseDocxTranscript(input.bytes)
-    if (!parsed) throw unreadable(NOT_TEAMS_DOCX)
-    return parsed
-  }
-  if (looksBinary(input.raw)) throw unreadable("That file isn't a text transcript.")
-  const parsed = parseTranscript(input.raw)
-  if (input.ext !== 'txt' && parsed.format === 'text') {
-    throw unreadable(`We couldn't find any timed captions in that .${input.ext} file.`)
-  }
-  return parsed
-}
-
 /** NUL bytes or many U+FFFD replacement chars → a binary file read as text. */
 function looksBinary(raw: string): boolean {
   if (raw.includes('\u0000')) return true
@@ -155,7 +145,7 @@ function looksBinary(raw: string): boolean {
   return replaced / raw.length > 0.01
 }
 
-/** Multipart `file` (.vtt / .srt / .txt / Teams .docx ≤ 2 MB) or JSON `{ text }`. */
+/** Multipart `file` (.vtt / .srt / .txt ≤ 2 MB) or JSON `{ text }`. */
 export async function readTranscriptRequest(req: Request): Promise<TranscriptInput> {
   // Reject before buffering the body; the per-file check below is exact.
   const declared = Number(req.headers.get('content-length') ?? 0)
@@ -170,11 +160,11 @@ export async function readTranscriptRequest(req: Request): Promise<TranscriptInp
       throw new ApiError('validation_failed', 'Attach the transcript as `file`.')
     }
     const ext = file.name.split('.').pop()?.toLowerCase()
-    if (ext !== 'vtt' && ext !== 'srt' && ext !== 'txt' && ext !== 'docx') {
-      throw unreadable('Transcripts must be .vtt, .srt, .txt or Teams .docx files.')
+    if (ext === 'docx') throw unreadable(TEAMS_DOCX_MESSAGE)
+    if (ext !== 'vtt' && ext !== 'srt' && ext !== 'txt') {
+      throw unreadable('Transcripts must be .vtt, .srt or .txt files.')
     }
     if (file.size > MAX_TRANSCRIPT_BYTES) throw tooLarge({ sizeBytes: file.size })
-    if (ext === 'docx') return { bytes: new Uint8Array(await file.arrayBuffer()), ext }
     return { raw: await file.text(), ext }
   }
   const json: unknown = await req.json().catch(() => null)
@@ -190,11 +180,11 @@ export async function readTranscriptRequest(req: Request): Promise<TranscriptInp
   return { raw: parsed.data.text, ext: 'txt' }
 }
 
-const defaultStore: StoreTranscript = async (path, body, contentType) => {
+const defaultStore: StoreTranscript = async (path, raw, contentType) => {
   const { supabaseAdmin } = await import('../supabase')
   const { error } = await supabaseAdmin()
     .storage.from('transcripts')
-    .upload(path, body, { contentType, upsert: true })
+    .upload(path, raw, { contentType, upsert: true })
   if (error) {
     throw new ApiError('upstream_unavailable', 'File storage is unavailable. Please try again.', {
       service: 'storage',

@@ -111,7 +111,7 @@ There are four ways to add a lecture. All of them feed the same pipeline after t
 | F1.2 | Markers are made during the student's **first experience** of the lecture: live, or the first viewing of a recording. There is no separate "replay and re-mark" feature. | Must |
 | F1.3 | Visible but unobtrusive confirmation when a marker is saved (counter + toast). Markers can be undone within 5 s. | Must |
 | F1.4 | **Watch mode (A):** embedded YouTube player for library lectures. Marker time = player time, so markers line up exactly with the official timestamped transcript. | Must |
-| F1.5 | **Import (B):** the student picks a local video or audio file plus a **.vtt or .srt** transcript. The media plays from the local file and is never uploaded. Only the transcript is uploaded. **Speaker names are stripped** on import. Teams **.docx** transcripts are supported too (timestamps and speaker lines parsed, speaker names stripped). | Must (VTT/SRT) · Must (DOCX, decided 6 Oct 2026) |
+| F1.5 | **Import (B):** the student picks a local video or audio file plus a **.vtt or .srt** transcript. The media plays from the local file and is never uploaded. Only the transcript is uploaded. **Speaker names are stripped** on import. | Must |
 | F1.6 | **Upload audio (D):** mp3 / m4a / webm / wav up to the per-account size limit ([[#F8. Trust, privacy and limits — Must\|F8.3]]). Lectheo transcribes it with vocabulary from the slides if they were provided ([[#F1. Capture with markers — Must (by mode)\|F1.9]]). Audio is **deleted after transcription**. | Must |
 | F1.7 | **Upload transcript only (D):** .vtt / .srt / .txt or pasted text. **Plain text has no timestamps**, so the map and diagnostic still work but there are no markers, and the UI says so. | Must |
 | F1.8 | **Record live (C):** in-browser audio recording with the screen kept awake and a "keep this tab open" warning. Audio is saved in pieces as it records, so a page refresh or crash doesn't lose it, and the student is offered to upload what was captured. Max 2 h (Google) / 20 min (sample). | Should |
@@ -306,7 +306,7 @@ Full analysis, profiles, feature matrix and sources: **[[Lectheo Competition]]**
 
 **In scope (Must):** sign-in page (Google + sample account); dashboard; CS50 library with watch mode; import recording + transcript; audio and transcript upload; markers; concept map + list view; adaptive diagnostic; spot the flaw; teach-back; Socratic feedback; mastery map; consent, deletion and limits.
 
-**Should (in order):** record live (slim) → Stump the AI (beta) → transfer problems → slides as extra input → transcript correction → Teams .docx import → own-course dedupe → persona picker.
+**Should (in order):** record live (slim) → Stump the AI (beta) → transfer problems → slides as extra input → transcript correction → own-course dedupe → persona picker.
 
 **Out of scope (Later):**
 - Live in-lecture transcription and translation
@@ -362,6 +362,8 @@ Full analysis, profiles, feature matrix and sources: **[[Lectheo Competition]]**
 - [ ] Final tagline.
 - [ ] Any evidence from 3–5 real students that they would tap "I'm lost" during a lecture? (Strengthens Real-World Impact.)
 
+*Decided on 7 Oct 2026:* Teams `.docx` import is dropped: real Teams exports carry one timestamp per speaker turn, which breaks marker alignment and the lecture links. Teams always offers `.vtt` from the same menu, so `.docx` adds no reach. A `.docx` upload is refused with a pointer to the `.vtt`.
+
 *Decided on 6 Oct 2026:* self-serve account deletion · rename and delete own courses · Teams `.docx` import becomes Must · record live stays cut · app usable on phones but desktop-first · code licensed MIT · launch on `lectheo.vercel.app` (no custom domain) · no analytics · the author reviews the eval labels before submission.
 
 *Decided on 6 Oct 2026:* the next-step card shows why, how long and what it leads to, plus two "Also worth doing" items, and never dead-ends (F0.10–F0.12).
@@ -397,7 +399,7 @@ These requirements are specified above but **not implemented yet**. Until they s
 
 | Req | Item | Status |
 |---|---|---|
-| F1.5 | Teams `.docx` transcripts | Promoted to Must (6 Oct 2026) and built: both Teams layouts parsed, unknown layouts refused with a clear message |
+| F1.5 | Teams `.docx` transcripts | Dropped 7 Oct 2026: one timestamp per speaker turn breaks marker alignment and lecture links; Teams always offers .vtt. |
 | F1.8 | Record live (mode C) | Cut, confirmed 6 Oct 2026. No entry point; the API returns `404` for `live`. Audio upload covers in-person lectures |
 | F1.9 | Slides PDF input | Cut. No upload; no transcription keyterms from slides |
 | F1.10 | Transcript correction and re-process | Cut. Contract exists, no route or UI |

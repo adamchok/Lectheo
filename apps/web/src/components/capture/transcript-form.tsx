@@ -23,7 +23,7 @@ import { useBuildMap } from './use-build-map'
 /** How much pasted text goes into the retry key (enough to tell two pastes apart). */
 const PASTE_KEY_CHARS = 200
 
-/** Mode D, transcript only (F1.7): .vtt / .srt / .txt / Teams .docx file or pasted text. */
+/** Mode D, transcript only (F1.7): .vtt / .srt / .txt file or pasted text. */
 export function TranscriptForm({ missing, createDraft }: DraftFormProps) {
   const buildMap = useBuildMap()
   const queryClient = useQueryClient()
@@ -85,13 +85,13 @@ export function TranscriptForm({ missing, createDraft }: DraftFormProps) {
           className="space-y-2 pt-2 data-[state=inactive]:hidden"
         >
           <Label htmlFor="transcript-file">
-            Transcript (.vtt, .srt, .txt or Teams .docx, up to 2 MB) <RequiredMark />
+            Transcript (.vtt, .srt or .txt, up to 2 MB) <RequiredMark />
           </Label>
           <Input
             id="transcript-file"
             type="file"
             {...fieldProps}
-            accept=".vtt,.srt,.txt,.docx"
+            accept=".vtt,.srt,.txt"
             onChange={(e) => setFile(e.currentTarget.files?.[0] ?? null)}
           />
         </TabsContent>

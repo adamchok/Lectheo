@@ -155,7 +155,7 @@ Three columns:
 
 *Ship when the fresh start is live: replace the last sentence with "A Google account starts empty and is yours alone. Add your own lectures:"*
 
-- **A recording with its transcript.** Pick the video or audio file and its `.vtt`, `.srt` or Teams `.docx` transcript (Teams, Zoom and Panopto can export them). The video plays from your laptop and is never uploaded.
+- **A recording with its transcript.** Pick the video or audio file and its `.vtt` or `.srt` captions (Teams, Zoom and Panopto can export them). The video plays from your laptop and is never uploaded.
 - **Audio only.** Upload the audio; Lectheo transcribes it, then deletes the audio.
 - **A transcript.** Paste or upload the text. Without timestamps you can't mark moments, but you still get the map, the diagnosis and practice.
 
