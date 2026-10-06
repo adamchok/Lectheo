@@ -1,5 +1,4 @@
 import { asc, eq, lectures, transcriptSegments } from '@lectheo/db'
-import { strToU8, zipSync } from 'fflate'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ACTOR_A, ACTOR_B, ACTOR_S, createFixture, type Fixture, ID } from '../courses/test-fixtures'
 import { TRANSCRIPT_UPLOAD_LIMIT } from '../rate-limit'
@@ -7,6 +6,7 @@ import {
   readTranscriptRequest,
   type StoreTranscript,
   takeTranscriptUpload,
+  TEAMS_DOCX_MESSAGE,
   uploadTranscript,
 } from './transcript-upload'
 
@@ -35,26 +35,6 @@ DAVID MALAN: Pointers hold addresses.
 00:00:03,000 --> 00:00:06,000
 DAVID MALAN: Dereferencing follows them.
 `
-
-/** A minimal .docx: a zip holding word/document.xml, one `<w:p>` per paragraph. */
-const docx = (...paragraphs: string[]): Uint8Array =>
-  zipSync({
-    '[Content_Types].xml': strToU8('<Types/>'),
-    'word/document.xml': strToU8(
-      `<w:document><w:body>${paragraphs
-        .map((p) => `<w:p><w:r><w:t>${p}</w:t></w:r></w:p>`)
-        .join('')}</w:body></w:document>`,
-    ),
-  })
-const TEAMS_DOCX = docx(
-  'CS101 Lecture 3',
-  'Jane Doe started transcription',
-  'Jane Doe   0:03',
-  'Hash tables map keys to buckets.',
-  'Sam Lee   0:41',
-  'What happens on a collision?',
-)
-const DOCX_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
 const segments = () =>
   f.db
@@ -96,31 +76,6 @@ describe('POST /lectures/{id}/transcript', () => {
     const text = (await segments()).map((r) => r.text).join(' ')
     expect(text).toContain('Pointers hold addresses.')
     expect(text).not.toMatch(/MALAN|Hash/)
-  })
-
-  it('parses a Teams .docx, strips speakers and keeps the .docx in Storage', async () => {
-    const input = { bytes: TEAMS_DOCX, ext: 'docx' as const }
-    const res = await uploadTranscript(ACTOR_A, DRAFT, input, f.db, store)
-    expect(res).toEqual({ segments: 1, hasTimestamps: true, durationMs: 41_000, truncated: false })
-    const text = (await segments()).map((r) => r.text).join(' ')
-    expect(text).toBe('Hash tables map keys to buckets. What happens on a collision?')
-    expect(await lecture()).toMatchObject({ hasTimestamps: true, durationMs: 41_000 })
-    expect(store).toHaveBeenCalledWith(`${ID.A}/${DRAFT}.docx`, TEAMS_DOCX, DOCX_TYPE)
-  })
-
-  it('422s a .docx that is not a Teams transcript, or not a zip at all', async () => {
-    const inputs = [docx('Essay', 'Hash tables are everywhere.'), strToU8('not a zip')]
-    for (const bytes of inputs) {
-      await expect(
-        uploadTranscript(ACTOR_A, DRAFT, { bytes, ext: 'docx' }, f.db, store),
-      ).rejects.toMatchObject({
-        code: 'unprocessable_input',
-        status: 422,
-        message:
-          "This .docx doesn't look like a Teams transcript. Download the .vtt from Teams instead.",
-      })
-    }
-    expect(store).not.toHaveBeenCalled()
   })
 
   it('plain text → no timestamps, null duration, speakers stripped', async () => {
@@ -198,7 +153,7 @@ describe('takeTranscriptUpload', () => {
 })
 
 describe('readTranscriptRequest', () => {
-  const multipart = (name: string, body: string | Uint8Array<ArrayBuffer>) => {
+  const multipart = (name: string, body: string) => {
     const form = new FormData()
     form.append('file', new File([body], name))
     return new Request('http://x', { method: 'POST', body: form })
@@ -206,20 +161,14 @@ describe('readTranscriptRequest', () => {
 
   it('reads multipart files and JSON text', async () => {
     expect(await readTranscriptRequest(multipart('w.VTT', VTT))).toEqual({ raw: VTT, ext: 'vtt' })
+    expect(await readTranscriptRequest(multipart('w.srt', SRT))).toEqual({ raw: SRT, ext: 'srt' })
+    expect(await readTranscriptRequest(multipart('w.txt', 'hi'))).toEqual({ raw: 'hi', ext: 'txt' })
     const json = new Request('http://x', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ text: 'hello' }),
     })
     expect(await readTranscriptRequest(json)).toEqual({ raw: 'hello', ext: 'txt' })
-  })
-
-  it('reads a .docx as bytes', async () => {
-    const bytes = new Uint8Array(TEAMS_DOCX)
-    expect(await readTranscriptRequest(multipart('Lecture 3.DOCX', bytes))).toEqual({
-      bytes,
-      ext: 'docx',
-    })
   })
 
   it('rejects an oversized body from Content-Length before reading it', async () => {
@@ -240,9 +189,22 @@ describe('readTranscriptRequest', () => {
     await expect(readTranscriptRequest(req)).rejects.toMatchObject({ code: 'payload_too_large' })
   })
 
+  it('422s a .docx with a pointer to the Teams .vtt', async () => {
+    await expect(readTranscriptRequest(multipart('Lecture 3.DOCX', 'PK'))).rejects.toMatchObject({
+      code: 'unprocessable_input',
+      status: 422,
+      message: TEAMS_DOCX_MESSAGE,
+    })
+    expect(TEAMS_DOCX_MESSAGE).toBe(
+      'Teams: download the transcript as .vtt instead (Transcript → Download → .vtt).',
+    )
+  })
+
   it('rejects other extensions (422) and files over 2 MB (413)', async () => {
     await expect(readTranscriptRequest(multipart('w.pdf', 'x'))).rejects.toMatchObject({
       code: 'unprocessable_input',
+      status: 422,
+      message: 'Transcripts must be .vtt, .srt or .txt files.',
     })
     await expect(
       readTranscriptRequest(multipart('w.txt', 'x'.repeat(2 * 1024 * 1024 + 1))),

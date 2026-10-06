@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>
-<w:p w:rsidR="00F01A2B" w:rsidRDefault="00F01A2B" w14:paraId="1A2B3C4D"><w:pPr><w:pStyle w:val="Heading1"/><w:tabs><w:tab w:val="right" w:pos="9360"/></w:tabs></w:pPr><w:r w:rsidRPr="00C1D2E3"><w:t>Lecture 7</w:t></w:r></w:p>
-<w:p w:rsidR="00F01A2B" w:rsidRDefault="00F01A2B"/>
-<w:p w:rsidR="00F01A2B"><w:r w:rsidRPr="00C1D2E3"><w:rPr><w:b/><w:bCs/></w:rPr><w:t>Jane</w:t></w:r><w:proofErr w:type="spellStart"/><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve"> Doe</w:t></w:r><w:proofErr w:type="spellEnd"/><w:r><w:tab/></w:r><w:r><w:t>0:05</w:t></w:r></w:p>
-<w:p w:rsidR="00F01A2B"><w:r><w:t xml:space="preserve">Loop while </w:t></w:r><w:r><w:t>i &lt; n and j &gt; 0</w:t></w:r><w:r><w:br w:type="textWrapping"/><w:t>then</w:t></w:r><w:ins w:id="1" w:author="Jane Doe" w:date="2026-10-06T10:00:00Z"><w:r><w:t xml:space="preserve"> stop</w:t></w:r></w:ins><w:del w:id="2" w:author="Jane Doe" w:date="2026-10-06T10:00:00Z"><w:r><w:delText> halt</w:delText></w:r></w:del><w:r><w:t>. See </w:t></w:r><w:hyperlink r:id="rId5" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t>the notes</w:t></w:r></w:hyperlink><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r><w:r><w:t>.</w:t></w:r></w:p>
-<w:p w:rsidR="00F01A2B"><w:r><w:rPr><w:b/></w:rPr><w:t>Sam Lee</w:t></w:r><w:r><w:t xml:space="preserve">   1:10</w:t></w:r></w:p>
-<w:p w:rsidR="00F01A2B"><w:r><w:t>Caf&#xE9; &#8212; ok&#0;&#99999999;&#xD800;!</w:t></w:r></w:p>
-<w:sectPr w:rsidR="00A1B2C3"><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:body></w:document>

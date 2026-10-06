@@ -27,7 +27,6 @@
     "class-variance-authority": "latest",
     "clsx": "latest",
     "cn": "^0.4.0",
-    "fflate": "^0.8.3",
     "idb-keyval": "^6.3.0",
     "lucide-react": "latest",
     "motion": "^14.0.0",

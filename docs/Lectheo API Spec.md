@@ -210,7 +210,7 @@ Library media also carries `startMs`/`endMs` (the core window) and `fallbackAudi
 → `200 { uploadUrl, path, expiresAt }`. The server enforces the **per-tier size** (sample ≤ 20 MB, Google ≤ 50 MB) here, and the bucket enforces 50 MB. The client then `PUT`s straight to Storage. Duration is **measured later** (from the transcription result), never trusted from the client. Audio longer than the tier limit is truncated before any AI processing.
 
 ### `POST /lectures/{id}/transcript` (sources `import`, `transcript`)
-`multipart/form-data`: one file `.vtt` | `.srt` | `.txt` (≤ 2 MB), `.docx` (Teams format, ≤ 2 MB; a `.docx` that isn't a Teams transcript → `422`), **or** JSON `{ text }`.
+`multipart/form-data`: one file `.vtt` | `.srt` | `.txt` (≤ 2 MB), a `.docx` → `422 unprocessable_input` "Teams: download the transcript as .vtt instead (Transcript → Download → .vtt)." (Teams `.docx` dropped 7 Oct 2026; any other extension → `422` "Transcripts must be .vtt, .srt or .txt files."), **or** JSON `{ text }`.
 The server parses it, **strips speaker names**, stores segments, and sets `hasTimestamps`. Size is capped in tokens by tier (sample ≈ 20 min of speech, Google ≈ 2 h).
 → `201 { segments: n, hasTimestamps: true, durationMs }` · `422 unprocessable_input` · `429 rate_limited` (10 uploads per user per 10 minutes, counted before the body is read).
 

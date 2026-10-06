@@ -1,8 +1,8 @@
 import { and, eq, isNull, lectures, pipelineSteps } from '@lectheo/db'
 import { RetryableError } from 'workflow'
-import { type ParsedTranscript, parseTranscript, segmentCues } from '@lectheo/domain'
+import { parseTranscript, segmentCues } from '@lectheo/domain'
 import type { DbLike } from '../db'
-import { NOT_TEAMS_DOCX, parseDocxTranscript } from '../docx'
+import { TEAMS_DOCX_MESSAGE } from '../lectures/transcript-upload'
 import { MEDIA_LIMITS } from '../quota'
 import { BUCKETS, createDownloadUrl, deleteObjects } from '../storage'
 import { SttHttpError, type SttClient } from '../stt/assemblyai'
@@ -28,11 +28,8 @@ const TRANSCRIPT_FILE = /\.(vtt|srt|txt|docx)$/
 const fileTime = (f: { updated_at?: string | null; created_at?: string | null }): number =>
   Date.parse(f.updated_at ?? f.created_at ?? '') || 0
 
-/** The stored transcript (`transcripts/{ownerId}/{lectureId}.*`), parsed, or null if missing. */
-async function downloadTranscript(
-  ownerId: string,
-  lectureId: string,
-): Promise<ParsedTranscript | null> {
+/** Raw transcript text from Storage (`transcripts/{ownerId}/{lectureId}.*`), or null. */
+async function downloadTranscript(ownerId: string, lectureId: string): Promise<string | null> {
   const bucket = supabaseAdmin().storage.from(BUCKETS.transcripts)
   const { data: files, error } = await bucket.list(ownerId, { search: lectureId })
   if (error) throw error
@@ -41,13 +38,14 @@ async function downloadTranscript(
     .filter((f) => f.name.startsWith(lectureId) && TRANSCRIPT_FILE.test(f.name))
     .sort((a, b) => fileTime(b) - fileTime(a))[0]
   if (!file) return null
+  if (file.name.endsWith('.docx')) {
+    // A .docx stored while Teams .docx import was live (6–7 Oct 2026).
+    throw new PipelineError('unprocessable_input', TEAMS_DOCX_MESSAGE)
+  }
   const { data, error: downloadError } = await bucket.download(`${ownerId}/${file.name}`)
   if (downloadError || !data)
     throw downloadError ?? new Error('transcript download returned no data')
-  if (!file.name.endsWith('.docx')) return parseTranscript(await data.text())
-  const parsed = parseDocxTranscript(new Uint8Array(await data.arrayBuffer()))
-  if (!parsed) throw new PipelineError('unprocessable_input', NOT_TEAMS_DOCX)
-  return parsed
+  return data.text()
 }
 
 export async function parseTranscriptStep(
@@ -59,13 +57,14 @@ export async function parseTranscriptStep(
     if (!reparse && (await hasSegments(db, lectureId))) return { segments: 'existing' as const }
 
     const lecture = await loadLecture(db, lectureId)
-    const parsed = await downloadTranscript(lecture.ownerId, lectureId)
-    if (parsed === null) {
+    const raw = await downloadTranscript(lecture.ownerId, lectureId)
+    if (raw === null) {
       throw new PipelineError(
         'no_transcript',
         'We couldn’t find a transcript for this lecture. Upload one and try again.',
       )
     }
+    const parsed = parseTranscript(raw)
     const segments = capToTier(
       segmentCues(parsed.cues, { hasTimestamps: parsed.hasTimestamps }),
       lecture.tier,

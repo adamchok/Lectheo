@@ -28,7 +28,7 @@ export const DOWNLOAD_URL_TTL_S = 3600
 
 export const storagePaths = {
   audio: (userId: string, lectureId: string) => `${userId}/${lectureId}`,
-  transcript: (userId: string, lectureId: string, ext: 'vtt' | 'srt' | 'txt' | 'docx') =>
+  transcript: (userId: string, lectureId: string, ext: 'vtt' | 'srt' | 'txt') =>
     `${userId}/${lectureId}.${ext}`,
   slides: (userId: string, lectureId: string) => `${userId}/${lectureId}/slides.pdf`,
 }
