@@ -65,7 +65,8 @@ watch test loads YouTube (or the MP3 fallback), so it needs internet. First run:
 - **Imported video never leaves your laptop.** It plays locally; only the transcript is uploaded.
 - Uploaded audio is **deleted after transcription**, and the copy at AssemblyAI is deleted too.
 - Speaker names are stripped from imported transcripts.
-- Deleting a lecture removes its media, transcript, markers and everything derived from it.
+- Deleting a lecture removes its media, transcript, markers and everything derived from it. Deleting a course does that for each of its lectures.
+- Google accounts can be deleted at any time from the account menu: courses, files, counters, profile and sign-in go; only the AI cost ledger keeps a bare id.
 - Sample accounts and all their data are deleted after 24 hours.
 - No advertising, no tracking cookies, no analytics.
 
@@ -73,13 +74,13 @@ watch test loads YouTube (or the MP3 fallback), so it needs internet. First run:
 
 | Data | Where | Kept until |
 | --- | --- | --- |
-| Google sign-in: name, email, Google account id (`openid email profile` only) | Supabase Auth, `profiles` | You ask us to delete the account |
-| Courses, lectures, transcript segments | `courses`, `lectures`, `transcript_segments` | You delete the lecture |
+| Google sign-in: name, email, Google account id (`openid email profile` only) | Supabase Auth, `profiles` | You delete your account (account menu) |
+| Courses, lectures, transcript segments | `courses`, `lectures`, `transcript_segments` | You delete the lecture or course |
 | Uploaded audio | Supabase Storage, `audio` bucket | Transcription finishes |
-| Uploaded transcript files (`.vtt`, `.srt`, `.txt`, Teams `.docx`) | Supabase Storage, `transcripts` bucket | You delete the lecture |
-| Your markers ("lost" / "important") | `markers`, `marker_concepts` | You delete the lecture |
-| Generated concept map and questions | `concepts`, `concept_edges`, `concept_occurrences`, `items`, `item_secrets` | You delete the lecture |
-| Your answers, confidence ratings, practice chats | `diagnostic_sessions`, `diagnostic_responses`, `activities`, `messages`, `attempts` | You delete the lecture |
+| Uploaded transcript files (`.vtt`, `.srt`, `.txt`) | Supabase Storage, `transcripts` bucket | You delete the lecture or course |
+| Your markers ("lost" / "important") | `markers`, `marker_concepts` | You delete the lecture or course |
+| Generated concept map and questions | `concepts`, `concept_edges`, `concept_occurrences`, `items`, `item_secrets` | You delete the lecture or course |
+| Your answers, confidence ratings, practice chats | `diagnostic_sessions`, `diagnostic_responses`, `activities`, `messages`, `attempts` | You delete the lecture or course |
 | AI call ledger: task, model, token counts, cost (no prompt or answer text) | `llm_calls`, `usage_counters` | Kept for budget accounting |
 | Your IP address, as the key of a counter for the sample-account button | `rate_limits` | Removed once older than 24 hours (cleared when the next sample account is created) |
 

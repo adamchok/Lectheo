@@ -28,7 +28,7 @@ export const DOWNLOAD_URL_TTL_S = 3600
 
 export const storagePaths = {
   audio: (userId: string, lectureId: string) => `${userId}/${lectureId}`,
-  transcript: (userId: string, lectureId: string, ext: 'vtt' | 'srt' | 'txt' | 'docx') =>
+  transcript: (userId: string, lectureId: string, ext: 'vtt' | 'srt' | 'txt') =>
     `${userId}/${lectureId}.${ext}`,
   slides: (userId: string, lectureId: string) => `${userId}/${lectureId}/slides.pdf`,
 }
@@ -102,6 +102,36 @@ export async function deleteObjects(bucket: Bucket, paths: string[]): Promise<vo
   if (paths.length === 0) return
   const { error } = await supabaseAdmin().storage.from(bucket).remove(paths)
   if (error) throw storageError('remove', error)
+}
+
+/** DELETE /me: every object under `{userId}/` in every bucket (paths in `storagePaths`). */
+export async function deleteUserObjects(userId: string): Promise<void> {
+  for (const bucket of Object.values(BUCKETS)) {
+    const paths = await listFiles(bucket, userId)
+    for (let i = 0; i < paths.length; i += STORAGE_PAGE) {
+      await deleteObjects(bucket, paths.slice(i, i + STORAGE_PAGE))
+    }
+  }
+}
+
+/** Storage lists, and removes, at most this many entries per call. */
+const STORAGE_PAGE = 1000
+
+/** File paths under a folder, paging and recursing into subfolders (one level per list call). */
+async function listFiles(bucket: Bucket, folder: string): Promise<string[]> {
+  const paths: string[] = []
+  for (let offset = 0; ; offset += STORAGE_PAGE) {
+    const { data, error } = await supabaseAdmin()
+      .storage.from(bucket)
+      .list(folder, { limit: STORAGE_PAGE, offset })
+    if (error || !data) throw storageError('list', error)
+    for (const entry of data) {
+      const path = `${folder}/${entry.name}`
+      // Folders are listed with a null id.
+      paths.push(...(entry.id === null ? await listFiles(bucket, path) : [path]))
+    }
+    if (data.length < STORAGE_PAGE) return paths
+  }
 }
 
 function storageError(op: string, cause: unknown): Error {

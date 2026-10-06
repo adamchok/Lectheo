@@ -37,6 +37,9 @@ export const CreateCourseRequest = z.object({
   title: z.string().trim().min(1).max(120),
 })
 
+/** PATCH /courses/{id}: rename an own course. */
+export const PatchCourseRequest = CreateCourseRequest.pick({ title: true })
+
 export const MapLecture = z.object({
   id: Id,
   title: z.string(),

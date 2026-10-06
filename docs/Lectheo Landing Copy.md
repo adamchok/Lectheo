@@ -153,7 +153,7 @@ Three columns:
 
 **Lead:** The sample account comes with Harvard's CS50x Lectures 3, 4 and 5, ready to watch and practice. A Google account starts empty and is yours alone. Add your own lectures:
 
-- **A recording with its transcript.** Pick the video or audio file and its `.vtt`, `.srt` or Teams `.docx` transcript (Teams, Zoom and Panopto can export them). The video plays from your laptop and is never uploaded.
+- **A recording with its transcript.** Pick the video or audio file and its `.vtt` or `.srt` captions (Teams, Zoom and Panopto can export them). The video plays from your laptop and is never uploaded.
 - **Audio only.** Upload the audio; Lectheo transcribes it, then deletes the audio.
 - **A transcript.** Paste or upload the text. Without timestamps you can't mark moments, but you still get the map, the diagnosis and practice.
 
@@ -196,9 +196,7 @@ Computer science students who learn from lectures, live or recorded. The sample 
 No. **Try the sample account** gives you your own copy of a student partway through CS50x, with Lecture 5 ready to watch. It's deleted after 24 hours. To add your own lectures, continue with Google. Your account starts empty: just your courses, nothing preloaded.
 
 **What happens to my lecture recordings?**
-Video never leaves your laptop; only the transcript is uploaded. Audio you upload is deleted as soon as it's transcribed, and so is the transcription provider's copy. Speaker names are removed from transcripts. Deleting a lecture deletes everything made from it. Details are in the [privacy policy](/privacy).
-
-*Add when self-serve deletion ships (`DELETE /me`): "You can delete your account at any time from the account menu."*
+Video never leaves your laptop; only the transcript is uploaded. Audio you upload is deleted as soon as it's transcribed, and so is the transcription provider's copy. Speaker names are removed from transcripts. Deleting a lecture deletes everything made from it. You can delete your account at any time from the account menu. Details are in the [privacy policy](/privacy).
 
 **Which AI does it use, and can it be wrong?**
 Several models through one gateway: one writes questions, a model from a different company checks them, and a separate judge grades against a fixed rubric. It can still be wrong, which is why every result links to the lecture so you can check it.
