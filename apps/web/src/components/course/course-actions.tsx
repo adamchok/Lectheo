@@ -1,11 +1,12 @@
 'use client'
 
+import type { LectureStatus } from '@lectheo/contracts'
 import { CircleX, Pencil, Trash2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useId, useState, type FormEvent } from 'react'
 import { toast } from 'sonner'
 import { pluralize } from '@/client/format'
-import { useDeleteCourse, useRenameCourse } from '@/client/queries'
+import { POLLING_LECTURE_STATUSES, useDeleteCourse, useRenameCourse } from '@/client/queries'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { errorMessage } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
@@ -20,37 +21,64 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const TITLE_MAX = 120
+const PROCESSING_REASON = 'You can delete this course once its lectures finish processing.'
 
 export interface CourseActionsProps {
   course: { id: string; title: string }
-  lectureCount: number
+  lectures: readonly { status: LectureStatus }[]
 }
 
 /** F0.7: the course page's Rename and Delete course (own courses only). */
-export function CourseActions({ course, lectureCount }: CourseActionsProps) {
+export function CourseActions({ course, lectures }: CourseActionsProps) {
   const [renaming, setRenaming] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  // The server refuses (409) while a lecture processes; say so before the user confirms.
+  const processing = lectures.some((l) => POLLING_LECTURE_STATUSES.includes(l.status))
   return (
     <>
       <Button variant="ghost" onClick={() => setRenaming(true)}>
         <Pencil aria-hidden />
         <span className="max-sm:sr-only">Rename</span>
       </Button>
-      <Button variant="ghost" onClick={() => setDeleting(true)}>
-        <Trash2 aria-hidden />
-        <span className="max-sm:sr-only">Delete course</span>
-      </Button>
+      {processing ? (
+        <ProcessingDeleteButton />
+      ) : (
+        <Button variant="ghost" onClick={() => setDeleting(true)}>
+          <Trash2 aria-hidden />
+          <span className="max-sm:sr-only">Delete course</span>
+        </Button>
+      )}
       {/* Mounted per opening, so the field starts from the current title. */}
       {renaming && <RenameCourseDialog course={course} onClose={() => setRenaming(false)} />}
       <DeleteCourseDialog
         course={course}
-        lectureCount={lectureCount}
+        lectureCount={lectures.length}
         open={deleting}
         onOpenChange={setDeleting}
       />
     </>
+  )
+}
+
+/** Focusable, with the reason as its description (same pattern as DeleteLectureButton). */
+function ProcessingDeleteButton() {
+  const reasonId = useId()
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button variant="ghost" aria-disabled="true" aria-describedby={reasonId}>
+          <Trash2 aria-hidden />
+          <span className="max-sm:sr-only">Delete course</span>
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{PROCESSING_REASON}</TooltipContent>
+      <span id={reasonId} className="sr-only">
+        {PROCESSING_REASON}
+      </span>
+    </Tooltip>
   )
 }
 
@@ -63,20 +91,27 @@ function RenameCourseDialog({
 }) {
   const rename = useRenameCourse(course.id)
   const [title, setTitle] = useState(course.title)
+  const [blank, setBlank] = useState(false)
   const inputId = useId()
   const errorId = useId()
+  const error = blank
+    ? 'Enter a course name.'
+    : rename.isError
+      ? `Couldn't rename the course. ${errorMessage(rename.error)}`
+      : null
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
     const next = title.trim()
-    if (!next || next === course.title) return onClose()
+    if (!next) return setBlank(true)
+    if (next === course.title) return onClose()
     rename.mutate(next, { onSuccess: onClose })
   }
 
   return (
     <Dialog open onOpenChange={(open) => !open && !rename.isPending && onClose()}>
-      <DialogContent>
-        <form onSubmit={submit} className="grid gap-4">
+      <DialogContent showCloseButton={!rename.isPending}>
+        <form onSubmit={submit} noValidate className="grid gap-4">
           <DialogHeader>
             <DialogTitle>Rename course</DialogTitle>
             <DialogDescription>Only you see this name.</DialogDescription>
@@ -86,17 +121,19 @@ function RenameCourseDialog({
             <Input
               id={inputId}
               value={title}
-              onChange={(event) => setTitle(event.target.value)}
+              onChange={(event) => {
+                setTitle(event.target.value)
+                setBlank(false)
+              }}
               maxLength={TITLE_MAX}
-              required
-              aria-invalid={rename.isError || undefined}
-              aria-describedby={rename.isError ? errorId : undefined}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? errorId : undefined}
             />
           </div>
-          {rename.isError && (
+          {error && (
             <p id={errorId} role="alert" className="text-body-sm text-destructive flex gap-2">
               <CircleX aria-hidden className="mt-0.5 size-4 shrink-0" />
-              Couldn&apos;t rename the course. {errorMessage(rename.error)}
+              {error}
             </p>
           )}
           <DialogFooter>
@@ -125,7 +162,12 @@ function DeleteCourseDialog({
   lectureCount,
   open,
   onOpenChange,
-}: CourseActionsProps & { open: boolean; onOpenChange: (open: boolean) => void }) {
+}: {
+  course: CourseActionsProps['course']
+  lectureCount: number
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
   const router = useRouter()
   const remove = useDeleteCourse()
   return (
@@ -140,7 +182,8 @@ function DeleteCourseDialog({
       confirmLabel="Delete course"
       pendingLabel="Deleting…"
       icon={<Trash2 aria-hidden />}
-      pending={remove.isPending}
+      // Stays pending until the navigation lands: a second click would only 404.
+      pending={remove.isPending || remove.isSuccess}
       error={remove.isError ? `Couldn't delete the course. ${errorMessage(remove.error)}` : null}
       onConfirm={() =>
         remove.mutate(course.id, {

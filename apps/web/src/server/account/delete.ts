@@ -38,6 +38,9 @@ const defaultDeps: AccountDeletionDeps = {
  * after a partial failure finishes the job: until the auth user is gone the session still works,
  * and a retry that finds no profile gets a fresh empty one from getActor().
  * `llm_calls` rows stay: `user_id` has no FK and is kept for budget accounting (Data Model).
+ * ponytail: a signed upload URL issued before the deletion (2 h TTL) can still land an object
+ * under `{userId}/` after the sweep; nothing references it. Sweep again from the daily cron
+ * (prefixes with no profile) if that matters.
  */
 export async function deleteAccount(
   actor: Actor,
@@ -47,7 +50,9 @@ export async function deleteAccount(
   if (actor.kind !== 'google') {
     throw new ApiError(
       'sample_account_restricted',
-      "Sample accounts can't be deleted: they're removed automatically after 24 hours.",
+      actor.isSample
+        ? "Sample accounts can't be deleted: they're removed automatically after 24 hours."
+        : "The owner account can't be deleted from the app.",
     )
   }
   const owned = await db

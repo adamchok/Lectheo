@@ -28,10 +28,14 @@ export async function getActor(db: DbLike = appDb()): Promise<Actor | null> {
   const { sub, is_anonymous: isAnonymous, user_metadata: meta, email } = data.claims
 
   const existing = await findProfile(db, sub)
-  const profile =
-    existing ??
-    (isAnonymous ? null : await ensureProfile(db, sub, 'google', displayName(meta, email)))
-  return profile ? toActor(profile) : null
+  if (existing) return toActor(existing)
+  if (isAnonymous) return null
+  // A deleted account's access token stays valid until it expires (~1 h): before recreating a
+  // profile, ask Auth whether the user still exists. The OAuth callback creates the profile, so
+  // this round trip only runs for such stale tokens (and the retry after a failed DELETE /me).
+  const { data: user, error: userError } = await supabase.auth.getUser()
+  if (userError || !user.user) return null
+  return toActor(await ensureProfile(db, sub, 'google', displayName(meta, email)))
 }
 
 /** Like getActor() but throws 401 `unauthenticated`. */

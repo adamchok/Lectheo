@@ -1,7 +1,7 @@
 'use client'
 
 import { CircleX } from 'lucide-react'
-import { useRef, type ReactNode } from 'react'
+import { useRef, type ReactNode, type RefObject } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -27,6 +27,11 @@ export interface ConfirmDialogProps {
   /** Shown inline with role="alert" until the dialog closes or the action is retried. */
   error: string | null
   onConfirm: () => void
+  /**
+   * Where focus returns on close when the opener is gone (a menu item). Design System:
+   * "after a dialog closes, focus returns to its trigger".
+   */
+  returnFocusTo?: RefObject<HTMLElement | null>
 }
 
 /** Confirm for an irreversible action: focus starts on Cancel, the destructive button acts. */
@@ -41,14 +46,21 @@ export function ConfirmDialog({
   pending,
   error,
   onConfirm,
+  returnFocusTo,
 }: ConfirmDialogProps) {
   const cancelRef = useRef<HTMLButtonElement>(null)
   return (
     <Dialog open={open} onOpenChange={(next) => !pending && onOpenChange(next)}>
       <DialogContent
+        showCloseButton={!pending}
         onOpenAutoFocus={(event) => {
           event.preventDefault()
           cancelRef.current?.focus()
+        }}
+        onCloseAutoFocus={(event) => {
+          if (!returnFocusTo?.current) return
+          event.preventDefault()
+          returnFocusTo.current.focus()
         }}
       >
         <DialogHeader>

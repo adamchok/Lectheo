@@ -101,7 +101,9 @@ export default function PrivacyPage() {
         <li>
           Google accounts are kept until you delete them. You can delete your account at any time
           from the account menu (<strong>Delete account</strong>): it removes your courses,
-          lectures, markers, practice, uploaded files and your sign-in. If you can&apos;t sign in,
+          lectures, markers, practice, uploaded files and your sign-in. The AI-call cost record
+          (token counts and cost, no content) is kept, with your bare user id, for budget
+          accounting. If you can&apos;t sign in,
           email <a href={`mailto:${CONTACT}`}>{CONTACT}</a> and we will delete it for you.
         </li>
       </ul>

@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
-import { act } from 'react'
+import { act, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { TooltipProvider } from './ui/tooltip'
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean | undefined
@@ -17,6 +18,7 @@ const mutation = () => ({
   error: null,
 })
 vi.mock('@/client/queries', () => ({
+  POLLING_LECTURE_STATUSES: ['processing', 'map_ready'],
   useDeleteAccount: mutation,
   useDeleteCourse: mutation,
   useRenameCourse: mutation,
@@ -57,11 +59,37 @@ describe('Delete account dialog (F0.6)', () => {
   })
 })
 
+describe('Menu-opened dialogs', () => {
+  it('return focus to the account button on close (the menu item is gone)', async () => {
+    const trigger = document.createElement('button')
+    document.body.appendChild(trigger)
+    const ref = { current: trigger }
+    function Harness() {
+      const [open, setOpen] = useState(true)
+      return <DeleteAccountDialog open={open} onOpenChange={setOpen} returnFocusTo={ref} />
+    }
+    act(() => root.render(<Harness />))
+    act(() => buttonIn(dialog()!, 'Cancel')?.click())
+    // Radix restores focus on the next tick.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)))
+    expect(dialog()).toBeNull()
+    expect(document.activeElement).toBe(trigger)
+    trigger.remove()
+  })
+})
+
 describe('Course actions (F0.7)', () => {
   const course = { id: 'c1', title: 'Biology' }
+  const ready = { status: 'ready' } as const
 
   it('Delete course confirms with the consequence and starts focus on Cancel', () => {
-    act(() => root.render(<CourseActions course={course} lectureCount={3} />))
+    act(() =>
+      root.render(
+        <TooltipProvider>
+          <CourseActions course={course} lectures={[ready, ready, ready]} />
+        </TooltipProvider>,
+      ),
+    )
     act(() => buttonNamed('Delete course')?.click())
     expect(dialog()?.textContent).toContain('Delete “Biology”?')
     expect(dialog()?.textContent).toContain('This deletes its 3 lectures, the concept map')
@@ -70,9 +98,51 @@ describe('Course actions (F0.7)', () => {
   })
 
   it('Rename opens a small dialog with the current title', () => {
-    act(() => root.render(<CourseActions course={course} lectureCount={1} />))
+    act(() =>
+      root.render(
+        <TooltipProvider>
+          <CourseActions course={course} lectures={[ready]} />
+        </TooltipProvider>,
+      ),
+    )
     act(() => buttonNamed('Rename')?.click())
     expect(dialog()?.textContent).toContain('Rename course')
     expect(dialog()?.querySelector('input')?.value).toBe('Biology')
+  })
+
+  it('Rename refuses a blank name with a message', () => {
+    act(() =>
+      root.render(
+        <TooltipProvider>
+          <CourseActions course={course} lectures={[ready]} />
+        </TooltipProvider>,
+      ),
+    )
+    act(() => buttonNamed('Rename')?.click())
+    const input = dialog()!.querySelector('input')!
+    act(() => {
+      const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+      setValue.call(input, '   ')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    act(() => buttonIn(dialog()!, 'Save')?.click())
+    expect(dialog()?.querySelector('[role="alert"]')?.textContent).toContain('Enter a course name.')
+    expect(input.getAttribute('aria-invalid')).toBe('true')
+  })
+
+  it('Delete course is aria-disabled with the reason while a lecture processes', () => {
+    act(() =>
+      root.render(
+        <TooltipProvider>
+          <CourseActions course={course} lectures={[ready, { status: 'processing' }]} />
+        </TooltipProvider>,
+      ),
+    )
+    const button = buttonNamed('Delete course')!
+    expect(button.getAttribute('aria-disabled')).toBe('true')
+    const reason = document.getElementById(button.getAttribute('aria-describedby')!)
+    expect(reason?.textContent).toContain('once its lectures finish processing')
+    act(() => button.click())
+    expect(dialog()).toBeNull()
   })
 })

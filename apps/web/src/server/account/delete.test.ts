@@ -106,6 +106,16 @@ describe('DELETE /me', () => {
     expect(deps.deleteAuthUser).not.toHaveBeenCalled()
   })
 
+  it('403s the owner account with its own message', async () => {
+    await expect(
+      deleteAccount({ userId: ID.A, kind: 'owner', isSample: false }, f.db, deps),
+    ).rejects.toMatchObject({
+      code: 'sample_account_restricted',
+      message: expect.stringMatching(/owner/),
+    })
+    expect((await rowsOfA()).profiles).toBe(1)
+  })
+
   it('409s while one of the user’s lectures is processing, before deleting anything', async () => {
     // A second own course, listed first, must not be deleted before the 409.
     await f.exec(`

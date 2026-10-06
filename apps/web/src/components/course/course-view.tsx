@@ -177,7 +177,7 @@ export function CourseView({ courseId }: { courseId: string }) {
               <ViewToggle view={activeView} onChange={changeView} />
             )}
             {course.kind === 'personal' && (
-              <CourseActions course={course} lectureCount={lectures.length} />
+              <CourseActions course={course} lectures={lectures} />
             )}
           </>
         }
