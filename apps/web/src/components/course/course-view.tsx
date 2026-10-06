@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { FEATURES } from '@/lib/features'
 import { ConceptList } from './concept-list'
+import { CourseActions } from './course-actions'
 import { LectureTimeline } from './lecture-timeline'
 import { NodePanel } from './node-panel'
 
@@ -170,10 +171,15 @@ export function CourseView({ courseId }: { courseId: string }) {
         crumbs={[{ label: course.title, href: `/courses/${course.id}` as Route }]}
         courseId={course.id}
         actions={
-          // No concepts means no map: hide the toggle rather than show "Map" pressed over a list.
-          FEATURES.conceptMapCanvas && nodes.length > 0 ? (
-            <ViewToggle view={activeView} onChange={changeView} />
-          ) : undefined
+          <>
+            {/* No concepts means no map: hide the toggle rather than show "Map" over a list. */}
+            {FEATURES.conceptMapCanvas && nodes.length > 0 && (
+              <ViewToggle view={activeView} onChange={changeView} />
+            )}
+            {course.kind === 'personal' && (
+              <CourseActions course={course} lectureCount={lectures.length} />
+            )}
+          </>
         }
       />
       <PageHeader

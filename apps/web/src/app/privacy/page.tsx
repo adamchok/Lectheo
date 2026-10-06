@@ -7,7 +7,7 @@ const CONTACT = 'adam.c11304@gmail.com'
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy policy" updated="6 October 2026">
+    <LegalPage title="Privacy policy" updated="7 October 2026">
       <p>
         Lectheo is a study tool built for the ForgeHacks 2026 hackathon. This page explains what we
         store, who processes it, and how to delete it. We keep as little as we can.
@@ -94,11 +94,15 @@ export default function PrivacyPage() {
       <h2>Retention and deletion</h2>
       <ul>
         <li>Sample accounts and all their data are deleted automatically after 24 hours.</li>
-        <li>Deleting a lecture removes its transcript, markers, questions and practice history.</li>
         <li>
-          Google accounts are kept until you ask us to delete them. Email{' '}
-          <a href={`mailto:${CONTACT}`}>{CONTACT}</a> and we will delete your account and all its
-          data.
+          Deleting a lecture removes its transcript, markers, questions and practice history.
+          Deleting a course does the same for every lecture in it.
+        </li>
+        <li>
+          Google accounts are kept until you delete them. You can delete your account at any time
+          from the account menu (<strong>Delete account</strong>): it removes your courses,
+          lectures, markers, practice, uploaded files and your sign-in. If you can&apos;t sign in,
+          email <a href={`mailto:${CONTACT}`}>{CONTACT}</a> and we will delete it for you.
         </li>
       </ul>
 

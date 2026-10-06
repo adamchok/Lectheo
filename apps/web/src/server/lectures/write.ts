@@ -14,7 +14,7 @@ export type RemoveObjects = (bucket: StorageBucket, paths: string[]) => Promise<
 
 const TRANSCRIPT_EXTS = ['vtt', 'srt', 'txt', 'docx'] as const
 /** Statuses where the pipeline is still running: delete → 409. */
-const MID_RUN_STATUSES: readonly Lecture['status'][] = ['processing', 'map_ready']
+export const MID_RUN_STATUSES: readonly Lecture['status'][] = ['processing', 'map_ready']
 const DELETABLE_STATUSES = LECTURE_STATUSES.filter((s) => !MID_RUN_STATUSES.includes(s))
 
 const defaultRemoveObjects: RemoveObjects = async (bucket, paths) => {

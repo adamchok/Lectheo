@@ -1,12 +1,13 @@
 'use client'
 
 import type { MeResponse } from '@lectheo/contracts'
-import { CircleX, LogOut, Monitor, Moon, RotateCcw, Sun } from 'lucide-react'
+import { CircleX, LogOut, Monitor, Moon, RotateCcw, Sun, Trash2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { useResetSample, useSignOut } from '@/client/queries'
+import { useDeleteAccount, useResetSample, useSignOut } from '@/client/queries'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -34,6 +35,46 @@ import { errorMessage } from './error-state'
 
 export const SAMPLE_ACCOUNT_LABEL = 'Sample account · progress resets when you leave'
 
+/** F0.6 wording: names the consequence before anything is deleted. */
+export const DELETE_ACCOUNT_CONSEQUENCE =
+  "This deletes your courses, lectures, marks and practice, and signs you out. It can't be undone."
+
+/** Delete account (Google accounts, F0.6): DELETE /me, then the landing page. */
+export function DeleteAccountDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const router = useRouter()
+  const remove = useDeleteAccount()
+  return (
+    <ConfirmDialog
+      open={open}
+      onOpenChange={(next) => {
+        onOpenChange(next)
+        if (!next) remove.reset()
+      }}
+      title="Delete your account?"
+      description={DELETE_ACCOUNT_CONSEQUENCE}
+      confirmLabel="Delete account"
+      pendingLabel="Deleting…"
+      icon={<Trash2 aria-hidden />}
+      pending={remove.isPending}
+      error={remove.isError ? `Couldn't delete your account. ${errorMessage(remove.error)}` : null}
+      onConfirm={() =>
+        remove.mutate(undefined, {
+          onSuccess: () => {
+            router.replace('/')
+            router.refresh()
+          },
+        })
+      }
+    />
+  )
+}
+
 function initials(name: string | null): string {
   if (!name) return '?'
   const parts = name.trim().split(/\s+/).slice(0, 2)
@@ -44,6 +85,7 @@ function initials(name: string | null): string {
 export function AccountMenu({ me, collapsed = false }: { me: MeResponse; collapsed?: boolean }) {
   const router = useRouter()
   const [confirmReset, setConfirmReset] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const resetSample = useResetSample()
   const signOut = useSignOut()
   const { theme, setTheme } = useTheme()
@@ -129,8 +171,16 @@ export function AccountMenu({ me, collapsed = false }: { me: MeResponse; collaps
             <LogOut aria-hidden />
             Sign out
           </DropdownMenuItem>
+          {me.kind === 'google' && (
+            <DropdownMenuItem variant="destructive" onSelect={() => setConfirmDelete(true)}>
+              <Trash2 aria-hidden />
+              Delete account
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <DeleteAccountDialog open={confirmDelete} onOpenChange={setConfirmDelete} />
 
       <Dialog
         open={confirmReset}

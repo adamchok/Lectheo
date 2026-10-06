@@ -406,7 +406,7 @@ nothing at all left → add_lecture ("Add Lecture N+1" / "Add your next lecture"
 |---|---|
 | `/` | Public landing and sign-in: Continue with Google · Try the sample account (Turnstile). Signed-in visitors are redirected to `/dashboard` (`proxy.ts`) |
 | `/privacy`, `/terms` | Legal pages |
-| `/dashboard` | Course cards, lecture list and status, "Next step" card, account menu (sample label + Reset). Google first run: an empty first-run screen with *Add your first lecture* |
+| `/dashboard` | Course cards, lecture list and status, "Next step" card, account menu (sample label + Reset; *Delete account* for Google accounts). Google first run: an empty first-run screen with *Add your first lecture* |
 | `/courses/[id]` | Concept map (React Flow, stored ELK layout) + list view toggle + lecture timeline with unlinked markers |
 | `/lectures/new` | Add lecture: Import recording · Upload audio · Paste or upload transcript, with the consent checkbox (Record live is not built) |
 | `/lectures/[id]/watch` | Watch mode (YouTube or local file) with L/I marking, transcript side panel |
@@ -468,7 +468,7 @@ Signed-in pages share one layout (`app/(app)/layout.tsx`) with `error.tsx` and `
 - Consent checkbox before any recording or upload.
 - Uploaded audio is deleted after transcription, and remote transcripts are deleted at AssemblyAI. Imported video never leaves the device.
 - Speaker names are stripped from imported transcripts.
-- `DELETE /lectures/{id}` cascades to derived data and Storage. Orphaned concepts are removed. *(decided 6 Oct 2026, to be built)*: `DELETE /courses/{id}` will do the same for every lecture in a course, and `DELETE /me` will delete a Google account's courses, files, counters, profile and auth user. Today account deletion is by email to the author.
+- `DELETE /lectures/{id}` cascades to derived data and Storage. Orphaned concepts are removed. `DELETE /courses/{id}` does the same for every lecture in a course, and `DELETE /me` deletes a Google account's courses, Storage objects, counters, profile and auth user (each step idempotent, so a retry finishes a partial deletion). `llm_calls` rows stay, with a bare user id, for budget accounting.
 - Sample accounts are purged after 24 h.
 - Secrets live only in Vercel env vars.
 - The README states what is stored (table, retention) and every processor: Supabase, Vercel, AssemblyAI (audio only), Anthropic, OpenAI, Google and TypeSafe through Vercel AI Gateway, Cloudflare Turnstile and YouTube.

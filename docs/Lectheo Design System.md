@@ -340,7 +340,7 @@ How, with TanStack Query: in `onMutate` cancel the related queries, snapshot the
 ### Feedback and confirmation
 
 - **Undo beats confirm.** A reversible action happens at once and offers Undo in a toast that stays until dismissed or replaced (marker undo must not vanish after 5 s).
-- **Confirm only the irreversible** (delete lecture, reset sample): a dialog that names the consequence ("This deletes the lecture, its markers and your practice on it."), a `destructive` button that repeats the verb ("Delete lecture"), focus starting on Cancel.
+- **Confirm only the irreversible** (delete lecture, delete course, delete account, reset sample): a dialog that names the consequence ("This deletes the lecture, its markers and your practice on it."), a `destructive` button that repeats the verb ("Delete lecture"), focus starting on Cancel.
 - **Toasts** (sonner; bottom-right on desktop, bottom on mobile) are for confirmations and undo. Errors that need action appear inline next to what failed, with `role="alert"`, and stay until resolved.
 - **Success is quiet**: a short confirmation in place ("Saved", the mastery badge changing), except the one signature moment under Motion.
 
@@ -414,7 +414,7 @@ The signed-in product is a workspace: a persistent sidebar to move between cours
   - Top: the wordmark, linking to Home.
   - Primary items: Home (dashboard) and New lecture.
   - "Courses" (`overline` label): every course, the CS50 library first. *(decided 6 Oct 2026, to be built)*: the student's own courses, most recent first; sample accounts keep the CS50 library first, and a new Google account's list is empty. The current course expands to list its lectures (number and title, truncated, the full title in a tooltip). The active item uses `sidebar-active` with `sidebar-active-foreground` and `aria-current="page"`.
-  - Bottom: an account card (initials, name, "Sample account · deleted in 23 h" when relevant) that opens the account menu: theme, Reset sample, Sign out.
+  - Bottom: an account card (initials, name, "Sample account · deleted in 23 h" when relevant) that opens the account menu: theme, Reset sample, Sign out, Delete account (Google accounts).
   - Items: `body-sm`, `radius-sm`, 32px tall, `space-3` horizontal padding, 16px icons. The active indicator glides between items with a Motion shared layout animation.
 - **Top bar**: `topbar-height`, sticky, `background` at 85 % opacity with backdrop blur, a `border` hairline below. Breadcrumbs with real names (Course › Lecture 5 › Spot the flaw) on the left; the page's actions on the right (map/list toggle, Delete lecture). The skip link stays the first focusable element.
 - **Content**: `<main id="main" tabIndex={-1}>` centred to `content-max` with the README gutters. Reading content (activities, explanations) is capped at `reading-max` inside it.

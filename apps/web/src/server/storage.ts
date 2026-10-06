@@ -104,6 +104,31 @@ export async function deleteObjects(bucket: Bucket, paths: string[]): Promise<vo
   if (error) throw storageError('remove', error)
 }
 
+/** DELETE /me: every object under `{userId}/` in every bucket (paths in `storagePaths`). */
+export async function deleteUserObjects(userId: string): Promise<void> {
+  for (const bucket of Object.values(BUCKETS)) {
+    await deleteObjects(bucket, await listFiles(bucket, userId))
+  }
+}
+
+/**
+ * File paths under a folder, recursing into subfolders (Storage lists one level at a time).
+ * ponytail: one page of 1,000 entries per folder; a user has a few lectures, so page if that grows.
+ */
+async function listFiles(bucket: Bucket, folder: string): Promise<string[]> {
+  const { data, error } = await supabaseAdmin().storage.from(bucket).list(folder, { limit: 1000 })
+  if (error || !data) throw storageError('list', error)
+  const nested = await Promise.all(
+    data.map((entry) =>
+      // Folders are listed with a null id.
+      entry.id === null
+        ? listFiles(bucket, `${folder}/${entry.name}`)
+        : [`${folder}/${entry.name}`],
+    ),
+  )
+  return nested.flat()
+}
+
 function storageError(op: string, cause: unknown): Error {
   const message = cause instanceof Error ? cause.message : 'no data'
   return new ApiError('upstream_unavailable', 'File storage is unavailable. Please try again.', {

@@ -200,9 +200,7 @@ No. **Try the sample account** gives you your own copy of a student partway thro
 *Ship when the fresh start is live: add "Your account starts empty: just your courses, nothing preloaded."*
 
 **What happens to my lecture recordings?**
-Video never leaves your laptop; only the transcript is uploaded. Audio you upload is deleted as soon as it's transcribed, and so is the transcription provider's copy. Speaker names are removed from transcripts. Deleting a lecture deletes everything made from it. Details are in the [privacy policy](/privacy).
-
-*Add when self-serve deletion ships (`DELETE /me`): "You can delete your account at any time from the account menu."*
+Video never leaves your laptop; only the transcript is uploaded. Audio you upload is deleted as soon as it's transcribed, and so is the transcription provider's copy. Speaker names are removed from transcripts. Deleting a lecture deletes everything made from it. You can delete your account at any time from the account menu. Details are in the [privacy policy](/privacy).
 
 **Which AI does it use, and can it be wrong?**
 Several models through one gateway: one writes questions, a model from a different company checks them, and a separate judge grades against a fixed rubric. It can still be wrong, which is why every result links to the lecture so you can check it.

@@ -70,9 +70,9 @@ Part of the architecture set: [[Lectheo Architecture]] · **API Spec** · [[Lect
   /session/sample/reset    POST
   /session/sign-out        POST
   /me                      GET            account menu (kind, display name, isSample)
-  /me                      DELETE         delete account, Google only  (to be built)
+  /me                      DELETE         delete account, Google only
   /courses                 GET POST
-  /courses/{id}            PATCH DELETE   rename, delete own course   (to be built)
+  /courses/{id}            PATCH DELETE   rename, delete own course
   /courses/{id}/map        GET            map + mastery + markers
   /courses/{id}/next       GET            recommender
   /lectures                POST           (body has courseId)
@@ -120,7 +120,7 @@ Sample accounts only. Deletes the user's per-user rows and clones again. → `20
 ### `GET /me`
 `200 { id, kind: "google"|"sample"|"owner", displayName, isSample }`. Drives the account menu (sample label and Reset sample).
 
-### `DELETE /me` (Google accounts; to be built)
+### `DELETE /me` (Google accounts)
 Deletes the account: every course the user owns (cascading to lectures, segments, markers, concepts, items, sessions, activities, attempts), their Storage objects, usage counters, the profile and finally the auth user. Then signs out. → `204`. Sample accounts → `403 sample_account_restricted` (they use Reset and expire after 24 h). Idempotent: a retry after partial failure finishes the job.
 
 ---
@@ -134,10 +134,10 @@ As built: library courses first, then the user's own, each in creation order (`k
 ### `POST /courses`
 `{ id, title(1..120) }` → `201 course`. Sample accounts can create **one** personal course (a second gets `403 sample_account_restricted`). Library courses are read-only, and exist only for sample accounts.
 
-### `PATCH /courses/{courseId}` (to be built)
+### `PATCH /courses/{courseId}`
 `{ title(1..120) }` → `200 course`. Own courses only; library → `404`.
 
-### `DELETE /courses/{courseId}` (to be built)
+### `DELETE /courses/{courseId}`
 `204`. Own courses only; library → `404`. Cascades to every lecture in the course (as `DELETE /lectures/{id}`), then removes the course's Storage objects. Refused with `409 already_processing` while one of its lectures is processing.
 
 ### `GET /courses/{courseId}/map`
