@@ -31,7 +31,7 @@ describe('GET /courses', () => {
       activityType: 'spot_flaw',
       outcome: 'incorrect',
     })
-    const forA = await listCourseSummaries(f.db, ID.A)
+    const forA = await listCourseSummaries(f.db, ACTOR_A)
     expect(forA.map((c) => c.id)).toEqual([ID.LIB, ID.P])
     expect(forA[0]).toMatchObject({
       kind: 'library',
@@ -42,7 +42,7 @@ describe('GET /courses', () => {
         url: 'https://cs50.harvard.edu/x/license/',
       },
     })
-    const forB = await listCourseSummaries(f.db, ID.B)
+    const forB = await listCourseSummaries(f.db, ACTOR_B)
     expect(forB.map((c) => c.id)).toEqual([ID.LIB])
     expect(forB[0]?.mastery).toEqual({ gray: 3, red: 0, amber: 0, green: 0 })
   })
@@ -68,10 +68,10 @@ describe('POST /courses', () => {
     })
   })
 
-  it('lets Google accounts create several courses', async () => {
+  it('lets non-sample accounts create several courses', async () => {
     await createCourse(ACTOR_A, { id: NEW_1, title: 'One' }, f.db)
     await createCourse(ACTOR_A, { id: NEW_2, title: 'Two' }, f.db)
-    expect((await listCourseSummaries(f.db, ID.A)).length).toBe(4)
+    expect((await listCourseSummaries(f.db, ACTOR_A)).length).toBe(4)
   })
 })
 

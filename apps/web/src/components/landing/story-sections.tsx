@@ -1,7 +1,11 @@
 import { ClipboardCheck, MessageCircleQuestion, Play } from 'lucide-react'
 import { Suspense } from 'react'
 import { KeyHint } from '@/components/key-hint'
-import { AuthErrorAlert, SignInActions } from '@/components/sign-in/sign-in-actions'
+import {
+  AuthErrorAlert,
+  SignInActions,
+  TRY_SAMPLE_HASH,
+} from '@/components/sign-in/sign-in-actions'
 import { CONTAINER, Screenshot, Section } from './section'
 import diagnosticDark from './screenshots/diagnostic-result-dark.png'
 import diagnosticLight from './screenshots/diagnostic-result-light.png'
@@ -31,7 +35,7 @@ export function Hero() {
             <Suspense>
               <AuthErrorAlert />
             </Suspense>
-            <SignInActions />
+            <SignInActions focusTarget={TRY_SAMPLE_HASH} />
           </div>
           <div className="text-caption text-muted-foreground space-y-1">
             <p>

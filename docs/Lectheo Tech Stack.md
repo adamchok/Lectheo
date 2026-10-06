@@ -272,7 +272,7 @@ Format: context → decision → consequences. All **Accepted, 4 Oct 2026** (v2 
 - **Context:** Judges need instant access to a realistic, non-"demo" dashboard, and several judges may test at once.
 - **Decision:**
   - The button creates an anonymous user (Turnstile-protected, server-side, on click).
-  - `clone_sample()` copies the seed student's per-user rows in one transaction. Library content stays shared and read-only, and today every account can read it. *(decided 6 Oct 2026, to be built)*: visible to sample accounts only, so Google accounts get a fresh start with no library.
+  - `clone_sample()` copies the seed student's per-user rows in one transaction. Library content stays shared and read-only, and only sample (and owner) accounts can read it, so Google accounts get a fresh start with no library.
   - The account menu shows "Sample account · progress resets when you leave" plus Reset. Accounts older than 24 h are purged daily by cron and after every sample sign-in.
 - **Consequences:**
   - \+ No collisions, a clean start every time, and it looks like the real product.

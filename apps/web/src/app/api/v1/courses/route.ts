@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 /** GET /api/v1/courses → library courses + the user's personal courses, with mastery counts. */
 export const GET = route(
   { auth: 'required', response: ListCoursesResponse },
-  async ({ actor }) => ({ data: await listCourseSummaries(appDb(), actor.userId) }),
+  async ({ actor }) => ({ data: await listCourseSummaries(appDb(), actor) }),
 )
 
 /** POST /api/v1/courses → 201 CourseSummary (replay-safe on the client-generated id). */

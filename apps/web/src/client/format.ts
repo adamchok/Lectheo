@@ -1,13 +1,5 @@
-/** Media time → "m:ss" under an hour, "h:mm:ss" from an hour (e.g. 761000 → "12:41"). */
-export function formatTimestamp(ms: number): string {
-  const totalSeconds = Math.max(0, Math.floor(ms / 1000))
-  const hours = Math.floor(totalSeconds / 3600)
-  const minutes = Math.floor((totalSeconds % 3600) / 60)
-  const seconds = totalSeconds % 60
-  const ss = String(seconds).padStart(2, '0')
-  if (hours > 0) return `${hours}:${String(minutes).padStart(2, '0')}:${ss}`
-  return `${minutes}:${ss}`
-}
+/** Media time → "m:ss" / "h:mm:ss". One implementation, shared with the recommender's evidence. */
+export { formatTimestamp } from '@lectheo/domain'
 
 /** Spoken form for screen readers: "12 minutes 41 seconds". */
 export function formatTimestampLong(ms: number): string {

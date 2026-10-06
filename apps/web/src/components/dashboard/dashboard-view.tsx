@@ -1,12 +1,11 @@
 'use client'
 
-import type { MasteryState } from '@lectheo/contracts'
-import { BookOpen, Network, Plus, TriangleAlert, type LucideIcon } from 'lucide-react'
+import type { CourseSummary, MasteryState } from '@lectheo/contracts'
+import { Network, Plus, TriangleAlert, type LucideIcon } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { useCourseMap, useCourses, useMe } from '@/client/queries'
-import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { LicenseNotice } from '@/components/license-notice'
 import { countMastery, MASTERY_META } from '@/components/mastery-meta'
@@ -17,12 +16,24 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { FEATURES } from '@/lib/features'
 import { cn } from '@/lib/utils'
 import { CourseRow } from './course-card'
+import { FirstRun } from './first-run'
 import { LectureList } from './lecture-list'
 import { NextStep } from './next-step-card'
 
 function greeting(displayName: string | null | undefined): string {
   const first = displayName?.trim().split(/\s+/)[0]
   return first ? `Welcome back, ${first}` : 'Welcome back'
+}
+
+/**
+ * The course the student last worked in (F0.4); a lecture of theirs that just became ready bumps
+ * its course's lastActiveAt, so it wins. Untouched lists keep the server order.
+ */
+function currentCourse(list: readonly CourseSummary[]): CourseSummary | undefined {
+  return list.reduce<CourseSummary | undefined>(
+    (best, c) => (!best || (c.lastActiveAt ?? '') > (best.lastActiveAt ?? '') ? c : best),
+    undefined,
+  )
 }
 
 interface Figure {
@@ -155,16 +166,12 @@ export function DashboardView() {
   }
 
   const list = courses.data
-  const primary = list.find((course) => course.kind === 'library') ?? list[0]
+  const primary = currentCourse(list)
   if (!primary) {
     return (
       <>
-        {header}
-        <EmptyState
-          icon={BookOpen}
-          title="No courses yet"
-          description="Your courses and the CS50 lecture library will appear here."
-        />
+        <PageChrome crumbs={[{ label: 'Home' }]} />
+        <FirstRun />
       </>
     )
   }

@@ -191,7 +191,12 @@ export interface SignInActionsProps {
    * button, errors in a popover. `menu`: "Sign in" only, for the mobile menu.
    */
   variant?: 'hero' | 'header' | 'menu'
+  /** When the URL hash is `#<focusTarget>`, focus this instance's sample button on load. */
+  focusTarget?: string
 }
+
+/** The hash the app links to after signing out to try the sample account (F0.8 first run). */
+export const TRY_SAMPLE_HASH = 'try-sample'
 
 /**
  * "Google sign-in didn't complete" after `/?error=auth` from /auth/callback. Reads the query on
@@ -219,8 +224,14 @@ export function AuthErrorAlert() {
 }
 
 /** Sample account (Turnstile → POST /session/sample) and Google sign-in (F0.1). */
-export function SignInActions({ variant = 'hero' }: SignInActionsProps) {
+export function SignInActions({ variant = 'hero', focusTarget }: SignInActionsProps) {
   const id = useId()
+  const sampleButton = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (!focusTarget || window.location.hash !== `#${focusTarget}`) return
+    sampleButton.current?.scrollIntoView({ block: 'center' })
+    sampleButton.current?.focus()
+  }, [focusTarget])
   const [error, setError] = useState<string | null>(null)
   const report = useCallback<ReportError>((next) => setError(next), [])
   const claim = useCallback(() => signInLock.claim(id), [id])
@@ -307,7 +318,13 @@ export function SignInActions({ variant = 'hero' }: SignInActionsProps) {
     <div className="space-y-4">
       {script}
       <div className="flex flex-col gap-3 sm:flex-row">
-        <Button size="lg" className="h-11 px-5" onClick={startSample} disabled={busy}>
+        <Button
+          ref={sampleButton}
+          size="lg"
+          className="h-11 px-5"
+          onClick={startSample}
+          disabled={busy}
+        >
           {sampleLabel}
         </Button>
         <Button

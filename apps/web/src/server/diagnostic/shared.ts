@@ -3,12 +3,14 @@ import {
   and,
   asc,
   count,
+  courses,
   diagnosticResponses,
   diagnosticSessions,
   eq,
   inArray,
   isNull,
   items,
+  lectures,
   markerConcepts,
   markers,
   not,
@@ -20,6 +22,7 @@ import { buildSources } from '../activities/sources'
 import type { Actor } from '../auth'
 import type { DbLike } from '../db'
 import { notFound } from '../errors'
+import { readableCourse } from '../ownership'
 
 /* Shared loading for the diagnostic (F3, API Spec §6). Every miss is a 404 (no existence leak). */
 
@@ -29,16 +32,24 @@ export type ItemRow = typeof items.$inferSelect
 
 export const isUuid = (id: string): boolean => z.uuid().safeParse(id).success
 
-/** The actor's own session, else 404. */
+/** The actor's own session on a lecture they can still read, else 404. */
 export async function loadOwnedSession(db: DbLike, actor: Actor, sid: string): Promise<SessionRow> {
   if (!isUuid(sid)) throw notFound()
   const [row] = await db
-    .select()
+    .select({ session: diagnosticSessions })
     .from(diagnosticSessions)
-    .where(and(eq(diagnosticSessions.id, sid), eq(diagnosticSessions.userId, actor.userId)))
+    .innerJoin(lectures, eq(lectures.id, diagnosticSessions.lectureId))
+    .innerJoin(courses, eq(courses.id, lectures.courseId))
+    .where(
+      and(
+        eq(diagnosticSessions.id, sid),
+        eq(diagnosticSessions.userId, actor.userId),
+        readableCourse(actor),
+      ),
+    )
     .limit(1)
   if (!row) throw notFound()
-  return row
+  return row.session
 }
 
 /**

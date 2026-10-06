@@ -151,9 +151,7 @@ Three columns:
 **Eyebrow:** Your lectures
 **Title:** Try it on CS50, then bring your own.
 
-**Lead:** The sample account comes with Harvard's CS50x Lectures 3, 4 and 5, ready to watch and practice. With a Google account you can add your own:
-
-*Ship when the fresh start is live: replace the last sentence with "A Google account starts empty and is yours alone. Add your own lectures:"*
+**Lead:** The sample account comes with Harvard's CS50x Lectures 3, 4 and 5, ready to watch and practice. A Google account starts empty and is yours alone. Add your own lectures:
 
 - **A recording with its transcript.** Pick the video or audio file and its `.vtt` or `.srt` captions (Teams, Zoom and Panopto can export them). The video plays from your laptop and is never uploaded.
 - **Audio only.** Upload the audio; Lectheo transcribes it, then deletes the audio.
@@ -195,9 +193,7 @@ An AI study partner for lectures. It finds what you personally don't understand,
 Computer science students who learn from lectures, live or recorded. The sample uses CS50x, and the activities are written for CS concepts.
 
 **Do I need an account to try it?**
-No. **Try the sample account** gives you your own copy of a student partway through CS50x, with Lecture 5 ready to watch. It's deleted after 24 hours. To add your own lectures, continue with Google.
-
-*Ship when the fresh start is live: add "Your account starts empty: just your courses, nothing preloaded."*
+No. **Try the sample account** gives you your own copy of a student partway through CS50x, with Lecture 5 ready to watch. It's deleted after 24 hours. To add your own lectures, continue with Google. Your account starts empty: just your courses, nothing preloaded.
 
 **What happens to my lecture recordings?**
 Video never leaves your laptop; only the transcript is uploaded. Audio you upload is deleted as soon as it's transcribed, and so is the transcription provider's copy. Speaker names are removed from transcripts. Deleting a lecture deletes everything made from it. You can delete your account at any time from the account menu. Details are in the [privacy policy](/privacy).

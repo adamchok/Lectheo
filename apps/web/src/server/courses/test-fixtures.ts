@@ -16,6 +16,7 @@ export const ID = {
   A: uid(1),
   B: uid(2),
   S: uid(3),
+  G: uid(4),
   LIB: uid(10),
   L1: uid(11),
   L2: uid(12),
@@ -33,8 +34,13 @@ export const ID = {
   SESSION: uid(70),
 } as const
 
-export const ACTOR_A: Actor = { userId: ID.A, kind: 'google', isSample: false }
-export const ACTOR_B: Actor = { userId: ID.B, kind: 'google', isSample: false }
+/*
+ * A and B are owner accounts: full limits like Google, and they can read the library (F0.7), so
+ * the library-based tests keep working. G is a Google account: own courses only.
+ */
+export const ACTOR_A: Actor = { userId: ID.A, kind: 'owner', isSample: false }
+export const ACTOR_B: Actor = { userId: ID.B, kind: 'owner', isSample: false }
+export const ACTOR_G: Actor = { userId: ID.G, kind: 'google', isSample: false }
 export const ACTOR_S: Actor = { userId: ID.S, kind: 'sample', isSample: true }
 
 /** The 🔒 key_points value seeded on every concept; it must never reach a response. */
@@ -52,7 +58,7 @@ export async function createFixture(): Promise<Fixture> {
   const kp = `'["${SECRET_KEY_POINT}"]'::jsonb`
   await exec(`
     INSERT INTO profiles (id, kind) VALUES
-      ('${ID.A}', 'google'), ('${ID.B}', 'google'), ('${ID.S}', 'sample');
+      ('${ID.A}', 'owner'), ('${ID.B}', 'owner'), ('${ID.S}', 'sample'), ('${ID.G}', 'google');
     INSERT INTO courses (id, kind, title, attribution, layout) VALUES ('${ID.LIB}', 'library',
       'CS50x 2026',
       '{"source":"CS50x 2026 by Harvard University","license":"CC BY-NC-SA 4.0",

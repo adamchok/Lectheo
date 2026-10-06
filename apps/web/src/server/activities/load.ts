@@ -8,20 +8,20 @@ import {
   items,
   itemSecrets,
   messages,
-  or,
 } from '@lectheo/db'
 import { z } from 'zod'
 import { aiContext } from '../ai-hooks'
 import type { Actor } from '../auth'
 import type { DbLike } from '../db'
 import { notFound } from '../errors'
+import { readableCourse } from '../ownership'
 import type { ActivityContext, ActivityRow, ConceptRow, ItemRow, ItemSecretsRow } from './types'
 
 /* Loading + ownership for the activities core. Every miss is a 404 (no existence leak). */
 
 const isUuid = (id: string): boolean => z.uuid().safeParse(id).success
 
-/** A concept the actor can read: its course is library content or owned by the actor. */
+/** A concept the actor can read (ownership.ts read rule on its course). */
 export async function loadConceptForRead(
   db: DbLike,
   actor: Actor,
@@ -32,12 +32,7 @@ export async function loadConceptForRead(
     .select({ concept: concepts })
     .from(concepts)
     .innerJoin(courses, eq(courses.id, concepts.courseId))
-    .where(
-      and(
-        eq(concepts.id, conceptId),
-        or(eq(courses.ownerId, actor.userId), eq(courses.kind, 'library')),
-      ),
-    )
+    .where(and(eq(concepts.id, conceptId), readableCourse(actor)))
     .limit(1)
   if (!row) throw notFound()
   return row.concept
@@ -49,7 +44,7 @@ export async function findActivity(db: DbLike, id: string): Promise<ActivityRow 
   return row
 }
 
-/** The actor's own activity, else 404. */
+/** The actor's own activity on a concept they can still read, else 404. */
 export async function loadOwnedActivity(
   db: DbLike,
   actor: Actor,
@@ -57,12 +52,14 @@ export async function loadOwnedActivity(
 ): Promise<ActivityRow> {
   if (!isUuid(id)) throw notFound()
   const [row] = await db
-    .select()
+    .select({ activity: activities })
     .from(activities)
-    .where(and(eq(activities.id, id), eq(activities.userId, actor.userId)))
+    .innerJoin(concepts, eq(concepts.id, activities.conceptId))
+    .innerJoin(courses, eq(courses.id, concepts.courseId))
+    .where(and(eq(activities.id, id), eq(activities.userId, actor.userId), readableCourse(actor)))
     .limit(1)
   if (!row) throw notFound()
-  return row
+  return row.activity
 }
 
 async function loadItem(db: DbLike, itemId: string | null): Promise<ItemRow | null> {
@@ -93,7 +90,8 @@ export async function buildContext(
   concept?: ConceptRow,
 ): Promise<ActivityContext> {
   const [conceptRow, item] = await Promise.all([
-    concept ?? loadConceptById(db, activity.conceptId),
+    // Same read rule as a new activity: a leftover row on unreadable (library) content is a 404.
+    concept ?? loadConceptForRead(db, actor, activity.conceptId),
     loadItem(db, activity.itemId),
   ])
   let secrets: Promise<ItemSecretsRow> | undefined
@@ -107,10 +105,4 @@ export async function buildContext(
     secrets: () => (secrets ??= loadSecrets(db, item)),
     visibleMessages: () => visibleMessages(db, activity.id),
   }
-}
-
-async function loadConceptById(db: DbLike, id: string): Promise<ConceptRow> {
-  const [row] = await db.select().from(concepts).where(eq(concepts.id, id)).limit(1)
-  if (!row) throw notFound()
-  return row
 }

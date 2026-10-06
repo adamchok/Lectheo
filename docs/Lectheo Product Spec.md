@@ -378,20 +378,12 @@ Recorded at submission (6 Oct 2026). Each deviation is deliberate; evidence is i
 
 | Req | Spec says | As built | Why |
 |---|---|---|---|
+| F0.9 | When processing reaches `map_ready` the map opens | The processing card offers **Open the map** at `map_ready`; the dashboard never navigates on its own. | The page is safe to leave and the student may be elsewhere; moving them without a click would be surprising. |
+| F0.12 | Stump on the concept **mastered longest ago** | Stump on the mastered concept **practiced longest ago** (oldest latest attempt), `packages/domain/src/recommender.ts`. A lecture whose processing failed (to retry), then one still being added (*Finish adding …*), is offered before *add a lecture*. | Close enough for spacing practice without replaying every attempt to find when each concept turned green. |
 | F2.2 | About 1 concept per 3 minutes (min 3, max 20) | The pipeline follows the rule (`packages/domain/src/scale.ts`). The **CS50 library** has 6 concepts per 45-minute window, where the rule gives about 15. | The library curriculum is fixed: the item bank's stable ids, the seed student and the e2e judge path depend on it. Six well-verified concepts per lecture beat fifteen thinner ones for a two-minute judge path. Student-added lectures get the full rule. |
 | F7.1 | Library processed from the official subtitles **and slides** | Built from the official timestamped subtitles only (`scripts/seed-library.ts`). | Slides input is a Should in the decision log (§10). Every concept and item cites subtitle timestamps, so grounding is checkable without slides. |
 
-### Decided 6 Oct 2026, to be built
-
-These requirements are specified above but **not implemented yet**. Until they ship, the product behaves as before (for example, Google accounts still see the CS50 library).
-
-| Req | Item |
-|---|---|
-| F0.4 | Dashboard follows the student's own course |
-| F0.7 | CS50 library visible to sample accounts only (rename and delete own courses are built) |
-| F0.8 | First-run screen for new Google accounts |
-| F0.9 | Processing steps on the dashboard |
-| F0.10–F0.12 | Next-step card: why, how long, payoff; *Also worth doing*; no dead end |
+Built on 6 Oct 2026: F0.4 (the dashboard follows the student's own course), F0.6 (self-serve *Delete account*), F0.7 (rename and delete own courses; the CS50 library is visible to sample and owner accounts only), F0.8 (first-run screen), F0.9 (processing steps on the dashboard), F0.10–F0.12 (why, how long, payoff, *Also worth doing*, no dead end) and F8.2 (delete course and delete account).
 
 ### Should items: built or cut
 

@@ -77,10 +77,11 @@ export async function createActivity(
   const existing = await findActivity(db, input.id)
   if (existing) return replay(db, actor, existing, input.type)
 
+  // A 404 (unreadable concept) costs nothing.
+  const concept = await loadConceptForRead(db, actor, input.conceptId)
   // ponytail: consumed before start, so a 409 bank_empty still costs one unit (no refund, like
   // every quota here); refund in a catch around start() if students hit it in practice.
   await consume(actor, 'activities', db)
-  const concept = await loadConceptForRead(db, actor, input.conceptId)
   const ai = aiContext({ actor, db })
   const base = { db, actor, concept, ai, activityId: input.id, persona: input.persona ?? null }
   const start = await withAiErrors(db, () => handler.start(base))

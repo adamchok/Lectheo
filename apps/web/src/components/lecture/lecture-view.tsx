@@ -1,16 +1,7 @@
 'use client'
 
 import type { LectureResponse, LectureSource, PipelineStep } from '@lectheo/contracts'
-import {
-  Circle,
-  Check,
-  ClipboardCheck,
-  LoaderCircle,
-  Network,
-  Play,
-  RotateCw,
-  Sparkles,
-} from 'lucide-react'
+import { ClipboardCheck, Network, Play, RotateCw, Sparkles } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -35,36 +26,7 @@ import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { Spinner } from '@/components/ui/spinner'
-
-const STEP_LABELS: Readonly<Record<PipelineStep, string>> = {
-  parseTranscript: 'Reading the transcript',
-  buildKeyterms: 'Collecting key terms',
-  submitTranscription: 'Sending audio for transcription',
-  pollTranscription: 'Transcribing audio',
-  fetchTranscript: 'Fetching the transcript',
-  segment: 'Splitting into segments',
-  extractConcepts: 'Finding the concepts',
-  validateGraph: 'Checking concept links',
-  layoutMap: 'Laying out the map',
-  alignMarkers: 'Linking your markers',
-  draftItems: 'Writing practice questions',
-  verifyItems: 'Verifying questions independently',
-}
-
-/** Mirrors server/pipeline/state.ts#pipelinePath (the order the steps run in). */
-const MAP_STEPS: readonly PipelineStep[] = [
-  'extractConcepts',
-  'validateGraph',
-  'layoutMap',
-  'alignMarkers',
-  'draftItems',
-  'verifyItems',
-]
-const isAudio = (source: LectureSource): boolean => source === 'audio' || source === 'live'
-const stepsFor = (source: LectureSource): readonly PipelineStep[] =>
-  isAudio(source)
-    ? ['submitTranscription', 'pollTranscription', 'fetchTranscript', ...MAP_STEPS]
-    : ['parseTranscript', ...MAP_STEPS]
+import { isAudio, STEP_LABELS, StepList, stepsFor } from './pipeline-steps'
 
 type ReprocessFrom = 'parseTranscript' | 'submitTranscription' | 'extractConcepts' | 'draftItems'
 
@@ -80,38 +42,6 @@ function retryFrom(step: string, code: string, source: LectureSource): Reprocess
   }
   if (step === 'draftItems' || step === 'verifyItems') return 'draftItems'
   return 'extractConcepts'
-}
-
-const STEP_STATE_TEXT = { done: '(done)', current: '(in progress)', pending: '(waiting)' } as const
-
-function StepList({ lecture }: { lecture: LectureResponse }) {
-  const steps = stepsFor(lecture.source)
-  const done = lecture.progress?.done ?? 0
-  return (
-    <ol className="space-y-2 text-sm">
-      {steps.map((step, i) => {
-        const state = i < done ? 'done' : i === done ? 'current' : 'pending'
-        const Icon = state === 'done' ? Check : state === 'current' ? LoaderCircle : Circle
-        return (
-          <li
-            key={step}
-            className={cn(
-              'flex items-center gap-2',
-              state === 'pending' && 'text-muted-foreground',
-              state === 'current' && 'font-medium',
-            )}
-          >
-            <Icon
-              aria-hidden
-              className={cn('size-4 shrink-0', state === 'current' && 'motion-safe:animate-spin')}
-            />
-            <span>{STEP_LABELS[step]}</span>
-            <span className="sr-only">{STEP_STATE_TEXT[state]}</span>
-          </li>
-        )
-      })}
-    </ol>
-  )
 }
 
 function MapLinks({ lecture }: { lecture: LectureResponse }) {

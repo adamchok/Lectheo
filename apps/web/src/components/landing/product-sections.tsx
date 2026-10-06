@@ -200,7 +200,7 @@ export function YourLectures() {
       id="your-lectures-title"
       eyebrow="Your lectures"
       title="Try it on CS50, then bring your own."
-      lead="The sample account comes with Harvard's CS50x Lectures 3, 4 and 5, ready to watch and practice. With a Google account you can add your own:"
+      lead="The sample account comes with Harvard's CS50x Lectures 3, 4 and 5, ready to watch and practice. A Google account starts empty and is yours alone. Add your own lectures:"
     >
       <ul className="grid gap-8 md:grid-cols-3">
         {SOURCES.map((source) => (
