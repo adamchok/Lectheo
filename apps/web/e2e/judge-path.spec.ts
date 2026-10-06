@@ -61,7 +61,7 @@ test('watch Lecture 5: player, transcript, markers with undo persist after reloa
 
   await page
     .getByRole('listitem')
-    .filter({ hasText: 'Marked: important' })
+    .filter({ hasText: 'Marked: Important' })
     .getByRole('button', { name: 'Undo' })
     .click()
   await expect(page.getByText(/^0 important$/)).toBeVisible()
@@ -84,7 +84,7 @@ async function answerSureAndWrong(page: Page): Promise<void> {
   const confidence = page.waitForResponse(
     (r) => r.url().endsWith('/confidence') && r.request().method() === 'POST',
   )
-  await question.getByRole('radio', { name: /^sure/i }).click()
+  await question.getByRole('button', { name: /^sure/i }).click()
   const response = await confidence
   const itemId = new URL(response.url()).pathname.split('/').at(-2) ?? ''
   const { options } = (await response.json()) as { options: { id: string }[] }
@@ -155,7 +155,7 @@ test('concept map: laid-out nodes, Pointers red, spot the flaw from the panel', 
 
   await expect(page).toHaveURL(/\/activities\/[^/?]+\?from=red$/)
   await expect(page.getByRole('heading', { name: /does this explanation hold up/i })).toBeVisible()
-  await page.getByRole('radio', { name: 'Correct' }).check({ force: true })
+  await page.getByRole('radio', { name: 'No flaw' }).check({ force: true })
   await page.getByRole('button', { name: 'Submit' }).click()
 
   const result = page.getByRole('region', { name: 'Result' })

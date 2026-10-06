@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AudioForm } from './audio-form'
 import { ConsentCheckbox, useConsent } from './consent'
 import { type CourseChoice, CoursePicker } from './course-picker'
+import { RequiredMark } from './form-parts'
 import { ImportForm } from './import-form'
 import { TranscriptForm } from './transcript-form'
 
@@ -37,8 +38,8 @@ export interface DraftInput {
 export type CreateDraft = (input: DraftInput) => Promise<LectureResponse>
 
 export interface DraftFormProps {
-  /** Course, title and consent are all set. */
-  ready: boolean
+  /** Steps still missing outside the form (course, title, consent); empty when all are set. */
+  missing: readonly string[]
   isSample: boolean
   createDraft: CreateDraft
 }
@@ -69,10 +70,10 @@ export function NewLectureView() {
 
   if (courses.isPending || me.isPending) {
     return (
-      <div aria-busy aria-label="Loading" className="max-w-2xl space-y-4">
+      <Skeleton label="Loading" className="max-w-2xl space-y-4">
         <Skeleton className="h-9 w-full" />
         <Skeleton className="h-64 w-full rounded-xl" />
-      </div>
+      </Skeleton>
     )
   }
   if (courses.isError) {
@@ -98,7 +99,6 @@ export function NewLectureView() {
     !title.trim() && 'add a title',
     !consent.given && 'confirm you have permission',
   ].filter((step): step is string => Boolean(step))
-  const ready = missing.length === 0
 
   const createDraft: CreateDraft = async ({ source, media, fileKey }) => {
     const lectureTitle = title.trim()
@@ -114,16 +114,28 @@ export function NewLectureView() {
     const id = idFor(lectureIds.current, key)
     return createLecture.mutateAsync({ id, courseId, title: lectureTitle, source, media })
   }
-  const formProps: DraftFormProps = { ready, isSample, createDraft }
+  const formProps: DraftFormProps = { missing, isSample, createDraft }
 
   return (
     <div className="max-w-2xl space-y-6">
+      {/* Hidden from screen readers: each field announces "required" itself. */}
+      <p aria-hidden className="text-caption text-muted-foreground">
+        Fields marked <RequiredMark /> are required.
+      </p>
       <div className="grid gap-4 sm:grid-cols-2">
-        <CoursePicker courses={personal} canCreate={canCreate} value={course} onChange={setChoice} />
+        <CoursePicker
+          courses={personal}
+          canCreate={canCreate}
+          value={course}
+          onChange={setChoice}
+        />
         <div className="space-y-2">
-          <Label htmlFor="lecture-title">Lecture title</Label>
+          <Label htmlFor="lecture-title">
+            Lecture title <RequiredMark />
+          </Label>
           <Input
             id="lecture-title"
+            required
             placeholder="e.g. Week 6 · Trees"
             maxLength={200}
             value={title}
@@ -160,9 +172,6 @@ export function NewLectureView() {
           <TranscriptForm {...formProps} />
         </TabsContent>
       </Tabs>
-      {!ready && (
-        <p className="text-muted-foreground text-sm">To continue, {missing.join(', ')}.</p>
-      )}
     </div>
   )
 }

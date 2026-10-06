@@ -3,12 +3,12 @@
 import type { CourseSummary } from '@lectheo/contracts'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { RequiredMark } from './form-parts'
 
 export type CourseChoice = { kind: 'existing'; id: string } | { kind: 'new'; title: string }
 
 const NEW = '__new__'
-const selectClass =
-  'border-input bg-background h-9 w-full rounded-md border px-3 text-sm'
+const selectClass = 'border-input bg-background h-9 w-full rounded-md border px-3 text-sm'
 
 export interface CoursePickerProps {
   courses: readonly CourseSummary[]
@@ -22,10 +22,13 @@ export interface CoursePickerProps {
 export function CoursePicker({ courses, canCreate, value, onChange }: CoursePickerProps) {
   return (
     <div className="space-y-2">
-      <Label htmlFor="course">Course</Label>
+      <Label htmlFor="course">
+        Course <RequiredMark />
+      </Label>
       {courses.length > 0 && (
         <select
           id="course"
+          required
           className={selectClass}
           value={value.kind === 'existing' ? value.id : NEW}
           onChange={(e) =>
@@ -48,6 +51,7 @@ export function CoursePicker({ courses, canCreate, value, onChange }: CoursePick
         <Input
           id={courses.length > 0 ? 'new-course' : 'course'}
           aria-label={courses.length > 0 ? 'New course name' : undefined}
+          required
           placeholder="e.g. Biology 101"
           maxLength={120}
           value={value.title}

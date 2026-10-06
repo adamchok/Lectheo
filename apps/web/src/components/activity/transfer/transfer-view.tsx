@@ -4,16 +4,17 @@ import type { ActivityResponse, SubmitResponse } from '@lectheo/contracts'
 import { Lightbulb } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { toast } from 'sonner'
-import { errorMessage } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
+import { InlineError } from '../shared'
 import { useShowExplanation } from '../spot-flaw/api'
 import { OUTCOME_LABELS, parseMasteryState } from '../spot-flaw/logic'
 import {
   type ExplanationData,
   GuidingQuestion,
+  MapLink,
   MasteryChange,
   RetryActions,
   RubricList,
@@ -21,13 +22,9 @@ import {
   TryScore,
 } from '../spot-flaw/result-panel'
 import { ANSWER_MAX, useSubmitTransfer } from './api'
-import { Spinner } from '@/components/ui/spinner'
 
 /** POST …/explanation: the rubric comes along once the activity is closed (reopen). */
 type Revealed = ExplanationData & { rubric?: SubmitResponse['rubric'] }
-
-const failed = (title: string) => (error: unknown) =>
-  toast.error(title, { description: errorMessage(error) })
 
 /** Screen-reader summary of a submit (the result section itself mounts with its content). */
 export function resultAnnouncement(result: SubmitResponse): string {
@@ -42,7 +39,7 @@ export function resultAnnouncement(result: SubmitResponse): string {
 function ModelSolution({ explanation }: { explanation: ExplanationData }) {
   return (
     <section aria-labelledby="solution-title" className="space-y-3">
-      <h3 id="solution-title" className="font-medium">
+      <h3 id="solution-title" className="text-heading">
         Model solution
       </h3>
       {explanation.explanation.split(/\n{2,}/).map((p, i) => (
@@ -83,12 +80,16 @@ export function TransferView({ activity }: { activity: ActivityResponse }) {
   const tryNo = activity.tries.length === 0 ? 1 : 2
 
   // Reopening a closed activity: the reveal isn't in the GET; after the final try "Show me"
-  // changes nothing server-side and returns the rubric too.
+  // changes nothing server-side and returns the rubric too. Once only (StrictMode re-runs
+  // effects); a failure shows inline with "Try again" (showMe.error below).
   const needsReveal = closed && !finalResult && !explanation
-  const { mutate: reveal, isIdle: revealIdle } = showMe
+  const revealStarted = useRef(false)
+  const { mutate: reveal } = showMe
   useEffect(() => {
-    if (needsReveal && revealIdle) reveal(undefined, { onSuccess: setExplanation })
-  }, [needsReveal, revealIdle, reveal])
+    if (!needsReveal || revealStarted.current) return
+    revealStarted.current = true
+    reveal(undefined, { onSuccess: setExplanation })
+  }, [needsReveal, reveal])
 
   useEffect(() => {
     if (!focusTo.current) return
@@ -110,9 +111,9 @@ export function TransferView({ activity }: { activity: ActivityResponse }) {
         setResults((prev) => [...prev, res])
         if (fromRetryForm) setRetrying(false)
       },
-      onError: (error) => {
+      // The error shows inline under the form (submit.error); the answer stays as typed.
+      onError: () => {
         focusTo.current = null
-        failed("Couldn't check your answer")(error)
       },
     })
   }
@@ -120,11 +121,7 @@ export function TransferView({ activity }: { activity: ActivityResponse }) {
     focusTo.current = 'answer'
     setRetrying(true)
   }
-  const onShowMe = () =>
-    showMe.mutate(undefined, {
-      onSuccess: setExplanation,
-      onError: failed("Couldn't load the model solution"),
-    })
+  const onShowMe = () => showMe.mutate(undefined, { onSuccess: setExplanation })
 
   const shownExplanation =
     finalResult?.explanation !== undefined
@@ -136,7 +133,7 @@ export function TransferView({ activity }: { activity: ActivityResponse }) {
     <div className="space-y-8">
       <section aria-labelledby="problem-title" className="space-y-3">
         <div className="space-y-1">
-          <h2 id="problem-title" className="font-serif text-xl font-medium">
+          <h2 id="problem-title" className="text-title-md">
             Apply it to a new problem
           </h2>
           <p className="text-muted-foreground text-sm text-pretty">
@@ -162,7 +159,7 @@ export function TransferView({ activity }: { activity: ActivityResponse }) {
           aria-labelledby="answer-title"
           aria-busy={submit.isPending}
         >
-          <label id="answer-title" htmlFor="transfer-answer" className="font-medium">
+          <label id="answer-title" htmlFor="transfer-answer" className="text-label">
             {tryNo === 1 ? 'Your answer' : 'Your revised answer'}
           </label>
           <Textarea
@@ -176,9 +173,7 @@ export function TransferView({ activity }: { activity: ActivityResponse }) {
           />
           <div className="flex flex-wrap items-center gap-3">
             <Button type="submit" size="lg" disabled={!answer.trim() || submit.isPending}>
-              {submit.isPending && (
-                <Spinner />
-              )}
+              {submit.isPending && <Spinner />}
               {submit.isPending ? 'Checking…' : 'Submit'}
             </Button>
             <span className="text-muted-foreground text-xs tabular-nums">
@@ -188,6 +183,9 @@ export function TransferView({ activity }: { activity: ActivityResponse }) {
               <span className="text-muted-foreground text-sm">Grading takes a few seconds.</span>
             )}
           </div>
+          {submit.isError && (
+            <InlineError title="Couldn't check your answer" error={submit.error} />
+          )}
         </form>
       ) : (
         lastTry && (
@@ -218,14 +216,18 @@ export function TransferView({ activity }: { activity: ActivityResponse }) {
         )
       )}
 
+      {showMe.isError && (
+        <InlineError
+          title="Couldn't load the model solution"
+          error={showMe.error}
+          onRetry={onShowMe}
+        />
+      )}
       {shownExplanation && <ModelSolution explanation={shownExplanation} />}
       {!shownExplanation && lastResult && <Sources sources={lastResult.sources} />}
       {rubric && <RubricList rubric={rubric} />}
-      <MasteryChange
-        start={startState}
-        results={results.map((r) => r.mastery)}
-        courseId={activity.courseId}
-      />
+      <MasteryChange start={startState} results={results.map((r) => r.mastery)} />
+      {(closed || results.length > 0) && <MapLink courseId={activity.courseId} primary={closed} />}
     </div>
   )
 }

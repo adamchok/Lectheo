@@ -393,7 +393,6 @@ These requirements are specified above but **not implemented yet**. Until they s
 | F0.10–F0.12 | Next-step card: why, how long, payoff; *Also worth doing*; no dead end |
 | F1.5 | Teams `.docx` transcripts (today refused with a clear message) |
 | F8.2 | Delete course and delete account (delete lecture is built) |
-| §7 | Phone usability for the app (sidebar sheet, on-screen marker buttons) |
 
 ### Should items: built or cut
 

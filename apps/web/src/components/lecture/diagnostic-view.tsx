@@ -6,12 +6,13 @@ import type {
   DiagnosticResultsResponse,
   Finding,
 } from '@lectheo/contracts'
-import { ArrowRight, Check, CircleX, TriangleAlert } from 'lucide-react'
+import { ArrowRight, CircleCheck, CircleX, TriangleAlert } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { isApiClientError } from '@/client/api'
 import { useFocusOnMount } from '@/client/focus'
+import { pluralize } from '@/client/format'
 import { isBareShortcut } from '@/client/keyboard'
 import {
   useDiagnosticAnswer,
@@ -21,7 +22,11 @@ import {
   useStartDiagnostic,
 } from '@/client/queries'
 import { useStartPractice } from '@/client/practice'
-import { CONFIDENCE_OPTIONS, ConfidencePicker } from '@/components/confidence-picker'
+import {
+  CONFIDENCE_OPTIONS,
+  ConfidencePicker,
+  confidenceForKey,
+} from '@/components/confidence-picker'
 import { ErrorState, errorMessage } from '@/components/error-state'
 import { KeyHint } from '@/components/key-hint'
 import { MasteryBadge } from '@/components/mastery-badge'
@@ -38,10 +43,11 @@ export function DiagnosticView({ lectureId }: { lectureId: string }) {
     <LectureFrame
       lectureId={lectureId}
       section="Diagnostic"
-      description="A few questions on the ideas you flagged. Rate your confidence first, then pick an answer."
+      reading
+      description="A few questions on this lecture's key ideas. Rate your confidence first, then pick an answer."
     >
       {(lecture) => (
-        <div className="mx-auto max-w-3xl">
+        <div>
           <DiagnosticRunner lectureId={lectureId} courseId={lecture.courseId} />
         </div>
       )}
@@ -69,24 +75,26 @@ interface Question {
 
 function Loading({ label }: { label: string }) {
   return (
-    <div aria-busy aria-label={label} className="space-y-3">
+    <Skeleton label={label} className="space-y-3">
       <Skeleton className="h-6 w-2/3" />
       <Skeleton className="h-28 w-full rounded-xl" />
-    </div>
+    </Skeleton>
   )
 }
 
 function Note({ children }: { children: string }) {
-  return <p className="bg-muted text-muted-foreground rounded-lg px-4 py-3 text-sm">{children}</p>
+  return (
+    <p className="bg-muted text-muted-foreground text-body-sm rounded-lg px-4 py-3">{children}</p>
+  )
 }
 
 /** Every verified question for this lecture has been seen (start → 409 no_items). */
 function FinishedState({ lectureId, courseId }: { lectureId: string; courseId: string }) {
   return (
     <section className="bg-card space-y-4 rounded-xl border p-6 text-center shadow-sm">
-      <Check aria-hidden className="text-mastery-green mx-auto size-5" />
-      <h2 className="text-xl font-semibold">You&apos;ve finished this diagnostic</h2>
-      <p className="text-muted-foreground text-sm">
+      <CircleCheck aria-hidden className="text-mastery-green mx-auto size-5" />
+      <h2 className="text-title-md">You&apos;ve finished this diagnostic</h2>
+      <p className="text-muted-foreground text-body-sm">
         You&apos;ve answered every question we have for this lecture. Keep going with practice on
         the concept map.
       </p>
@@ -141,6 +149,7 @@ function DiagnosticRunner({ lectureId, courseId }: { lectureId: string; courseId
   return (
     <DiagnosticFlow
       key={start.data.sessionId}
+      courseId={courseId}
       sessionId={start.data.sessionId}
       initial={unanswered}
       answeredBefore={session.data.items.length - unanswered.length}
@@ -151,19 +160,24 @@ function DiagnosticRunner({ lectureId, courseId }: { lectureId: string; courseId
 
 interface FlowProps {
   sessionId: string
+  courseId: string
   /** Unanswered questions in session order (resume). */
   initial: Question[]
   answeredBefore: number
   note?: string
 }
 
-function DiagnosticFlow({ sessionId, initial, answeredBefore, note }: FlowProps) {
+function DiagnosticFlow({ sessionId, courseId, initial, answeredBefore, note }: FlowProps) {
   const [queue, setQueue] = useState(initial)
   const [index, setIndex] = useState(0)
   const [answers, setAnswers] = useState<ReadonlyMap<string, AnswerResponse>>(new Map())
   const current = queue[index]
 
-  if (!current) return <DiagnosticResults sessionId={sessionId} answers={answers} note={note} />
+  if (!current) {
+    return (
+      <DiagnosticResults sessionId={sessionId} courseId={courseId} answers={answers} note={note} />
+    )
+  }
 
   const handleAnswered = (itemId: string, result: AnswerResponse) => {
     setAnswers((prev) => new Map(prev).set(itemId, result))
@@ -182,7 +196,7 @@ function DiagnosticFlow({ sessionId, initial, answeredBefore, note }: FlowProps)
   return (
     <div className="space-y-6">
       {showNote && <Note>{note}</Note>}
-      <p className="text-muted-foreground text-sm" aria-live="polite">
+      <p className="text-muted-foreground text-body-sm" aria-live="polite">
         Question {answeredBefore + index + 1} of {answeredBefore + queue.length}
         {current.isFollowUp && ' · follow-up on the same idea'}
       </p>
@@ -237,42 +251,40 @@ function QuestionCard({ sessionId, question, isLast, onAnswered, onNext }: Quest
     setChosen(optionId)
     answer.mutate({ itemId: question.id, optionId }, { onSuccess: onAnswered })
   }
-  const pickRef = useRef(handlePick)
-  useEffect(() => {
-    pickRef.current = handlePick
-  })
 
-  // A–D pick an option once options are shown (1–4 rate confidence in ConfidencePicker).
-  useEffect(() => {
-    if (!options || feedback) return
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.shiftKey || !isBareShortcut(event)) return
-      const letter = event.key.toUpperCase() as (typeof LETTERS)[number]
-      const option = options[LETTERS.indexOf(letter)]
-      if (!option) return
+  // 1–4 rate confidence, then A–E pick an option, only while focus is inside this question
+  // (WCAG 2.1.4); never while typing or with a modifier held.
+  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.shiftKey || !isBareShortcut(event.nativeEvent)) return
+    if (!options) {
+      const next = confidenceForKey(event.key)
+      if (!next) return
       event.preventDefault()
-      pickRef.current(option.id)
+      handleRate(next)
+      return
     }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [options, feedback])
+    const option = options[LETTERS.indexOf(event.key.toUpperCase() as (typeof LETTERS)[number])]
+    if (!option || feedback) return
+    event.preventDefault()
+    handlePick(option.id)
+  }
 
   // "Next question" unmounts with the previous card: focus the new question, not <body>.
   const heading = useFocusOnMount<HTMLHeadingElement>()
   const levelLabel = CONFIDENCE_OPTIONS.find((o) => o.value === level)?.label
   return (
-    <section className="bg-card space-y-6 rounded-xl border p-6 shadow-sm" aria-label="Question">
-      <h2
-        ref={heading}
-        tabIndex={-1}
-        className="text-lg leading-snug font-semibold text-balance outline-none"
-      >
+    <section
+      className="bg-card space-y-6 rounded-xl border p-6 shadow-sm"
+      aria-label="Question"
+      onKeyDown={handleKeyDown}
+    >
+      <h2 ref={heading} tabIndex={-1} className="text-title-md text-balance">
         {question.stem}
       </h2>
 
       {options ? (
         <>
-          <p className="text-muted-foreground text-sm">Confidence: {levelLabel}</p>
+          <p className="text-muted-foreground text-body-sm">Confidence: {levelLabel}</p>
           <OptionList
             options={options}
             chosen={chosen}
@@ -282,12 +294,12 @@ function QuestionCard({ sessionId, question, isLast, onAnswered, onNext }: Quest
             focusOnMount={ratedHere}
           />
           {answer.isPending && (
-            <p className="text-muted-foreground flex items-center gap-2 text-sm">
+            <p className="text-muted-foreground text-body-sm flex items-center gap-2">
               <Spinner /> Checking…
             </p>
           )}
           {answer.isError && (
-            <p role="alert" className="text-destructive text-sm">
+            <p role="alert" className="text-destructive text-body-sm">
               {errorMessage(answer.error)}
             </p>
           )}
@@ -301,13 +313,17 @@ function QuestionCard({ sessionId, question, isLast, onAnswered, onNext }: Quest
             legend="How confident are you? Pick one to see the answers."
           />
           {confidence.isError && (
-            <p role="alert" className="text-destructive text-sm">
+            <p role="alert" className="text-destructive text-body-sm">
               {errorMessage(confidence.error)}
             </p>
           )}
         </>
       )}
 
+      {/* Always mounted, so the verdict is announced when it arrives (WCAG 4.1.3). */}
+      <p role="status" className="sr-only">
+        {feedback && `Answer checked: ${verdictText(feedback)}`}
+      </p>
       {feedback && <FeedbackCard feedback={feedback} isLast={isLast} onNext={onNext} />}
     </section>
   )
@@ -339,12 +355,7 @@ function OptionList({
     if (shouldFocus.current) list.current?.focus()
   }, [])
   return (
-    <ul
-      ref={list}
-      tabIndex={-1}
-      className="space-y-2 rounded-lg"
-      aria-label="Answer options"
-    >
+    <ul ref={list} tabIndex={-1} className="space-y-2 rounded-lg" aria-label="Answer options">
       {options.map((option, i) => {
         const isCorrect = correctOptionId === option.id
         const isWrongPick = correctOptionId !== undefined && chosen === option.id && !isCorrect
@@ -353,11 +364,12 @@ function OptionList({
             <button
               type="button"
               onClick={() => onPick(option.id)}
-              disabled={disabled}
+              aria-disabled={disabled || undefined}
+              aria-keyshortcuts={LETTERS[i]}
               aria-pressed={chosen === option.id}
               className={cn(
                 'hover:border-primary/50 flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-colors',
-                'disabled:cursor-default',
+                'aria-disabled:cursor-default',
                 chosen === option.id && !correctOptionId && 'border-primary bg-accent',
                 isCorrect && 'border-mastery-green-solid bg-mastery-green-bg',
                 isWrongPick && 'border-destructive bg-destructive/10',
@@ -366,7 +378,7 @@ function OptionList({
               <KeyHint className="mt-0.5">{LETTERS[i]}</KeyHint>
               <span className="flex-1">{option.text}</span>
               {isCorrect && (
-                <Check aria-label="Correct answer" className="text-mastery-green size-5" />
+                <CircleCheck aria-label="Correct answer" className="text-mastery-green size-5" />
               )}
               {isWrongPick && (
                 <CircleX aria-label="Your answer" className="text-destructive size-5" />
@@ -385,33 +397,43 @@ interface FeedbackCardProps {
   onNext: () => void
 }
 
+const verdictText = (feedback: AnswerResponse): string =>
+  `${feedback.correct ? 'Correct' : 'Not quite'} · ${FINDING_LABEL[feedback.finding]}`
+
 /** Immediate feedback after each answer (F3.4): verdict, why, explanation, lecture link. */
 function FeedbackCard({ feedback, isLast, onNext }: FeedbackCardProps) {
-  const Icon = feedback.correct ? Check : CircleX
+  const Icon = feedback.correct ? CircleCheck : CircleX
+  const reasons = feedback.mastery.reasons ?? []
   const next = feedback.followUp
     ? 'One more on this idea'
     : isLast
       ? 'See results'
       : 'Next question'
   return (
-    <div aria-live="polite" className="bg-muted/50 space-y-3 rounded-lg border p-4">
-      <p className="flex items-center gap-2 font-semibold">
+    <div className="bg-muted/50 space-y-3 rounded-lg border p-4">
+      <p className="text-heading flex items-center gap-2">
         <Icon
           aria-hidden
           className={cn('size-5', feedback.correct ? 'text-mastery-green' : 'text-destructive')}
         />
-        {feedback.correct ? 'Correct' : 'Not quite'} · {FINDING_LABEL[feedback.finding]}
+        {verdictText(feedback)}
       </p>
-      {feedback.whyYourChoiceIsWrong && <p className="text-sm">{feedback.whyYourChoiceIsWrong}</p>}
-      <p className="text-muted-foreground text-sm">{feedback.explanation}</p>
+      {feedback.whyYourChoiceIsWrong && (
+        <p className="text-body-sm">{feedback.whyYourChoiceIsWrong}</p>
+      )}
+      <p className="text-muted-foreground text-body-sm">{feedback.explanation}</p>
       {feedback.source && <SourceRef source={feedback.source} />}
       <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-        <MasteryBadge
-          state={feedback.mastery.state}
-          reasons={feedback.mastery.reasons}
-          confidentMistake={feedback.mastery.confidentMistake}
-          size="sm"
-        />
+        <div className="space-y-1">
+          <MasteryBadge
+            state={feedback.mastery.state}
+            confidentMistake={feedback.mastery.confidentMistake}
+            size="sm"
+          />
+          {reasons.length > 0 && (
+            <p className="text-muted-foreground text-caption">{reasons.join(' · ')}</p>
+          )}
+        </div>
         <Button onClick={onNext} autoFocus>
           {next}
           <ArrowRight aria-hidden />
@@ -423,13 +445,14 @@ function FeedbackCard({ feedback, isLast, onNext }: FeedbackCardProps) {
 
 interface ResultsProps {
   sessionId: string
+  courseId: string
   /** Answers from this visit, for the "why" on the headline card. */
   answers: ReadonlyMap<string, AnswerResponse>
   note?: string
 }
 
 /** Results ordered confident mistakes → wrong → unsure-right → right (F3.6). */
-function DiagnosticResults({ sessionId, answers, note }: ResultsProps) {
+function DiagnosticResults({ sessionId, courseId, answers, note }: ResultsProps) {
   const results = useDiagnosticResults(sessionId)
   // "See results" unmounted with the last question: land on the results heading.
   const heading = useRef<HTMLHeadingElement>(null)
@@ -452,29 +475,31 @@ function DiagnosticResults({ sessionId, answers, note }: ResultsProps) {
   const headline = findings.find((f) => f.finding === 'confident_mistake')
   const rest = findings.filter((f) => f !== headline)
   const shownNote = results.data.note ?? note
-  const mistakes = `${summary.confidentMistakes} confident ${summary.confidentMistakes === 1 ? 'mistake' : 'mistakes'}`
+  const mistakes = pluralize(summary.confidentMistakes, 'confident mistake')
+  // Findings come worst first: with no confident mistake, offer practice on the weakest one.
+  const weakest = headline ? undefined : findings.find((f) => f.finding !== 'right')
   return (
     <div className="space-y-6">
-      <h2 ref={heading} tabIndex={-1} className="text-xl font-semibold outline-none">
+      <h2 ref={heading} tabIndex={-1} className="text-title-lg">
         Your results
       </h2>
       {shownNote && <Note>{shownNote}</Note>}
       {headline && (
         <ConfidentMistakeCard finding={headline} answer={answers.get(headline.itemId)} />
       )}
-      <p className="text-muted-foreground text-sm">
-        {summary.total} questions · {mistakes} · {summary.wrong} wrong · {summary.unsureRight} right
-        but unsure · {summary.right} right
+      <p className="text-muted-foreground text-body-sm">
+        {pluralize(summary.total, 'question')} · {mistakes} · {summary.wrong} wrong ·{' '}
+        {summary.unsureRight} right but unsure · {summary.right} right
       </p>
       {rest.length > 0 && (
         <ul className="divide-y rounded-xl border">
           {rest.map((f) => (
             <li key={f.itemId} className="flex flex-wrap items-center justify-between gap-2 p-4">
               <span>
-                <span className="font-medium">{f.conceptName}</span>
+                <span className="text-heading">{f.conceptName}</span>
                 <span
                   className={cn(
-                    'text-muted-foreground ml-2 text-sm',
+                    'text-muted-foreground text-body-sm ml-2',
                     f.finding === 'possible_slip' && 'italic',
                   )}
                 >
@@ -486,7 +511,29 @@ function DiagnosticResults({ sessionId, answers, note }: ResultsProps) {
           ))}
         </ul>
       )}
+      <div className="flex flex-wrap items-center gap-3">
+        <Button asChild>
+          <Link href={`/courses/${courseId}` as Route}>
+            See it on the map
+            <ArrowRight aria-hidden />
+          </Link>
+        </Button>
+        {weakest && <PracticeWeakestButton finding={weakest} />}
+      </div>
     </div>
+  )
+}
+
+function PracticeWeakestButton({ finding }: { finding: ResultFinding }) {
+  const { startPractice, isPending } = useStartPractice()
+  return (
+    <Button
+      variant="outline"
+      pending={isPending}
+      onClick={() => startPractice({ conceptId: finding.conceptId, type: 'spot_flaw' })}
+    >
+      Practice the weakest concept
+    </Button>
   )
 }
 
@@ -513,17 +560,16 @@ function ConfidentMistakeCard({ finding, answer }: ConfidentMistakeCardProps) {
       aria-labelledby="confident-mistake-title"
       className="border-destructive/40 bg-destructive/5 space-y-3 rounded-xl border-2 p-6"
     >
-      <p className="text-destructive flex items-center gap-2 text-sm font-semibold tracking-wide uppercase">
+      <p className="text-destructive text-overline flex items-center gap-2">
         <TriangleAlert aria-hidden className="size-4" /> Confident mistake
       </p>
-      <h3 id="confident-mistake-title" className="text-2xl font-semibold">
+      <h3 id="confident-mistake-title" className="text-title-md">
         {finding.conceptName}
       </h3>
-      <p>{why}</p>
+      <p className="text-body">{why}</p>
       {finding.source && <SourceRef source={finding.source} />}
       <div className="flex flex-wrap items-center gap-3 pt-2">
-        <Button size="lg" disabled={isPending} onClick={handlePractice}>
-          {isPending && <Spinner />}
+        <Button variant="outline" pending={isPending} onClick={handlePractice}>
           Practice this
           <ArrowRight aria-hidden />
         </Button>

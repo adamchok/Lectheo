@@ -37,8 +37,12 @@ const fetchOrThrow: typeof fetch = async (input, init) => {
   })
 }
 
-/** useChat against POST /activities/{id}/messages; the body is only `{ text }` (API Spec §1). */
+/**
+ * useChat against POST /activities/{id}/messages; the body is only `{ text }` (API Spec §1).
+ * Each finished turn refreshes the cached GET, so coming back within staleTime keeps the turns.
+ */
 export function useTeachBackChat(activity: ActivityResponse) {
+  const queryClient = useQueryClient()
   const transport = useMemo(
     () =>
       new DefaultChatTransport<TeachBackMessage>({
@@ -56,6 +60,12 @@ export function useTeachBackChat(activity: ActivityResponse) {
     id: activity.id,
     messages: toUiMessages(activity.messages),
     transport,
+    onFinish: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.activity(activity.id),
+        exact: true,
+      })
+    },
   })
 }
 

@@ -23,6 +23,7 @@ import {
   type LectureStatus,
 } from '@lectheo/contracts'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useRef } from 'react'
 import type { z } from 'zod'
 import { apiFetch } from './api'
 import { newId } from './ids'
@@ -82,7 +83,8 @@ export function useCourseMap(courseId: string | undefined) {
 }
 
 export function useLecture(lectureId: string | undefined) {
-  return useQuery({
+  const queryClient = useQueryClient()
+  const query = useQuery({
     queryKey: queryKeys.lecture(lectureId ?? ''),
     queryFn: ({ signal }) =>
       apiFetch(`/lectures/${lectureId}`, { schema: LectureResponse, signal }),
@@ -92,6 +94,24 @@ export function useLecture(lectureId: string | undefined) {
       return status && POLLING_LECTURE_STATUSES.includes(status) ? LECTURE_POLL_MS : false
     },
   })
+
+  // Processing just finished (ready or failed): the course list, map and transcript are stale.
+  const status = query.data?.status
+  const courseId = query.data?.courseId
+  const lastStatus = useRef(status)
+  useEffect(() => {
+    const was = lastStatus.current
+    lastStatus.current = status
+    if (!was || !status || !POLLING_LECTURE_STATUSES.includes(was)) return
+    if (POLLING_LECTURE_STATUSES.includes(status)) return
+    void queryClient.invalidateQueries({ queryKey: queryKeys.courses, exact: true })
+    if (courseId) void queryClient.invalidateQueries({ queryKey: queryKeys.courseMap(courseId) })
+    void queryClient.invalidateQueries({
+      queryKey: [...queryKeys.lecture(lectureId ?? ''), 'transcript'],
+    })
+  }, [status, courseId, lectureId, queryClient])
+
+  return query
 }
 
 export function useResetSample() {
@@ -122,6 +142,7 @@ export function useActivity(activityId: string | undefined) {
 
 /** Starts a practice activity (POST /activities) with a client UUIDv7. */
 export function useStartActivity() {
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: { conceptId: string; type: ActivityType }) =>
       apiFetch('/activities', {
@@ -129,6 +150,8 @@ export function useStartActivity() {
         body: { id: newId(), conceptId: input.conceptId, type: input.type },
         schema: CreateActivityResponse,
       }),
+    // A started activity changes what the next-step card recommends.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.courses }),
   })
 }
 
@@ -256,10 +279,9 @@ export function useDeleteLecture() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (lectureId: string) => apiFetch(`/lectures/${lectureId}`, { method: 'DELETE' }),
-    onSuccess: (_result, lectureId) => {
-      queryClient.removeQueries({ queryKey: queryKeys.lecture(lectureId) })
-      return queryClient.invalidateQueries({ queryKey: queryKeys.courses })
-    },
+    // The caller leaves the page (router.replace) before removing the lecture's queries, so the
+    // mounted page never refetches a deleted lecture and flashes a 404.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.courses }),
   })
 }
 
@@ -273,6 +295,9 @@ export function useProcessLecture() {
         schema: ProcessResponse,
       }),
     onSuccess: (_result, { lectureId }) =>
-      queryClient.invalidateQueries({ queryKey: queryKeys.lecture(lectureId) }),
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.lecture(lectureId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.courses, exact: true }),
+      ]),
   })
 }

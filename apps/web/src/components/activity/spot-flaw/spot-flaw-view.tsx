@@ -3,9 +3,8 @@
 import type { ActivityResponse, HintResponse, SubmitResponse } from '@lectheo/contracts'
 import { useSearchParams } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
-import { toast } from 'sonner'
-import { errorMessage } from '@/components/error-state'
 import { Separator } from '@/components/ui/separator'
+import { InlineError } from '../shared'
 import { useAskAuthor, useShowExplanation, useSubmitAnswer, useTakeHint } from './api'
 import { AnswerForm } from './answer-form'
 import { AuthorChat } from './author-chat'
@@ -15,6 +14,7 @@ import {
   Explanation,
   type ExplanationData,
   GuidingQuestion,
+  MapLink,
   MasteryChange,
   RetryActions,
   RubricList,
@@ -29,9 +29,6 @@ const HINTS_AVAILABLE = 2
 
 /** POST …/explanation: the rubric comes along once the activity is closed (reopen). */
 type Revealed = ExplanationData & { rubric?: SubmitResponse['rubric'] }
-
-const failed = (title: string) => (error: unknown) =>
-  toast.error(title, { description: errorMessage(error) })
 
 /**
  * Spot the flaw (F4c, F5): scenario → ask the author → hints → answer → Socratic retry → final
@@ -63,12 +60,16 @@ export function SpotFlawView({ activity }: { activity: ActivityResponse }) {
   const finalResult = lastResult?.final ? lastResult : undefined
 
   // Reopening a closed activity: the explanation isn't in the GET, and asking for it after the
-  // final try changes nothing server-side.
+  // final try changes nothing server-side. Once only (StrictMode re-runs effects); a failure
+  // shows inline with "Try again" (showMe.error below).
   const needsReveal = closed && !finalResult && !explanation
-  const { mutate: reveal, isIdle: revealIdle } = showMe
+  const revealStarted = useRef(false)
+  const { mutate: reveal } = showMe
   useEffect(() => {
-    if (needsReveal && revealIdle) reveal(undefined, { onSuccess: setExplanation })
-  }, [needsReveal, revealIdle, reveal])
+    if (!needsReveal || revealStarted.current) return
+    revealStarted.current = true
+    reveal(undefined, { onSuccess: setExplanation })
+  }, [needsReveal, reveal])
 
   const onSubmit = () => {
     // These callbacks run after the hook's refetch, when Retry may already be on screen and
@@ -79,24 +80,13 @@ export function SpotFlawView({ activity }: { activity: ActivityResponse }) {
         setResults((prev) => [...prev, res])
         if (fromRetryForm) setRetrying(false)
       },
-      onError: failed("Couldn't check your answer"),
     })
   }
+  // Failures show inline next to what failed (mutation.error), not in a toast that times out.
   const onHint = () =>
-    takeHint.mutate(undefined, {
-      onSuccess: (res) => setHints((prev) => [...prev, res]),
-      onError: failed("Couldn't load a hint"),
-    })
-  const onShowMe = () =>
-    showMe.mutate(undefined, {
-      onSuccess: setExplanation,
-      onError: failed("Couldn't load the explanation"),
-    })
-  const onAsk = (text: string) =>
-    ask.mutateAsync(text).catch((error: unknown) => {
-      failed("The author couldn't answer")(error)
-      throw error
-    })
+    takeHint.mutate(undefined, { onSuccess: (res) => setHints((prev) => [...prev, res]) })
+  const onShowMe = () => showMe.mutate(undefined, { onSuccess: setExplanation })
+  const onAsk = (text: string) => ask.mutateAsync(text)
 
   // Submit unmounts the form and Retry unmounts the result: move focus to whichever replaced it.
   const resultRef = useRef<HTMLElement>(null)
@@ -118,7 +108,7 @@ export function SpotFlawView({ activity }: { activity: ActivityResponse }) {
     <div className="space-y-8">
       <section aria-labelledby="scenario-title" className="space-y-3">
         <div className="space-y-1">
-          <h2 id="scenario-title" className="font-serif text-xl font-medium">
+          <h2 id="scenario-title" className="text-title-md">
             Does this explanation hold up?
           </h2>
           <p className="text-muted-foreground text-sm text-pretty">
@@ -140,6 +130,7 @@ export function SpotFlawView({ activity }: { activity: ActivityResponse }) {
         onAsk={onAsk}
         pending={ask.isPending}
         disabled={closed}
+        error={ask.error}
       />
 
       {!closed && (
@@ -150,29 +141,30 @@ export function SpotFlawView({ activity }: { activity: ActivityResponse }) {
           hintsAvailable={HINTS_AVAILABLE}
           onTake={onHint}
           pending={takeHint.isPending}
+          error={takeHint.error}
         />
       )}
 
       <Separator />
 
       {showForm ? (
-        <AnswerForm
-          answer={answer}
-          onChange={setAnswer}
-          sentenceCount={sentences.length}
-          onSubmit={onSubmit}
-          pending={submit.isPending}
-          tryNo={tryNo}
-        />
+        <div className="space-y-4">
+          <AnswerForm
+            answer={answer}
+            onChange={setAnswer}
+            sentenceCount={sentences.length}
+            onSubmit={onSubmit}
+            pending={submit.isPending}
+            tryNo={tryNo}
+          />
+          {submit.isError && (
+            <InlineError title="Couldn't check your answer" error={submit.error} />
+          )}
+        </div>
       ) : (
         lastTry && (
           // Focused on mount (above), which announces it; aria-live here would read it twice.
-          <section
-            ref={resultRef}
-            tabIndex={-1}
-            aria-label="Result"
-            className="space-y-5 outline-none"
-          >
+          <section ref={resultRef} tabIndex={-1} aria-label="Result" className="space-y-5">
             <TryScore tryNo={lastTry.tryNo} outcome={lastTry.outcome} result={lastResult} />
             {!closed && lastTry.feedback.guidingQuestion && (
               <GuidingQuestion question={lastTry.feedback.guidingQuestion} />
@@ -189,14 +181,18 @@ export function SpotFlawView({ activity }: { activity: ActivityResponse }) {
         )
       )}
 
+      {showMe.isError && (
+        <InlineError
+          title="Couldn't load the explanation"
+          error={showMe.error}
+          onRetry={onShowMe}
+        />
+      )}
       {shownExplanation && <Explanation explanation={shownExplanation} />}
       {!shownExplanation && lastResult && <Sources sources={lastResult.sources} />}
       {rubric && <RubricList rubric={rubric} />}
-      <MasteryChange
-        start={startState}
-        results={results.map((r) => r.mastery)}
-        courseId={activity.courseId}
-      />
+      <MasteryChange start={startState} results={results.map((r) => r.mastery)} />
+      {(closed || results.length > 0) && <MapLink courseId={activity.courseId} primary={closed} />}
     </div>
   )
 }

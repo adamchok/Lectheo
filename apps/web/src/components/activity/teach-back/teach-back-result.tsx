@@ -1,16 +1,16 @@
 'use client'
 
-import type { MasterySummary, Outcome, SubmitResponse } from '@lectheo/contracts'
+import type { MasteryState, MasterySummary, Outcome, SubmitResponse } from '@lectheo/contracts'
 import { ArrowRight, Lightbulb, MessageCircleQuestion } from 'lucide-react'
-import Link from 'next/link'
-import { useEffect, useRef } from 'react'
+import { Fragment, useEffect, useRef } from 'react'
 import { useFocusOnMount } from '@/client/focus'
 import { MasteryBadge } from '@/components/mastery-badge'
 import { MasteryBadgeTransition } from '@/components/mastery-badge-transition'
 import { MASTERY_META } from '@/components/mastery-meta'
 import { SourceRef } from '@/components/source-ref'
-import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { JudgeNote } from '../shared'
+import { masteryTrail } from '../spot-flaw/logic'
 import { MapLink } from '../spot-flaw/result-panel'
 
 type Criterion = SubmitResponse['criteria'][number]
@@ -41,9 +41,7 @@ function Sources({ sources }: { sources: SubmitResponse['sources'] }) {
   if (sources.length === 0) return null
   return (
     <div className="space-y-1">
-      <p className="text-muted-foreground text-xs font-semibold tracking-[0.08em] uppercase">
-        From the lecture
-      </p>
+      <p className="text-overline text-muted-foreground">From the lecture</p>
       <ul className="space-y-0.5">
         {sources.map((s) => (
           <li key={`${s.lectureId}-${s.idx}`}>
@@ -66,17 +64,13 @@ export function TryFeedback({ result }: { result: SubmitResponse }) {
       className="bg-card border-border space-y-5 rounded-2xl border p-5 sm:p-6"
     >
       <div className="space-y-1">
-        <h2
-          ref={heading}
-          id="try-feedback-title"
-          tabIndex={-1}
-          className="font-serif text-xl font-medium outline-none"
-        >
+        <h2 ref={heading} id="try-feedback-title" tabIndex={-1} className="text-title-md">
           How your explanation landed
         </h2>
-        <p className="text-muted-foreground text-sm">
+        <p className="text-muted-foreground text-body-sm">
           {result.score} of {result.maxScore} points. You get one more try.
         </p>
+        <JudgeNote />
       </div>
       <ul className="divide-border divide-y">
         {result.criteria.map((c) => (
@@ -87,7 +81,7 @@ export function TryFeedback({ result }: { result: SubmitResponse }) {
         ))}
       </ul>
       {guidingQuestion && (
-        <p className="bg-accent flex gap-2.5 rounded-xl p-4 text-[0.9375rem] leading-relaxed">
+        <p className="bg-accent flex gap-2.5 rounded-xl p-4 text-body">
           <MessageCircleQuestion aria-hidden className="text-primary mt-0.5 size-5 shrink-0" />
           <span>{guidingQuestion}</span>
         </p>
@@ -114,14 +108,17 @@ const HEADLINES: Readonly<Record<Outcome, string>> = {
 /** Final try: key points revealed with coverage, the lecture summary, sources, mastery change. */
 export function FinalReveal({
   result,
+  start,
   before,
   courseId,
   autoFocus = false,
 }: {
   /** Links back to the concept map, where the node now shows this state. */
-  courseId?: string
+  courseId: string
   result: SubmitResponse
-  /** Mastery after try 1, when known, to show the change. */
+  /** State before the activity, when the entry point passed it (?from=). */
+  start: MasteryState | null
+  /** Mastery after try 1, when this session made it. */
   before?: MasterySummary
   /**
    * Set when this session's submit produced the verdict (the chat form just unmounted). Not on
@@ -132,7 +129,11 @@ export function FinalReveal({
   const coverage = new Map(result.criteria.map((c) => [c.id, c]))
   // teach-back.ts finalReveal: explanation is the concept summary; key points come as the rubric.
   const summary = result.explanation
-  const changed = before && before.state !== result.mastery.state
+  // Start → after try 1 → now, repeats merged; the last one is the badge that animates in.
+  const trail = masteryTrail(start, [
+    ...(before ? [before.state] : []),
+    result.mastery.state,
+  ]).slice(0, -1)
   const heading = useRef<HTMLHeadingElement>(null)
   const shouldFocus = useRef(autoFocus)
   useEffect(() => {
@@ -144,26 +145,22 @@ export function FinalReveal({
       className="bg-card border-border space-y-6 rounded-2xl border p-5 sm:p-6"
     >
       <div className="space-y-1">
-        <h2
-          ref={heading}
-          id="final-title"
-          tabIndex={-1}
-          className="font-serif text-2xl font-medium outline-none"
-        >
+        <h2 ref={heading} id="final-title" tabIndex={-1} className="text-title-md">
           {HEADLINES[result.outcome]}
         </h2>
-        <p className="text-muted-foreground text-sm">
+        <p className="text-muted-foreground text-body-sm">
           {result.score} of {result.maxScore} points on the key points from the lecture.
         </p>
+        <JudgeNote />
       </div>
 
       <div className="space-y-2">
-        <h3 className="text-sm font-semibold">Key points</h3>
+        <h3 className="text-heading">Key points</h3>
         <ol className="space-y-3">
           {(result.rubric ?? []).map((r, i) => {
             const c = coverage.get(r.id)
             return (
-              <li key={r.id} className="flex items-start justify-between gap-3 text-[0.9375rem]">
+              <li key={r.id} className="flex items-start justify-between gap-3 text-body">
                 <span className="leading-relaxed">
                   <span className="text-muted-foreground mr-2 tabular-nums">{i + 1}.</span>
                   {r.description}
@@ -177,8 +174,8 @@ export function FinalReveal({
 
       {summary && (
         <div className="space-y-1">
-          <h3 className="text-sm font-semibold">In the lecture</h3>
-          <p className="text-muted-foreground text-[0.9375rem] leading-relaxed">{summary}</p>
+          <h3 className="text-heading">In the lecture</h3>
+          <p className="text-muted-foreground text-body">{summary}</p>
         </div>
       )}
       <Sources sources={result.sources} />
@@ -186,27 +183,19 @@ export function FinalReveal({
       <div className="border-border flex flex-col gap-4 border-t pt-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="text-muted-foreground">Mastery</span>
-          {changed && (
-            <>
-              <MasteryBadge state={before.state} size="sm" />
-              <ArrowRight aria-label="now" className="text-muted-foreground size-4" />
-            </>
-          )}
+          {trail.map((state, i) => (
+            <Fragment key={`${state}-${i}`}>
+              <MasteryBadge state={state} size="sm" />
+              <ArrowRight role="img" aria-label="then" className="text-muted-foreground size-4" />
+            </Fragment>
+          ))}
           <MasteryBadgeTransition
             state={result.mastery.state}
             reasons={result.mastery.reasons}
             confidentMistake={result.mastery.confidentMistake}
           />
         </div>
-        <div className="flex flex-wrap items-center gap-4">
-          {courseId && <MapLink courseId={courseId} />}
-          <Button asChild>
-            <Link href="/dashboard">
-              Back to dashboard
-              <ArrowRight aria-hidden />
-            </Link>
-          </Button>
-        </div>
+        <MapLink courseId={courseId} primary />
       </div>
     </section>
   )

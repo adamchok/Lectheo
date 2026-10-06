@@ -1,6 +1,6 @@
 'use client'
 
-import type { NextStepResponse } from '@lectheo/contracts'
+import type { ActivityType, NextStepResponse } from '@lectheo/contracts'
 import { ArrowRight, Check, ClipboardCheck, Play, Sparkles } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
@@ -10,7 +10,6 @@ import { ErrorState } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ACTIVITY_LABELS } from '@/lib/labels'
-import { Spinner } from '@/components/ui/spinner'
 
 const ICONS = {
   watch: Play,
@@ -18,6 +17,14 @@ const ICONS = {
   activity: Sparkles,
   none: Check,
 } as const
+
+/** Button labels per activity: product names keep their capitals (Design System §1 voice). */
+const START_LABELS: Readonly<Record<ActivityType, string>> = {
+  spot_flaw: 'Start Spot the flaw',
+  teach_back: 'Start Teach-back',
+  transfer: 'Try a Transfer problem',
+  stump: 'Start Stump the AI',
+}
 
 function NextStepAction({ step }: { step: NextStepResponse }) {
   const { startPractice, isPending } = useStartPractice()
@@ -44,44 +51,27 @@ function NextStepAction({ step }: { step: NextStepResponse }) {
   }
   if (step.kind === 'activity' && step.conceptId && step.activityType) {
     const { conceptId, activityType } = step
-    const start = () => startPractice({ conceptId, type: activityType })
     return (
-      <Button size="lg" onClick={start} disabled={isPending}>
-        {isPending ? (
-          <>
-            <Spinner />
-            Preparing…
-          </>
-        ) : (
-          <>
-            Start {ACTIVITY_LABELS[activityType].toLowerCase()}
-            <ArrowRight aria-hidden />
-          </>
-        )}
+      <Button
+        size="lg"
+        pending={isPending}
+        pendingLabel="Preparing…"
+        onClick={() => startPractice({ conceptId, type: activityType })}
+      >
+        {START_LABELS[activityType]}
+        <ArrowRight aria-hidden />
       </Button>
     )
   }
   return null
 }
 
-/** Dashboard "Next step" from the practice recommender (F0.4, Architecture §6.3). */
-export function NextStepCard({ courseId }: { courseId: string }) {
-  const nextStep = useNextStep(courseId)
-
-  if (nextStep.isPending) {
-    return (
-      <section aria-label="Next step" aria-busy className="bg-card border-border rounded-2xl border p-6">
-        <Skeleton className="mb-3 h-4 w-24" />
-        <Skeleton className="mb-6 h-7 w-3/4" />
-        <Skeleton className="h-10 w-40" />
-      </section>
-    )
-  }
-  if (nextStep.isError) {
-    return <ErrorState title="Couldn't load your next step" error={nextStep.error} onRetry={() => nextStep.refetch()} />
-  }
-
-  const step = nextStep.data
+/**
+ * The one hero on Home (Design System §4 next-step card). Presentational: it takes the
+ * GET /courses/{id}/next response as is, so the recommender can change what it returns without
+ * touching the page around it.
+ */
+export function NextStepCard({ step }: { step: NextStepResponse }) {
   const Icon = ICONS[step.kind]
   const subject =
     step.kind === 'activity' && step.activityType && step.conceptName
@@ -91,22 +81,47 @@ export function NextStepCard({ courseId }: { courseId: string }) {
   return (
     <section
       aria-labelledby="next-step-title"
-      className="bg-card border-border relative overflow-hidden rounded-2xl border p-6 sm:p-7"
+      className="bg-card border-border relative overflow-hidden rounded-xl border p-5 sm:p-6"
     >
       <div aria-hidden className="bg-primary absolute inset-y-0 left-0 w-1" />
-      <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
-        <div className="space-y-2">
-          <p className="text-primary flex items-center gap-1.5 text-xs font-semibold tracking-[0.08em] uppercase">
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0 space-y-2">
+          <p className="text-overline text-primary flex items-center gap-1.5">
             <Icon aria-hidden className="size-4" />
             Next step
           </p>
-          <h2 id="next-step-title" className="font-serif text-2xl leading-snug font-medium text-balance">
+          <h2 id="next-step-title" className="text-title-md text-balance">
             {step.reason}
           </h2>
-          {subject && <p className="text-muted-foreground text-sm">{subject}</p>}
+          {subject && <p className="text-body-sm text-muted-foreground">{subject}</p>}
         </div>
         <NextStepAction step={step} />
       </div>
     </section>
   )
+}
+
+/** Loads the course's next step (F0.4, Architecture §6.3) into the card. */
+export function NextStep({ courseId }: { courseId: string }) {
+  const nextStep = useNextStep(courseId)
+
+  if (nextStep.isPending) {
+    return (
+      <Skeleton label="Loading your next step" className="border-border rounded-xl border p-6">
+        <Skeleton className="mb-3 h-4 w-24" />
+        <Skeleton className="mb-6 h-6 w-3/4" />
+        <Skeleton className="h-10 w-40" />
+      </Skeleton>
+    )
+  }
+  if (nextStep.isError) {
+    return (
+      <ErrorState
+        title="Couldn't load your next step"
+        error={nextStep.error}
+        onRetry={() => nextStep.refetch()}
+      />
+    )
+  }
+  return <NextStepCard step={nextStep.data} />
 }

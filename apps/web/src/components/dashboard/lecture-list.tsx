@@ -15,9 +15,19 @@ import { Skeleton } from '@/components/ui/skeleton'
 
 type MapLecture = CourseMapResponse['lectures'][number]
 
-function lectureAction(lecture: MapLecture, isLibrary: boolean): { href: Route; label: string } {
-  if (isLibrary && lecture.status === 'ready') {
-    return { href: `/lectures/${lecture.id}/watch` as Route, label: 'Watch' }
+/** Whether the student has already marked moments in this lecture (watched it at least once). */
+function hasMarkers(lecture: MapLecture, map: CourseMapResponse): boolean {
+  return (
+    map.nodes.some((node) => node.moments.some((m) => m.lectureId === lecture.id)) ||
+    map.unlinkedMarkers.some((m) => m.lectureId === lecture.id)
+  )
+}
+
+function lectureAction(lecture: MapLecture, map: CourseMapResponse): { href: Route; label: string } {
+  if (map.course.kind === 'library' && lecture.status === 'ready') {
+    // Re-watching to add markers is allowed (F1.2): "Review" once there are some.
+    const label = hasMarkers(lecture, map) ? 'Review' : 'Watch'
+    return { href: `/lectures/${lecture.id}/watch` as Route, label }
   }
   return { href: `/lectures/${lecture.id}` as Route, label: 'Open' }
 }
@@ -26,15 +36,13 @@ function LectureRow({ lecture, map }: { lecture: MapLecture; map: CourseMapRespo
   const nodes = map.nodes.filter((node) => node.lectureIds.includes(lecture.id))
   const counts = countMastery(nodes.map((node) => node.mastery.state))
   const confidentMistakes = nodes.filter((node) => node.mastery.confidentMistake).length
-  const action = lectureAction(lecture, map.course.kind === 'library')
+  const action = lectureAction(lecture, map)
 
   return (
     <li className="grid grid-cols-[3.5rem_1fr_auto] items-center gap-4 py-4 sm:grid-cols-[3.5rem_1fr_10rem_auto]">
-      <span className="text-muted-foreground font-mono text-xs tabular-nums">
-        L{String(lecture.seq).padStart(2, '0')}
-      </span>
+      <span className="text-mono-sm text-muted-foreground">Lec {lecture.seq}</span>
       <div className="min-w-0 space-y-1">
-        <p className="truncate font-medium">{lecture.title}</p>
+        <p className="text-body-sm truncate font-semibold">{lecture.title}</p>
         <div className="flex flex-wrap items-center gap-2">
           <LectureStatusChip
             status={lecture.status}
@@ -76,11 +84,11 @@ export function LectureList({ courseId }: { courseId: string }) {
 
   if (map.isPending) {
     return (
-      <div aria-busy aria-label="Loading lectures" className="space-y-3">
+      <Skeleton label="Loading lectures" className="space-y-3">
         {[0, 1, 2].map((i) => (
           <Skeleton key={i} className="h-14 w-full" />
         ))}
-      </div>
+      </Skeleton>
     )
   }
   if (map.isError) {

@@ -56,7 +56,7 @@ export function ErrorState({
     action ??
     (notFound && (
       <Button asChild variant="outline" size="sm">
-        <Link href="/dashboard">Back to dashboard</Link>
+        <Link href="/dashboard">Back to Home</Link>
       </Button>
     ))
   return (

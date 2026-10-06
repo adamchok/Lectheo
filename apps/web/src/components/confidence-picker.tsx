@@ -1,9 +1,7 @@
 'use client'
 
 import type { ConfidenceLevel } from '@lectheo/contracts'
-import { useEffect, useId, useRef } from 'react'
-import { isBareShortcut } from '@/client/keyboard'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { useId } from 'react'
 import { cn } from '@/lib/utils'
 import { KeyHint } from './key-hint'
 
@@ -18,19 +16,25 @@ export const CONFIDENCE_OPTIONS: ReadonlyArray<{
   { value: 'no_idea', label: 'No idea', hint: "I haven't got this yet" },
 ]
 
+/** The level whose 1–4 shortcut is `key`, if any. The caller scopes the listener to its region. */
+export function confidenceForKey(key: string): ConfidenceLevel | undefined {
+  return CONFIDENCE_OPTIONS[Number.parseInt(key, 10) - 1]?.value
+}
+
 export interface ConfidencePickerProps {
   value: ConfidenceLevel | undefined
   onChange: (level: ConfidenceLevel) => void
   disabled?: boolean
-  /** Number keys 1–4 select an option while no text field has focus. */
+  /** Show the 1–4 key hints; the caller handles the keys within its region (WCAG 2.1.4). */
   hotkeys?: boolean
-  /** Visible legend; defaults to the F3.3 prompt. */
+  /** Visible label for the group; defaults to the F3.3 prompt. */
   legend?: string
   className?: string
 }
 
 /**
- * Confidence rating, asked before answer options are shown (F3.3). Presentational only.
+ * Confidence rating, asked before answer options are shown (F3.3). Presentational only. Plain
+ * buttons, not radios: arrow keys move nothing, so a rating commits only on click/Enter/Space.
  */
 export function ConfidencePicker({
   value,
@@ -41,63 +45,36 @@ export function ConfidencePicker({
   className,
 }: ConfidencePickerProps) {
   const id = useId()
-  const onChangeRef = useRef(onChange)
-  useEffect(() => {
-    onChangeRef.current = onChange
-  }, [onChange])
-
-  useEffect(() => {
-    if (!hotkeys || disabled) return
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.shiftKey || !isBareShortcut(event)) return
-      const index = Number.parseInt(event.key, 10) - 1
-      const option = CONFIDENCE_OPTIONS[index]
-      if (!option) return
-      event.preventDefault()
-      onChangeRef.current(option.value)
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [hotkeys, disabled])
-
   return (
-    <fieldset className={cn('space-y-3', className)} disabled={disabled}>
-      <legend className="mb-3 text-sm font-medium" id={`${id}-legend`}>
+    <div role="group" aria-labelledby={`${id}-legend`} className={cn('space-y-3', className)}>
+      <p id={`${id}-legend`} className="text-heading">
         {legend}
-      </legend>
-      <RadioGroup
-        aria-labelledby={`${id}-legend`}
-        value={value ?? ''}
-        onValueChange={(next) => onChange(next as ConfidenceLevel)}
-        disabled={disabled}
-        className="grid grid-cols-2 gap-2 lg:grid-cols-4"
-      >
-        {CONFIDENCE_OPTIONS.map((option, index) => {
-          const itemId = `${id}-${option.value}`
-          const selected = value === option.value
-          return (
-            <label
-              key={option.value}
-              htmlFor={itemId}
-              className={cn(
-                'border-border bg-card hover:border-primary/50 flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors',
-                'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring',
-                selected && 'border-primary bg-accent',
-                disabled && 'cursor-not-allowed opacity-60',
-              )}
-            >
-              <RadioGroupItem id={itemId} value={option.value} className="mt-0.5" />
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center justify-between gap-2">
-                  <span className="font-medium">{option.label}</span>
-                  {hotkeys && <KeyHint>{index + 1}</KeyHint>}
-                </span>
-                <span className="text-muted-foreground block text-xs">{option.hint}</span>
+      </p>
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        {CONFIDENCE_OPTIONS.map((option, index) => (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={value === option.value}
+            aria-disabled={disabled || undefined}
+            aria-keyshortcuts={hotkeys ? String(index + 1) : undefined}
+            onClick={() => !disabled && onChange(option.value)}
+            className={cn(
+              'border-input bg-card hover:border-primary/50 flex items-start gap-3 rounded-lg border p-3 text-left transition-colors',
+              value === option.value && 'border-primary bg-accent',
+              disabled && 'cursor-not-allowed opacity-60',
+            )}
+          >
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center justify-between gap-2">
+                <span className="text-heading">{option.label}</span>
+                {hotkeys && <KeyHint>{index + 1}</KeyHint>}
               </span>
-            </label>
-          )
-        })}
-      </RadioGroup>
-    </fieldset>
+              <span className="text-muted-foreground text-caption block">{option.hint}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
   )
 }

@@ -22,7 +22,7 @@ describe('spot-flaw answer logic', () => {
   })
 
   it('blocks submit until the answer is complete', () => {
-    expect(submitBlocker(EMPTY_ANSWER)).toMatch(/Flawed or Correct/)
+    expect(submitBlocker(EMPTY_ANSWER)).toMatch(/Flawed or No flaw/)
     expect(submitBlocker(pickVerdict(EMPTY_ANSWER, 'correct'))).toBeNull()
     expect(submitBlocker(pickVerdict(EMPTY_ANSWER, 'flawed'))).toMatch(/sentence/)
     const located = pickSentence(EMPTY_ANSWER, 0)

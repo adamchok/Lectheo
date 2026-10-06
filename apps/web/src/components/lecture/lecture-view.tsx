@@ -13,15 +13,23 @@ import {
 } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { useEffect } from 'react'
 import { formatTimestamp, formatTimestampLong } from '@/client/format'
-import { useCourseMap, useLecture, useProcessLecture, useTranscript } from '@/client/queries'
+import {
+  useCourseMap,
+  useCourses,
+  useLecture,
+  useProcessLecture,
+  useTranscript,
+} from '@/client/queries'
 import { DeleteLectureButton } from '@/components/capture/delete-lecture-button'
 import { ErrorState, errorMessage } from '@/components/error-state'
 import { LectureStatusChip } from '@/components/lecture-status-chip'
 import { LicenseNotice } from '@/components/license-notice'
 import { MarkerCounts } from '@/components/marker-counts'
 import { PageHeader } from '@/components/page-header'
+import { PageChrome } from '@/components/shell/page-chrome'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -256,19 +264,23 @@ function TranscriptPanel({ lecture }: { lecture: LectureResponse }) {
   const available = !isAudio(lecture.source) || ['map_ready', 'ready'].includes(lecture.status)
   const transcript = useTranscript(available ? lecture.id : undefined)
   const segments = transcript.data
+  // Deep link: /lectures/{id}?t=<ms>#transcript highlights and scrolls to the segment at t.
+  const t = Number(useSearchParams().get('t'))
+  // Last segment starting at or before t (covers gaps between cues and t = duration).
+  const hitIdx =
+    Number.isFinite(t) && t > 0 ? segments?.findLast((s) => s.startMs <= t)?.idx : undefined
 
-  // Deep link: /lectures/{id}?t=<ms>#transcript scrolls to the segment playing at t.
   useEffect(() => {
-    if (!segments?.length) return
-    const t = Number(new URLSearchParams(window.location.search).get('t'))
-    if (!Number.isFinite(t) || t <= 0) return
-    // Last segment starting at or before t (covers gaps between cues and t = duration).
-    const hit = segments.findLast((s) => s.startMs <= t)
-    if (hit) document.getElementById(`s${hit.idx}`)?.scrollIntoView({ block: 'center' })
-  }, [segments])
+    if (hitIdx === undefined) return
+    document.getElementById(`s${hitIdx}`)?.scrollIntoView({ block: 'center' })
+  }, [hitIdx])
 
   return (
-    <section id="transcript" aria-labelledby="transcript-heading" className="space-y-3">
+    <section
+      id="transcript"
+      aria-labelledby="transcript-heading"
+      className="min-w-0 scroll-mt-[calc(var(--topbar-height)+1rem)] space-y-3"
+    >
       <h2 id="transcript-heading" className="font-medium">
         Transcript
       </h2>
@@ -277,7 +289,9 @@ function TranscriptPanel({ lecture }: { lecture: LectureResponse }) {
           The transcript appears here once the audio has been transcribed.
         </p>
       )}
-      {available && transcript.isPending && <Skeleton className="h-40 w-full" />}
+      {available && transcript.isPending && (
+        <Skeleton label="Loading the transcript" className="h-40 w-full" />
+      )}
       {transcript.isError && (
         <ErrorState
           title="Couldn't load the transcript"
@@ -291,16 +305,22 @@ function TranscriptPanel({ lecture }: { lecture: LectureResponse }) {
       {segments && segments.length > 0 && (
         <ol className="border-border max-h-[32rem] space-y-3 overflow-y-auto rounded-xl border p-4 text-sm leading-relaxed">
           {segments.map((s) => (
-            <li key={s.idx} id={`s${s.idx}`} className="flex scroll-mt-4 gap-3">
+            <li
+              key={s.idx}
+              id={`s${s.idx}`}
+              aria-current={s.idx === hitIdx ? 'true' : undefined}
+              className={cn(
+                '-mx-2 flex scroll-mt-4 gap-3 rounded-md px-2',
+                s.idx === hitIdx && 'bg-accent text-foreground py-1',
+              )}
+            >
               {lecture.hasTimestamps && (
-                <span
-                  className="text-muted-foreground w-14 shrink-0 font-mono text-xs tabular-nums"
-                  aria-label={formatTimestampLong(s.startMs)}
-                >
-                  {formatTimestamp(s.startMs)}
+                <span className="text-muted-foreground w-14 shrink-0 font-mono text-xs tabular-nums">
+                  <span aria-hidden>{formatTimestamp(s.startMs)}</span>
+                  <span className="sr-only">{formatTimestampLong(s.startMs)}</span>
                 </span>
               )}
-              <span>{s.text}</span>
+              <span className="min-w-0 break-words">{s.text}</span>
             </li>
           ))}
         </ol>
@@ -321,7 +341,8 @@ function LectureActions({
   const mapReady = (lecture.status === 'map_ready' || lecture.status === 'ready') && !empty
   return (
     <>
-      {(lecture.source === 'import' || (lecture.source === 'library' && lecture.status === 'ready')) && (
+      {(lecture.source === 'import' ||
+        (lecture.source === 'library' && lecture.status === 'ready')) && (
         <Button asChild>
           <Link href={`/lectures/${lecture.id}/watch` as Route}>
             <Play aria-hidden />
@@ -345,7 +366,6 @@ function LectureActions({
           </Link>
         </Button>
       )}
-      {lecture.source !== 'library' && <DeleteLectureButton lecture={lecture} />}
     </>
   )
 }
@@ -353,15 +373,16 @@ function LectureActions({
 /** /lectures/[id]: status, step-by-step processing (2 s polling), errors + retry, transcript. */
 export function LectureView({ lectureId }: { lectureId: string }) {
   const lecture = useLecture(lectureId)
+  const courses = useCourses()
   const conceptCount = useLectureConceptCount(lecture.data)
 
   if (lecture.isPending) {
     return (
-      <div aria-busy aria-label="Loading lecture" className="space-y-4">
+      <Skeleton label="Loading lecture" className="space-y-4">
         <Skeleton className="h-4 w-24" />
         <Skeleton className="h-9 w-96 max-w-full" />
         <Skeleton className="h-32 w-full" />
-      </div>
+      </Skeleton>
     )
   }
   if (lecture.isError) {
@@ -377,11 +398,20 @@ export function LectureView({ lectureId }: { lectureId: string }) {
   const data = lecture.data
   const processing = data.status === 'processing' || data.status === 'map_ready'
   const userLecture = data.source !== 'library'
+  const courseTitle = courses.data?.find((c) => c.id === data.courseId)?.title ?? 'Course'
 
   return (
     <>
+      <PageChrome
+        crumbs={[
+          { label: courseTitle, href: `/courses/${data.courseId}` as Route },
+          { label: `Lecture ${data.seq}` },
+        ]}
+        title={data.title}
+        courseId={data.courseId}
+        actions={userLecture ? <DeleteLectureButton lecture={data} /> : undefined}
+      />
       <PageHeader
-        back={{ href: `/courses/${data.courseId}` as Route, label: 'Course' }}
         eyebrow={`Lecture ${data.seq}`}
         title={data.title}
         description={

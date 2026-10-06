@@ -1,10 +1,13 @@
 'use client'
 
 import type { MarkerKind } from '@lectheo/contracts'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type RefObject } from 'react'
 import { isBareShortcut } from '../keyboard'
 
 const KEY_TO_MARKER: Readonly<Record<string, MarkerKind>> = { l: 'lost', i: 'important' }
+
+/** `aria-keyshortcuts` values for the marker buttons. */
+export const MARKER_SHORTCUTS: Readonly<Record<MarkerKind, string>> = { lost: 'L', important: 'I' }
 
 /** Maps a key event to a marker kind, or null when it isn't a marker shortcut. */
 export function markerKindForEvent(event: KeyboardEvent): MarkerKind | null {
@@ -14,14 +17,15 @@ export function markerKindForEvent(event: KeyboardEvent): MarkerKind | null {
 }
 
 /**
- * L → "I'm lost", I → "Important" (F1.1). Ignored while an input, textarea, select or
- * contenteditable has focus, and for modified or auto-repeated presses.
+ * L → "I'm lost", I → "Important" (F1.1). Only while focus is inside `scope` (the watch region:
+ * player, marker buttons, transcript), so single-key shortcuts never fire elsewhere on the page
+ * (WCAG 2.1.4). Ignored while a text field has focus, and for modified or auto-repeated presses.
  */
 export function useMarkerHotkeys(
   onMarker: (kind: MarkerKind) => void,
-  options: { enabled?: boolean } = {},
+  options: { scope: RefObject<HTMLElement | null>; enabled?: boolean },
 ): void {
-  const { enabled = true } = options
+  const { scope, enabled = true } = options
   const callback = useRef(onMarker)
 
   useEffect(() => {
@@ -29,14 +33,20 @@ export function useMarkerHotkeys(
   }, [onMarker])
 
   useEffect(() => {
-    if (!enabled) return
+    const region = scope.current
+    if (!enabled || !region) return
     const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      // Right after navigation focus rests on <body> or <main> (nothing chosen yet): the watch
+      // page is the only thing to act on, so L/I work there too. Any other control opts out.
+      const idle = target === document.body || target?.id === 'main'
+      if (!idle && !(target && region.contains(target))) return
       const kind = markerKindForEvent(event)
       if (!kind) return
       event.preventDefault()
       callback.current(kind)
     }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [enabled])
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [enabled, scope])
 }

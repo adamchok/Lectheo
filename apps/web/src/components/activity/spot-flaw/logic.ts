@@ -26,7 +26,7 @@ export function pickVerdict(answer: Answer, verdict: Verdict): Answer {
 
 /** Why the answer can't be submitted yet, or null when it can. */
 export function submitBlocker(answer: Answer): string | null {
-  if (answer.verdict === null) return 'Choose Flawed or Correct.'
+  if (answer.verdict === null) return 'Choose Flawed or No flaw.'
   if (answer.verdict === 'correct') return null
   if (answer.flawSentenceIdx === null) return 'Pick the sentence you think is wrong.'
   if (answer.correction.trim() === '') return 'Write what the sentence should say.'

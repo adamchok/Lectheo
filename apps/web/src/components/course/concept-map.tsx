@@ -11,6 +11,7 @@ import {
   type NodeTypes,
 } from '@xyflow/react'
 import { NODE_HEIGHT, NODE_WIDTH } from '@lectheo/domain'
+import { useTheme } from 'next-themes'
 import { useMemo, type KeyboardEvent } from 'react'
 import { RELATION_LABELS } from '@/lib/labels'
 import { ConceptNode, conceptAriaLabel, type ConceptFlowNode } from './concept-node'
@@ -29,7 +30,7 @@ function positionOf(node: MapNode, index: number): Point {
   )
 }
 
-function toFlowNodes(nodes: readonly MapNode[], selectedId: string | null): ConceptFlowNode[] {
+function toFlowNodes(nodes: readonly MapNode[]): ConceptFlowNode[] {
   return (
     nodes
       .map((concept, i) => ({
@@ -38,7 +39,7 @@ function toFlowNodes(nodes: readonly MapNode[], selectedId: string | null): Conc
         position: positionOf(concept, i),
         data: { concept },
         ariaLabel: conceptAriaLabel(concept),
-        selected: concept.id === selectedId,
+        selected: false,
       }))
       // Tab order follows the layers: left column first, then top to bottom.
       .sort((a, b) => a.position.x - b.position.x || a.position.y - b.position.y)
@@ -102,10 +103,17 @@ export interface ConceptMapProps {
 
 /** React Flow canvas over the stored ELK layout (F2.8: Tab between nodes, Enter opens one). */
 export function ConceptMap({ map, selectedId, onOpen }: ConceptMapProps) {
-  const nodes = useMemo(() => toFlowNodes(map.nodes, selectedId), [map.nodes, selectedId])
+  const { resolvedTheme } = useTheme()
+  const laidOut = useMemo(() => toFlowNodes(map.nodes), [map.nodes])
+  // Selecting a node only replaces the nodes whose `selected` flag changed.
+  const nodes = useMemo(
+    () =>
+      laidOut.map((n) => (n.id === selectedId ? { ...n, selected: true } : n)),
+    [laidOut, selectedId],
+  )
   const edges = useMemo(
-    () => toFlowEdges(map.edges, new Map(nodes.map((n) => [n.id, n.position]))),
-    [map.edges, nodes],
+    () => toFlowEdges(map.edges, new Map(laidOut.map((n) => [n.id, n.position]))),
+    [map.edges, laidOut],
   )
 
   // React Flow treats Enter as "select"; we also open the panel for the focused node.
@@ -117,7 +125,7 @@ export function ConceptMap({ map, selectedId, onOpen }: ConceptMapProps) {
   }
 
   return (
-    <div className="bg-card border-border h-[36rem] overflow-hidden rounded-xl border">
+    <div className="bg-card border-border h-[36rem] overflow-hidden rounded-lg border lg:h-[max(32rem,calc(100dvh-16rem))]">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -130,7 +138,7 @@ export function ConceptMap({ map, selectedId, onOpen }: ConceptMapProps) {
         fitView
         fitViewOptions={{ padding: 0.15 }}
         minZoom={0.2}
-        colorMode="system"
+        colorMode={resolvedTheme === 'dark' ? 'dark' : 'light'}
         aria-label="Concept map"
       >
         <Background gap={24} />

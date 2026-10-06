@@ -43,7 +43,11 @@ export function quotaMessage(
   const head = label ? `You've used today's ${limit}${label}.` : "You've reached today's limit."
   const resetAt = typeof details?.resetAt === 'string' ? new Date(details.resetAt) : null
   if (!resetAt || Number.isNaN(resetAt.getTime())) return `${head} Please try again tomorrow.`
-  const time = resetAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone })
+  const time = resetAt.toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone,
+  })
   return `${head} The limit resets at ${time}.`
 }
 
