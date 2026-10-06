@@ -141,7 +141,8 @@ const FAQ: ReadonlyArray<{ question: string; answer: ReactNode }> = [
       <>
         No. <strong className={strong}>Try the sample account</strong> gives you your own copy of a
         student partway through CS50x, with Lecture 5 ready to watch. It&apos;s deleted after 24
-        hours. To add your own lectures, continue with Google.
+        hours. To add your own lectures, continue with Google. Your account starts empty: just your
+        courses, nothing preloaded.
       </>
     ),
   },

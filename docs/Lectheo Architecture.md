@@ -149,12 +149,12 @@ sequenceDiagram
     API->>API: signInAnonymously (server-side, sets cookie)
     API->>DB: BEGIN · insert profile(kind=sample) · clone_sample(seed, user) · COMMIT
     API-->>UI: {redirect: /dashboard}
-    Note over V,DB: Google path: OAuth → /auth/callback → ensureProfile(kind=google) → /dashboard (planned: first run empty, no library)
+    Note over V,DB: Google path: OAuth → /auth/callback → ensureProfile(kind=google) → /dashboard (first run: empty, no library)
 ```
 
 The sample account is **lived-in**: L3 practiced (mostly green/amber), L4 with a confident mistake on *pointers*, L5 "Ready to watch". **Reset sample** deletes the per-user rows and clones again. Sample accounts older than 24 h are purged by the daily cron **and** after every sample sign-in (Hobby cron is daily only). Before Turnstile is even checked, the route applies a per-IP limit (5 per 10 min, `rate_limits`).
 
-**Google accounts will start fresh** *(decided 6 Oct 2026, to be built)* ( [[Lectheo Product Spec#F0. Accounts, sample account and dashboard — Must|F0.7–F0.9]]): no courses, no library. Today they see the CS50 library like everyone else. The first dashboard is a first-run screen whose one action is *Add your first lecture*; while that lecture processes, the dashboard shows its pipeline steps. The CS50 library is part of the sample experience only.
+**Google accounts start fresh** ([[Lectheo Product Spec#F0. Accounts, sample account and dashboard — Must|F0.7–F0.9]]): no courses, no library. The first dashboard is a first-run screen whose one action is *Add your first lecture*; while that lecture processes, the dashboard shows its pipeline steps. The CS50 library is part of the sample experience only: `server/ownership.ts` makes every library route a 404 for Google accounts and `GET /courses` omits it.
 
 ### 4.2 Capture modes (F1)
 
@@ -378,20 +378,19 @@ priority = 100·confidentMistake + 60·red + 40·markedLost + 25·amber
          + 10·prerequisiteOfRed − 15·practicedInLast10Min
 next type = first of [spot_flaw, teach_back, transfer*, stump*] without an independent correct
             (* only when enabled)
-as built: dashboard uses the library course (else the first course);
-          next step = unwatched library lecture → pending diagnostic → top concept → none
-planned (F0.4, F0.8–F0.12, to be built):
-dashboard course: the course the student last worked in; a lecture of theirs that just became ready wins
+dashboard course (F0.4): the course with the latest lastActiveAt (GET /courses); a lecture of theirs
+                 that just became ready bumps it, so it wins
 dashboard "Next step" (for that course): processing lecture (show steps) → unwatched library lecture (sample only)
                  → pending diagnostic → top concept
 no courses (Google first run) → no next step; the first-run screen replaces the card
-all concepts green → Stump the AI on the concept mastered longest ago
-nothing at all left → add_lecture ("Add Lecture N+1" / "Add your next lecture")
+all concepts green → Stump the AI on the mastered concept practiced longest ago
+then a lecture whose processing failed (kind processing, to retry)
+nothing at all left → add_lecture ("Add Lecture N+1" in an own course / "Add your next lecture")
 ```
 
-**Card content, planned ([[Lectheo Product Spec#F0. Accounts, sample account and dashboard — Must|F0.10–F0.12]], to be built).** The response carries the evidence, estimate and payoff, so the card never computes them:
+**Card content ([[Lectheo Product Spec#F0. Accounts, sample account and dashboard — Must|F0.10–F0.12]]).** The response carries the evidence, estimate and payoff, so the card never computes them. The rules are pure functions in `packages/domain/src/recommender.ts`; `server/courses/next.ts` only gathers data:
 - **Evidence** (≤ 2, strongest first): confident mistake → wrong or partial in the latest attempt ("Partial in Spot the flaw") → a *lost* marker linked to the concept (with its lecture moment) → an *important* marker. Only the student's own data.
-- **Estimate:** watch = lecture duration; diagnostic = 3 min; any practice activity = 5 min. Fixed values, revisited once real timings exist.
+- **Estimate:** watch = lecture duration (`null` when unknown); diagnostic = 3 min; any practice activity = 5 min. Fixed values, revisited once real timings exist.
 - **Payoff:** confident mistake → "A correct answer here clears the confident mistake." · red → "A correct answer moves it to Getting there." · amber with one independent type done → "One more independent win in a different activity → Mastered." · watch → "Your marks decide what the diagnostic asks." · diagnostic → "Finds the mistakes you're sure about." · Stump on a green concept → "The hardest test there is: write a question the AI can't answer."
 - **Also worth doing:** ranked concepts 2 and 3 from the same ranking, each with its own next activity type and reason.
 
@@ -447,7 +446,7 @@ Signed-in pages share one layout (`app/(app)/layout.tsx`) with `error.tsx` and `
 
 ### 9.1 Identity and authorization
 - **Google accounts** (OAuth) and **sample accounts** (anonymous, created only by clicking the button, after Turnstile). Supabase's anonymous sign-in limit is raised to ~300/h (it only sees Vercel's egress IPs). The app enforces its own per-IP limit: 5 sample sign-ins per 10 minutes.
-- Every handler loads the resource with an ownership join (`WHERE user_id = actor OR (course.kind = 'library' AND actor is sample or owner)` for reads; strict ownership for writes). The sample-or-owner condition is *(decided 6 Oct 2026, to be built)*; today any signed-in account can read library content. IDs from other users → 404. Specific checks:
+- Every handler loads the resource with an ownership join (`WHERE user_id = actor OR (course.kind = 'library' AND actor is sample or owner)` for reads; strict ownership for writes). The read rule is `readableCourse()` in `server/ownership.ts`, used by every loader (courses, lectures, concepts, the actor's own activities and diagnostic sessions), so a Google account gets 404 on all library content. IDs from other users → 404. Specific checks:
   - The diagnostic confidence and answer endpoints require `itemId` ∈ that session.
   - Segment and asset routes join through the lecture owner.
   - `GET /activities/{id}` returns only visible messages.

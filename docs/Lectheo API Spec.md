@@ -30,7 +30,7 @@ Part of the architecture set: [[Lectheo Architecture]] · **API Spec** · [[Lect
 | Validation | Zod on every body, query and path param. Every response goes through an **explicit response schema** (allow-list), and a contract test asserts no 🔒 field ever appears. |
 | Safe retries | **No idempotency-key store.** Creating requests carry a **client-generated UUIDv7 `id`**, and the server does `INSERT … ON CONFLICT (id) DO NOTHING RETURNING`, then returns the existing row. State changes are **guarded updates** (`… WHERE status = 'active' RETURNING`). A second call gets `409 invalid_state` or the same result. |
 | Streaming | Teach-back replies use the AI SDK **UI message stream** (SSE). The client uses `useChat` with `prepareSendMessagesRequest`, sending only the newest message. |
-| Authorization | Every handler checks ownership in code. Library content is readable by all and writable by none. *(decided 6 Oct 2026, to be built)*: readable by sample (and owner) accounts only; for Google accounts it won't exist (404), so they get a fresh start ([[Lectheo Product Spec#F0. Accounts, sample account and dashboard — Must|F0.7]]). Any ID belonging to another user returns **404** (no existence leak). Writes to library or other users' resources return **404**; `403` is used only for `sample_account_restricted`. |
+| Authorization | Every handler checks ownership in code. Library content is readable by sample and owner accounts only and writable by none. For Google accounts it doesn't exist: every library course, lecture, concept, item, map, watch, diagnostic and activity route returns **404**, and `GET /courses` omits it, so they get a fresh start ([[Lectheo Product Spec#F0. Accounts, sample account and dashboard — Must|F0.7]]). The rule lives in one place, `readableCourse()` in `server/ownership.ts`. Any ID belonging to another user returns **404** (no existence leak). Writes to library or other users' resources return **404**; `403` is used only for `sample_account_restricted`. |
 | Limits | 429 uses the standard envelope with `details.resetAt`. |
 
 ### Error envelope
@@ -128,8 +128,8 @@ Deletes the account: every course the user owns (cascading to lectures, segments
 ## 4. Courses
 
 ### `GET /courses`
-`200 { data: [{ id, title, kind: "library"|"personal", attribution?, lectureCount, mastery: {gray, red, amber, green} }] }`
-As built: library courses first, then the user's own, each in creation order (`kind, createdAt`), for every account. *(decided 6 Oct 2026, to be built)*: Google accounts get their own courses only, most recently active first; an empty list means first run ([[Lectheo Product Spec#F0. Accounts, sample account and dashboard — Must|F0.8]]).
+`200 { data: [{ id, title, kind: "library"|"personal", attribution?, lectureCount, mastery: {gray, red, amber, green}, lastActiveAt }] }`
+`lastActiveAt` is the student's latest work in the course (their own course and lectures, including a lecture that just finished processing, plus their marks, diagnostic sessions, activities and attempts), or `null`. Google accounts get their own courses only, most recently active first; an empty list means first run ([[Lectheo Product Spec#F0. Accounts, sample account and dashboard — Must|F0.8]]). Sample and owner accounts get the library first, then their own, each in creation order. The dashboard opens the course with the latest `lastActiveAt` (F0.4).
 
 ### `POST /courses`
 `{ id, title(1..120) }` → `201 course`. Sample accounts can create **one** personal course (a second gets `403 sample_account_restricted`). Library courses are read-only, and exist only for sample accounts.
@@ -165,13 +165,11 @@ Joins concepts, edges, layout, this user's markers and **mastery computed on rea
 `moments` are this user's markers on the concept ("▶ 12:41" links). `sources` are where the lecture teaches it ([[Lectheo Product Spec#F2. Concept map — Must|F2.4]]): up to 3, most salient first. `position` is `null` before the layout exists.
 
 ### `GET /courses/{courseId}/next`
-**As built:** `200 { kind: "watch"|"diagnostic"|"activity"|"none", lectureId?, conceptId?, conceptName?, activityType?, reason }` (`packages/contracts/src/api/courses.ts`).
-
-**Planned, F0.9–F0.12 *(decided 6 Oct 2026, to be built)*:** `200 { kind: "processing"|"watch"|"diagnostic"|"activity"|"add_lecture", lectureId?, conceptId?, conceptName?, activityType?, reason, evidence, estimateMinutes, payoff, alsoWorthDoing }`
+`200 { kind: "processing"|"watch"|"diagnostic"|"activity"|"add_lecture", lectureId?, conceptId?, conceptName?, activityType?, reason, evidence, estimateMinutes, payoff, alsoWorthDoing }` (F0.9–F0.12, `packages/contracts/src/api/courses.ts`; rules in `packages/domain/src/recommender.ts`).
 
 | Field | Meaning |
 |---|---|
-| `kind` | `processing`: a lecture of the student's is in the pipeline (the dashboard shows its steps). `add_lecture`: nothing left to do in the course (replaces v2's `none`). |
+| `kind` | `processing`: a lecture of the student's is in the pipeline (`processing` or `map_ready`; the dashboard shows its steps), or, when nothing else is left, one whose processing failed. `add_lecture`: nothing left to do in the course (replaced `none`). |
 | `reason` | The card's headline, written for the student (see the examples below). |
 | `evidence` | 0–2 items `{ kind: "marked_lost"|"marked_important"|"confident_mistake"|"wrong"|"partial", text, source?: { lectureId, tMs } }`, strongest first. Built from the student's own markers and attempts only. |
 | `estimateMinutes` | Watch: the lecture's duration. Diagnostic: 3. Spot the flaw, teach-back, transfer, Stump: 5. `null` for `processing` and `add_lecture`. |

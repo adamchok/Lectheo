@@ -12,7 +12,7 @@
 
 **Try it:** [lectheo.vercel.app](https://lectheo.vercel.app) → **Try the sample account** (no sign-up; a pre-loaded CS50
 student with markers and a diagnostic already taken; deleted after 24 hours). Sign in with Google to add your own
-lectures. Demo video: _TODO link_.
+lectures: a Google account starts empty, and the CS50 library is part of the sample account only. Demo video: _TODO link_.
 
 Built for ForgeHacks 2026 (AI + Education). Product docs live in [`docs/`](docs/).
 

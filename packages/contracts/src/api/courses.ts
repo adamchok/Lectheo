@@ -23,6 +23,11 @@ export const CourseSummary = z.object({
   attribution: Attribution.nullable(),
   lectureCount: z.number().int(),
   mastery: MasteryCounts,
+  /**
+   * The student's latest work in the course (their lectures, marks, sessions, practice), or null.
+   * The dashboard opens the course with the latest value (F0.4).
+   */
+  lastActiveAt: z.iso.datetime().nullable(),
 })
 export type CourseSummary = z.infer<typeof CourseSummary>
 export const ListCoursesResponse = z.object({ data: z.array(CourseSummary) })
@@ -80,12 +85,58 @@ export const CourseMapResponse = z.object({
 })
 export type CourseMapResponse = z.infer<typeof CourseMapResponse>
 
+export const NEXT_STEP_KINDS = [
+  'processing',
+  'watch',
+  'diagnostic',
+  'activity',
+  'add_lecture',
+] as const
+export const NextStepKind = z.enum(NEXT_STEP_KINDS)
+export type NextStepKind = z.infer<typeof NextStepKind>
+
+export const EVIDENCE_KINDS = [
+  'marked_lost',
+  'marked_important',
+  'confident_mistake',
+  'wrong',
+  'partial',
+] as const
+export const EvidenceKind = z.enum(EVIDENCE_KINDS)
+export type EvidenceKind = z.infer<typeof EvidenceKind>
+
+/** One "Why" line on the next-step card (F0.10): the student's own marks and attempts only. */
+export const NextStepEvidence = z.object({
+  kind: EvidenceKind,
+  text: z.string(),
+  /** The lecture moment ("▶ 12:41") when the evidence is a mark. */
+  source: z.object({ lectureId: Id, tMs: Ms }).optional(),
+})
+export type NextStepEvidence = z.infer<typeof NextStepEvidence>
+
+/** "Also worth doing" row (F0.11): ranked concepts 2 and 3. */
+export const AlsoWorthDoing = z.object({
+  conceptId: Id,
+  conceptName: z.string(),
+  state: MasteryState,
+  confidentMistake: z.boolean(),
+  activityType: ActivityType,
+  reason: z.string(),
+})
+export type AlsoWorthDoing = z.infer<typeof AlsoWorthDoing>
+
+/** GET /courses/{id}/next (F0.4, F0.9–F0.12, Architecture §6.3). */
 export const NextStepResponse = z.object({
-  kind: z.enum(['watch', 'diagnostic', 'activity', 'none']),
+  kind: NextStepKind,
   lectureId: Id.optional(),
   conceptId: Id.optional(),
   conceptName: z.string().optional(),
   activityType: ActivityType.optional(),
   reason: z.string(),
+  evidence: z.array(NextStepEvidence).max(2),
+  /** Watch: the lecture's length. Diagnostic 3, practice 5. Null for processing and add_lecture. */
+  estimateMinutes: z.number().int().positive().nullable(),
+  payoff: z.string().nullable(),
+  alsoWorthDoing: z.array(AlsoWorthDoing).max(2),
 })
 export type NextStepResponse = z.infer<typeof NextStepResponse>
