@@ -89,6 +89,7 @@ export default async function OpengraphImage(): Promise<ImageResponse> {
         </div>
       </div>
     </div>,
-    { ...size, fonts },
+    // An empty `fonts` array disables next/og's default font and fails the build.
+    fonts.length > 0 ? { ...size, fonts } : size,
   )
 }
