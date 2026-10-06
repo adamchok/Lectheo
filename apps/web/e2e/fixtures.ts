@@ -11,7 +11,15 @@ const TURNSTILE_STUB = `window.turnstile = {
   reset: () => {}, remove: () => {},
 }`
 
-/** Landing → "Explore with a sample account" (Turnstile test keys always pass) → dashboard. */
+/** The hero (header and final call to action repeat its buttons). */
+export const landingHero = (page: Page) =>
+  page.getByRole('region', { name: /find what you missed/i })
+
+/** The hero's "Try the sample account" button. */
+export const heroSampleButton = (page: Page) =>
+  landingHero(page).getByRole('button', { name: /try the sample account/i })
+
+/** Landing → "Try the sample account" (Turnstile test keys always pass) → dashboard. */
 export async function signInSample(page: Page): Promise<void> {
   if (E2E_OFFLINE) {
     await page.route(/challenges\.cloudflare\.com\/turnstile\/v0\/api\.js/, (route) =>
@@ -19,7 +27,7 @@ export async function signInSample(page: Page): Promise<void> {
     )
   }
   await page.goto('/')
-  await page.getByRole('button', { name: /explore with a sample account/i }).click()
+  await heroSampleButton(page).click()
   await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 })
 }
 

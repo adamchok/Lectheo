@@ -12,6 +12,8 @@ const NEXT_CLI = 'node_modules/next/dist/bin/next'
  */
 export default defineConfig({
   testDir: './e2e',
+  // landing-screenshots.ts skips itself unless LANDING_SCREENSHOTS=1 (see the file).
+  testMatch: ['**/*.spec.ts', 'landing-screenshots.ts'],
   globalSetup: './e2e/global-setup.ts',
   fullyParallel: true,
   workers: 2,

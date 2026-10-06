@@ -1,6 +1,13 @@
 import { expect, test, type Page } from '@playwright/test'
 import { closeDb } from '@lectheo/db'
-import { correctOptionId, LIBRARY_COURSE_ID, lectureId, signInSample, silentWav } from './fixtures'
+import {
+  correctOptionId,
+  heroSampleButton,
+  LIBRARY_COURSE_ID,
+  lectureId,
+  signInSample,
+  silentWav,
+} from './fixtures'
 
 // The answer-key lookup opens a DB pool; close it so the worker can exit.
 test.afterAll(closeDb)
@@ -199,7 +206,7 @@ test('sign out: sample data is gone', async ({ page }) => {
   await page.getByRole('button', { name: /^account:/i }).click()
   await page.getByRole('menuitem', { name: 'Sign out' }).click()
   await expect(page).toHaveURL(/\/$/)
-  await expect(page.getByRole('button', { name: /explore with a sample account/i })).toBeVisible()
+  await expect(heroSampleButton(page)).toBeVisible()
 
   expect((await page.request.get('/api/v1/me')).status()).toBe(401)
   await page.goto('/dashboard')
