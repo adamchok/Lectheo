@@ -57,6 +57,54 @@ describe('parseTeamsDocx', () => {
     })
   })
 
+  it('parses a real Teams export: avatar, header and speech in one paragraph', () => {
+    expect(parseTeamsDocx(fixture('teams-real-export'))).toEqual({
+      format: 'docx',
+      hasTimestamps: true,
+      durationMs: 47_000,
+      cues: [
+        {
+          startMs: 14_000,
+          endMs: 31_000,
+          text: 'Today we look at hash tables and why lookups are O(1) on average.',
+        },
+        {
+          startMs: 31_000,
+          endMs: 47_000,
+          text: 'What happens when two keys land in the same bucket?',
+        },
+        {
+          startMs: 47_000,
+          endMs: 47_000,
+          text: 'That is a collision. We chain the entries in a list.',
+        },
+      ],
+    })
+  })
+
+  it('header on the first line: keeps loose-name repeats and the monotonic guard', () => {
+    const turn = (...lines: string[]): string => lines.join('</w:t><w:br/><w:t>')
+    const loose = doc(
+      turn('Jane Doe 0:03', 'Hello.'),
+      turn('Sam Lee 0:41', 'Q?', 'More.'),
+      turn('Jane Doe 1:02', 'Answer.'),
+      turn('Sam Lee 1:30', 'Thanks.'),
+    )
+    expect(parseTeamsDocx(loose)?.cues.map((c) => [c.startMs, c.text])).toEqual([
+      [3_000, 'Hello.'],
+      [41_000, 'Q? More.'],
+      [62_000, 'Answer.'],
+      [90_000, 'Thanks.'],
+    ])
+    const backwards = doc(
+      turn('Jane Doe   1:00', 'Hello.'),
+      turn('Sam Lee   0:30', 'Quoted header.'),
+    )
+    expect(parseTeamsDocx(backwards)?.cues.map((c) => [c.startMs, c.text])).toEqual([
+      [60_000, 'Hello. Sam Lee 0:30 Quoted header.'],
+    ])
+  })
+
   it('ignores a 24-hour clock in the preamble and a bare time in the text', () => {
     const parsed = parseTeamsDocx(fixture('teams-24h-preamble'))
     expect(parsed?.cues).toEqual([

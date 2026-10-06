@@ -8,7 +8,8 @@ import { stripSpeakersFromCues } from './strip-speakers'
  *
  * Layouts seen in the wild:
  *  - "header": current Teams. Title / date / "X started transcription" preamble, then per turn
- *    a `Speaker Name   0:03` paragraph (time is m:ss or h:mm:ss) followed by text paragraphs.
+ *    a `Speaker Name   0:03` header (time is m:ss or h:mm:ss) followed by text. The header is
+ *    its own paragraph, or the first line of one (`<w:br/>`) with the turn's text after it.
  *  - "arrow": older Teams / Stream. `00:00:03.000 --> 00:00:07.000` paragraph, then a speaker
  *    paragraph, then text (VTT-like, one line per paragraph).
  *
@@ -127,27 +128,45 @@ function parseArrowLayout(paragraphs: readonly string[]): Cue[] {
  * recognised and their header stays in the text.
  */
 function headerRule(paragraphs: readonly string[]): (p: string) => number | null {
-  if (paragraphs.some((p) => HEADER.test(p))) return (p) => toStartMs(HEADER.exec(p))
+  const lines = paragraphs.flatMap((p) => headerCandidates(p).map(([line]) => line))
+  if (lines.some((line) => HEADER.test(line))) return (line) => toStartMs(HEADER.exec(line))
   const counts = new Map<string, number>()
   for (const p of paragraphs) {
-    const name = LOOSE_HEADER.exec(p)?.[1]
+    // One count per paragraph: its whole text or, failing that, its first line.
+    const name = headerCandidates(p)
+      .map(([line]) => LOOSE_HEADER.exec(line)?.[1])
+      .find((n) => n !== undefined)
     if (name !== undefined) counts.set(name, (counts.get(name) ?? 0) + 1)
   }
-  return (p) => {
-    const match = LOOSE_HEADER.exec(p)
+  return (line) => {
+    const match = LOOSE_HEADER.exec(line)
     const isSpeaker = (counts.get(match?.[1] ?? '') ?? 0) >= MIN_SPEAKER_REPEATS
     return isSpeaker ? toStartMs(match) : null
   }
+}
+
+/**
+ * Where a paragraph's header could be, with the text that follows it: the whole paragraph
+ * (`Name<br/>0:03`), then its first line, as real Teams exports write the header and the speech
+ * in one paragraph (`[avatar] Jane Doe   0:14<br/>Speech…`).
+ */
+function headerCandidates(p: string): [string, string[]][] {
+  const i = p.indexOf('\n')
+  return i < 0 ? [[p, []]] : [[p, []], [p.slice(0, i), [p.slice(i + 1)]]]
 }
 
 function parseHeaderLayout(paragraphs: readonly string[]): Cue[] {
   const headerStartMs = headerRule(paragraphs)
   const turns: { startMs: number; lines: string[] }[] = []
   for (const p of paragraphs) {
-    const startMs = headerStartMs(p)
     const previous = turns.at(-1)
     // Turns never go back in time, so "Jane Doe  0:03" quoted after 12:04 stays text.
-    if (startMs !== null && startMs >= (previous?.startMs ?? 0)) turns.push({ startMs, lines: [] })
+    const turn = headerCandidates(p)
+      .map(([line, lines]) => ({ startMs: headerStartMs(line), lines }))
+      .find((t): t is { startMs: number; lines: string[] } =>
+        t.startMs !== null && t.startMs >= (previous?.startMs ?? 0),
+      )
+    if (turn) turns.push(turn)
     else previous?.lines.push(p) // Paragraphs before the first header are the preamble.
   }
   // ponytail: Teams gives no end time, so the last turn ends where it starts and durationMs
