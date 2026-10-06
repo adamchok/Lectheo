@@ -68,8 +68,9 @@ const HTML_ENTITIES: Readonly<Record<string, string>> = {
  */
 export function stripCueMarkup(text: string): string {
   return text
-    .replace(/<[^>]*>/g, '')
-    .replace(/\{\\[^}]*\}/g, '')
+    // `[^<>]` / `[^{}]` keep these linear on unclosed `<` / `{` runs.
+    .replace(/<[^<>]*>/g, '')
+    .replace(/\{\\[^{}]*\}/g, '')
     .replace(/&(?:amp|lt|gt|quot|apos|nbsp|lrm|rlm|#39);/g, (entity) => HTML_ENTITIES[entity] ?? entity)
 }
 

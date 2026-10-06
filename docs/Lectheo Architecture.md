@@ -161,7 +161,7 @@ The sample account is **lived-in**: L3 practiced (mostly green/amber), L4 with a
 | Mode | Media | Marker time source | What's uploaded | Pipeline entry |
 |---|---|---|---|---|
 | **A. Watch (library)** | YouTube IFrame embed | `player.getCurrentTime()` | markers only | none: already processed. Markers are aligned on write |
-| **B. Import** | local file → `<video src=objectURL>` | `video.currentTime` | transcript file (.vtt / .srt; Teams .docx, Must since 6 Oct, *to be built*) + markers | `parseTranscript` |
+| **B. Import** | local file → `<video src=objectURL>` | `video.currentTime` | transcript file (.vtt / .srt / Teams .docx) + markers | `parseTranscript` |
 | **C. Live (Should, *not built*)** | `MediaRecorder` (Opus codec, 32 kbps, 10 s pieces) | elapsed media time = pieces × 10 s + offset into the current piece | audio (signed URL) + markers | `transcribe` |
 | **D. Upload** | audio file, or transcript / text | none (no markers) | audio or transcript | `transcribe` or `parseTranscript` |
 
@@ -456,7 +456,7 @@ Signed-in pages share one layout (`app/(app)/layout.tsx`) with `error.tsx` and `
 ### 9.2 Abuse and cost
 | Layer | Control |
 |---|---|
-| Bots | Turnstile on the sample button. Per-IP limit (5 / 10 min, `rate_limits`). Sign-in only on click. Vercel DDoS protection |
+| Bots | Turnstile on the sample button. Per-IP limit (5 / 10 min, `rate_limits`). Sign-in only on click. Per-user transcript upload limit (10 / 10 min). Vercel DDoS protection |
 | Browser hardening | Enforced CSP `frame-ancestors 'none'; object-src 'none'; base-uri 'self'`, plus a full CSP in report-only mode (Supabase, Turnstile and YouTube origins) until it runs clean |
 | Per-user quotas (daily) | Lectures: sample 1 (≤ 20 min / 20 MB), Google 3 (≤ 2 h / 50 MB). Re-processing: 2. LLM tasks: 60. Activities: 30 |
 | Inputs | Upload size enforced when the signed URL is created. Transcripts capped in tokens by tier. Messages ≤ 2,000 chars. 1 slides PDF ≤ 20 MB / 60 pages. Duration measured server-side and truncated to the tier limit |
@@ -520,7 +520,7 @@ Signed-in pages share one layout (`app/(app)/layout.tsx`) with `error.tsx` and `
 | 2 | Days-old models (Sonnet 5.5, GPT-6.1 Sol) and the experimental Jev API | Day-1 smoke test of every role. Pinned slugs + fallbacks. Jev behind `runTask`, with the Luna escalation |
 | 3 | Verifier rejects many Sonnet items | Measure on the library bank. If > 40%, switch `reasoner` to Opus 5.5 (one config line) |
 | 4 | Leak check deflects too often | Tune thresholds on `eval-guard`. Log the deflection rate |
-| 5 | Teams `.docx` transcript format varies | VTT/SRT/TXT shipped. DOCX promoted to Must on 6 Oct, to be built; refused with a clear message until then |
+| 5 | Teams `.docx` transcript format varies | VTT/SRT/TXT/DOCX shipped. Both known Teams layouts (`Name  0:03` headers, `start --> end` blocks) are parsed; any other `.docx` is refused with a clear message pointing to the `.vtt` |
 | 6 | Long recordings exceed 50 MB | 32 kbps Opus. 2 h cap. Suggest transcript import |
 | 7 | YouTube embed blocked (school network or privacy settings) | Detect the player error and fall back to CS50's official lecture MP3 (CC-licensed, same timeline as the subtitles) in a local `<audio>` player |
 | 8 | Name collision | Resolved: renamed to **Lectheo**. Register lectheo.com and the GitHub org before submission |

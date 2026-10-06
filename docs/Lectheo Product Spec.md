@@ -391,14 +391,13 @@ These requirements are specified above but **not implemented yet**. Until they s
 | F0.8 | First-run screen for new Google accounts |
 | F0.9 | Processing steps on the dashboard |
 | F0.10–F0.12 | Next-step card: why, how long, payoff; *Also worth doing*; no dead end |
-| F1.5 | Teams `.docx` transcripts (today refused with a clear message) |
 | F8.2 | Delete course and delete account (delete lecture is built) |
 
 ### Should items: built or cut
 
 | Req | Item | Status |
 |---|---|---|
-| F1.5 | Teams `.docx` transcripts | Promoted to Must (6 Oct 2026); to be built |
+| F1.5 | Teams `.docx` transcripts | Promoted to Must (6 Oct 2026) and built: both Teams layouts parsed, unknown layouts refused with a clear message |
 | F1.8 | Record live (mode C) | Cut, confirmed 6 Oct 2026. No entry point; the API returns `404` for `live`. Audio upload covers in-person lectures |
 | F1.9 | Slides PDF input | Cut. No upload; no transcription keyterms from slides |
 | F1.10 | Transcript correction and re-process | Cut. Contract exists, no route or UI |

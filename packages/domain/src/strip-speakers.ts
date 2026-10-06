@@ -15,7 +15,7 @@ export const MIN_SINGLE_WORD_SPEAKER_REPEATS = 2
 /** Maximum words in a speaker label (F1.5: "1–4 capitalized words then colon"). */
 export const MAX_SPEAKER_LABEL_WORDS = 4
 
-const VOICE_TAG = /<\/?v(?:\.[^\s>]*)?(?:\s[^>]*)?>/g
+const VOICE_TAG = /<\/?v(?:\.[^\s<>]*)?(?:\s[^<>]*)?>/g
 /** Leading dialogue markers used by some exporters: `>>` (CS50/YouTube) or `-`. */
 const DIALOGUE_DASH = /^(?:>>|-)\s*/
 /** A capitalized name word, an initial ("J."), or a number ("Speaker 1"). */

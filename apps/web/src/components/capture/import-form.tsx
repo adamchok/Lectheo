@@ -31,8 +31,9 @@ interface FormError {
 }
 
 /**
- * Mode B (F1.5): a local recording plus its .vtt / .srt. Only the transcript is uploaded; the
- * recording plays from this device in the watch page, where the student marks moments.
+ * Mode B (F1.5): a local recording plus its .vtt / .srt / Teams .docx. Only the transcript is
+ * uploaded; the recording plays from this device in the watch page, where the student marks
+ * moments.
  */
 export function ImportForm({
   missing,
@@ -117,7 +118,7 @@ export function ImportForm({
       </div>
       <div className="space-y-2">
         <Label htmlFor="import-transcript">
-          Transcript (.vtt or .srt, up to 2 MB) <RequiredMark />
+          Transcript (.vtt, .srt or Teams .docx, up to 2 MB) <RequiredMark />
         </Label>
         <Input
           id="import-transcript"
@@ -128,7 +129,7 @@ export function ImportForm({
             `${id}-transcript-help`,
             error?.field === 'transcript' && `${id}-error`,
           )}
-          accept=".vtt,.srt"
+          accept=".vtt,.srt,.docx"
           onChange={(e) => setTranscript(e.currentTarget.files?.[0] ?? null)}
         />
         <p id={`${id}-transcript-help`} className="text-muted-foreground text-xs">

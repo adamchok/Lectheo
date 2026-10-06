@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>
+<w:p><w:r><w:t>0:0:0.0 --&gt; 0:0:5.270</w:t></w:r></w:p>
+<w:p><w:r><w:t>Doe, Jane</w:t></w:r></w:p>
+<w:p><w:r><w:t>Hash tables map keys to buckets.</w:t></w:r></w:p>
+<w:p/>
+<w:p><w:r><w:t>00:00:05.270 --&gt; 00:00:09.500</w:t></w:r></w:p>
+<w:p><w:r><w:t>Lee, Sam</w:t></w:r></w:p>
+<w:p><w:r><w:t>What happens on a collision?</w:t></w:r></w:p>
+<w:p/>
+<w:p><w:r><w:t>00:00:09.500 --&gt; 00:00:12.000</w:t></w:r></w:p>
+<w:p><w:r><w:t>Doe, Jane</w:t></w:r></w:p>
+<w:p><w:r><w:t>We chain entries</w:t></w:r></w:p>
+<w:p><w:r><w:t>in a list.</w:t></w:r></w:p>
+<w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:body></w:document>

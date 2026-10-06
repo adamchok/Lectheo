@@ -4,7 +4,7 @@ import { parseVtt } from './parse-vtt'
 import { splitSentences } from './sentences'
 import { stripSpeakersFromCues } from './strip-speakers'
 
-export type TranscriptFormat = 'vtt' | 'srt' | 'text'
+export type TranscriptFormat = 'vtt' | 'srt' | 'docx' | 'text'
 
 export interface ParsedTranscript {
   readonly format: TranscriptFormat

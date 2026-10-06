@@ -2,7 +2,11 @@ import { TranscriptQuery, TranscriptResponse, TranscriptUploadResponse } from '@
 import { z } from 'zod'
 import { route } from '@/server/http'
 import { getTranscript } from '@/server/lectures/read'
-import { readTranscriptRequest, uploadTranscript } from '@/server/lectures/transcript-upload'
+import {
+  readTranscriptRequest,
+  takeTranscriptUpload,
+  uploadTranscript,
+} from '@/server/lectures/transcript-upload'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,12 +19,15 @@ export const GET = route(
 )
 
 /**
- * POST /api/v1/lectures/{id}/transcript: multipart `file` (.vtt/.srt/.txt ≤ 2 MB) or JSON
- * `{ text }` → 201 { segments, hasTimestamps, durationMs, truncated } · 422 unreadable.
- * The body is read by the handler (multipart), so the route declares no body schema.
+ * POST /api/v1/lectures/{id}/transcript: multipart `file` (.vtt/.srt/.txt/Teams .docx ≤ 2 MB)
+ * or JSON `{ text }` → 201 { segments, hasTimestamps, durationMs, truncated } · 422 unreadable
+ * · 429 rate_limited. The body is read by the handler (multipart), so the route declares no body
+ * schema; the rate limit is taken before the body is read.
  */
 export const POST = route(
   { auth: 'required', params: Params, response: TranscriptUploadResponse, status: 201 },
-  async ({ actor, params, req }) =>
-    uploadTranscript(actor, params.id, await readTranscriptRequest(req)),
+  async ({ actor, params, req }) => {
+    await takeTranscriptUpload(actor)
+    return uploadTranscript(actor, params.id, await readTranscriptRequest(req))
+  },
 )

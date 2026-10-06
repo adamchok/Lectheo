@@ -352,7 +352,7 @@ No prompt or answer text is stored here; the ledger is tokens, cost and outcome 
 
 **`app_flags`**: single row (`id = 1`, enforced by `CHECK`), columns `ai_degraded`, `intake_paused` (bool) and `updated_at`, set by the spend governor (see [[Lectheo Architecture#9.2 Abuse and cost]]).
 
-**`rate_limits`**: fixed-window request counters (per-IP limit on sample sign-in, `server/rate-limit.ts`).
+**`rate_limits`**: fixed-window request counters (per-IP limit on sample sign-in, per-user limit on transcript uploads, `server/rate-limit.ts`).
 
 | Column | Type | Notes |
 |---|---|---|
