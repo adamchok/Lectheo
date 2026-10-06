@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>
+<w:p><w:pPr><w:pStyle w:val="Title"/></w:pPr><w:r><w:t>CS101 Lecture 3 - Hash tables</w:t></w:r></w:p>
+<w:p><w:r><w:t>October 6, 2026, 2:00PM</w:t></w:r></w:p>
+<w:p><w:r><w:t>47m 12s</w:t></w:r></w:p>
+<w:p/>
+<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Jane Doe</w:t></w:r><w:r><w:t xml:space="preserve"> started transcription</w:t></w:r></w:p>
+<w:p><w:pPr><w:tabs><w:tab w:val="left" w:pos="4320"/></w:tabs></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Jane Doe</w:t></w:r><w:r><w:tab/><w:t>0:03</w:t></w:r></w:p>
+<w:p><w:r><w:t xml:space="preserve">Hash tables map keys to buckets &amp; </w:t></w:r><w:r><w:t>give O(1) lookups.</w:t></w:r></w:p>
+<w:p><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">Sam Lee (Guest)   </w:t></w:r><w:r><w:t>0:41</w:t></w:r></w:p>
+<w:p><w:r><w:t>What happens on a collision?</w:t></w:r></w:p>
+<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Jane Doe</w:t></w:r><w:r><w:t xml:space="preserve">   1:02:05</w:t></w:r></w:p>
+<w:p><w:r><w:t>We chain entries in a list.</w:t></w:r></w:p>
+<w:p><w:r><w:t>Open addressing is the other option.</w:t></w:r></w:p>
+<w:p><w:r><w:t>Jane Doe stopped transcription</w:t></w:r></w:p>
+<w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:body></w:document>
