@@ -94,6 +94,42 @@ describe('parseTeamsDocx', () => {
     expect(parsed?.cues).toEqual([{ startMs: 1_000, endMs: 2_000, text: 'Hi.' }])
   })
 
+  it('accepts a single space, a line break or no gap between name and time', () => {
+    const singleSpace = doc('Jane Doe 0:03', 'Hello there.', 'Sam Lee 0:41', 'Question?')
+    expect(parseTeamsDocx(singleSpace)?.cues).toEqual([
+      { startMs: 3_000, endMs: 41_000, text: 'Hello there.' },
+      { startMs: 41_000, endMs: 41_000, text: 'Question?' },
+    ])
+    const brAndRuns =
+      '<w:p><w:r><w:t>Jane Doe</w:t><w:br/><w:t>0:03</w:t></w:r></w:p>' +
+      '<w:p><w:r><w:t>Hello.</w:t></w:r></w:p>' +
+      '<w:p><w:r><w:t>Sam Lee</w:t></w:r><w:r><w:t>0:41</w:t></w:r></w:p>' +
+      '<w:p><w:r><w:t>Bye.</w:t></w:r></w:p>'
+    expect(parseTeamsDocx(brAndRuns)?.cues.map((c) => [c.startMs, c.text])).toEqual([
+      [3_000, 'Hello.'],
+      [41_000, 'Bye.'],
+    ])
+  })
+
+  it('a single space with a digit or comma in the name is not a header (preamble dates)', () => {
+    expect(parseTeamsDocx(doc('6 October 2026, 14:00', 'Agenda'))).toBeNull()
+    expect(parseTeamsDocx(doc('Room 101 10:30', 'Agenda'))).toBeNull()
+  })
+
+  it('arrow layout: a repeated sentence opening two blocks is speech, not a speaker', () => {
+    const parsed = parseTeamsDocx(
+      doc(
+        '0:0:1.0 --&gt; 0:0:2.0',
+        'Okay.',
+        'Let us start.',
+        '0:0:2.0 --&gt; 0:0:3.0',
+        'Okay.',
+        'Next.',
+      ),
+    )
+    expect(parsed?.cues.map((c) => c.text)).toEqual(['Okay. Let us start.', 'Okay. Next.'])
+  })
+
   it('arrow layout without speaker lines keeps every line', () => {
     const parsed = parseTeamsDocx(
       doc(

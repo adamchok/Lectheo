@@ -17,11 +17,21 @@ import { stripSpeakersFromCues } from './strip-speakers'
  */
 
 /**
- * `Speaker Name<tab>0:03` or `Speaker Name   1:02:03`. The name is required and must be
- * followed by a tab or 2+ spaces, so a preamble date ("6 October 2026, 14:00") or a text
- * paragraph that is just "10:30" isn't a header.
+ * `Speaker Name<tab>0:03` or `Speaker Name   1:02:03`. The name is required, so a text
+ * paragraph that is just "10:30" isn't a header. A tab or 2+ spaces may follow any name.
  */
 const HEADER = /^(\S.{0,79}?)(?:\t| {2})\s*(\d{1,2}):(\d{2})(?::(\d{2}))?$/
+/**
+ * One space, a `\n` from `<w:br/>`, or nothing (a name run straight into a time run) between
+ * name and time, as some Teams exports may write it: only when the name has no digit and no
+ * comma, which a preamble date ("6 October 2026, 14:00") always has.
+ * ponytail: a text paragraph like "Back at 12:30" also matches; the monotonic guard below only
+ * catches it when the time goes backwards. Check against the doc's repeat speakers if seen.
+ */
+const LOOSE_HEADER = /^(?=\S)([^\d,\n]{1,80}?)\s*(\d{1,2}):(\d{2})(?::(\d{2}))?$/
+/** A repeated arrow-layout first line is a speaker only if it reads like a name. */
+const MAX_SPEAKER_CHARS = 60
+const SENTENCE_END = /[.?!…]$/
 /** Teams notices such as "Jane Doe started transcription": not speech. */
 const NOTICE = /\s(?:started|stopped) transcription$/
 /**
@@ -97,7 +107,11 @@ function parseArrowLayout(paragraphs: readonly string[]): Cue[] {
     const first = lines[0]
     if (first !== undefined) firstLines.set(first, (firstLines.get(first) ?? 0) + 1)
   }
-  const hasSpeakers = [...firstLines.values()].some((n) => n >= MIN_SPEAKER_REPEATS)
+  // "Okay." opening two blocks is speech, not a speaker: names are short and unpunctuated.
+  const hasSpeakers = [...firstLines].some(
+    ([line, n]) =>
+      n >= MIN_SPEAKER_REPEATS && line.length <= MAX_SPEAKER_CHARS && !SENTENCE_END.test(line),
+  )
   return blocks.map(({ startMs, endMs, lines }) => ({
     startMs,
     endMs,
@@ -124,7 +138,7 @@ function parseHeaderLayout(paragraphs: readonly string[]): Cue[] {
 }
 
 function headerStartMs(paragraph: string): number | null {
-  const match = HEADER.exec(paragraph)
+  const match = HEADER.exec(paragraph) ?? LOOSE_HEADER.exec(paragraph)
   if (!match) return null
   const [, , a, b, c] = match
   const [h, m, s] = c === undefined ? [0, Number(a), Number(b)] : [Number(a), Number(b), Number(c)]
