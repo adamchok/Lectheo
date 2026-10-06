@@ -3,7 +3,7 @@ import { NewLectureView } from '@/components/capture/new-lecture-view'
 import { PageHeader } from '@/components/page-header'
 import { PageChrome } from '@/components/shell/page-chrome'
 
-export const metadata: Metadata = { title: 'Add a lecture' }
+export const metadata: Metadata = { title: 'New lecture' }
 
 export default function NewLecturePage() {
   return (

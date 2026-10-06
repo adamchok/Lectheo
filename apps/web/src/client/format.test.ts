@@ -25,20 +25,18 @@ describe('quotaMessage', () => {
   const resetAt = '2026-10-07T00:00:00.000Z'
 
   it('names the limit in words and the reset time in the given time zone', () => {
-    // The time is in the viewer's locale (12- or 24-hour), so build the expectation the same way.
-    const at = (timeZone: string) =>
-      new Date(resetAt).toLocaleTimeString(undefined, {
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZone,
-      })
-    expect(quotaMessage({ metric: 'activities', limit: 30, resetAt }, 'UTC')).toBe(
-      `You've used today's 30 practice activities. The limit resets at ${at('UTC')}.`,
+    expect(quotaMessage({ metric: 'activities', limit: 30, resetAt }, 'UTC', 'en-GB')).toBe(
+      "You've used today's 30 practice activities. The limit resets at 00:00.",
     )
-    expect(quotaMessage({ metric: 'llm_tasks', limit: 100, resetAt }, 'Asia/Kuala_Lumpur')).toBe(
-      `You've used today's 100 AI requests. The limit resets at ${at('Asia/Kuala_Lumpur')}.`,
+    expect(
+      quotaMessage({ metric: 'llm_tasks', limit: 100, resetAt }, 'Asia/Kuala_Lumpur', 'en-GB'),
+    ).toBe("You've used today's 100 AI requests. The limit resets at 08:00.")
+  })
+
+  it("writes the reset time in the viewer's locale (12-hour in en-US)", () => {
+    expect(quotaMessage({ metric: 'activities', limit: 30, resetAt }, 'UTC', 'en-US')).toMatch(
+      /resets at 12:00\sAM\.$/,
     )
-    expect(at('Asia/Kuala_Lumpur')).toMatch(/08:00|8:00/)
   })
 
   it('falls back to plain copy when details are missing or unknown', () => {

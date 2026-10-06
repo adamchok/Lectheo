@@ -78,8 +78,18 @@ export function PageChrome({ crumbs, actions, courseId, title }: PageChromeProps
     return () => setPageCourseId(null)
   }, [setPageCourseId, courseId])
 
+  // Data-driven names arrive after the route's static metadata, which (on a dynamic route) can
+  // stream in after this effect: re-assert the title whenever <head> changes.
   useEffect(() => {
-    if (tabTitle) document.title = `${tabTitle} · Lectheo`
+    if (!tabTitle) return
+    const wanted = `${tabTitle} · Lectheo`
+    const apply = () => {
+      if (document.title !== wanted) document.title = wanted
+    }
+    apply()
+    const observer = new MutationObserver(apply)
+    observer.observe(document.head, { subtree: true, childList: true, characterData: true })
+    return () => observer.disconnect()
   }, [tabTitle])
 
   if (!shell) return null

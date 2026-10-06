@@ -351,6 +351,13 @@
     text-rendering: optimizeLegibility;
     scroll-padding-top: calc(var(--topbar-height) + 16px);
   }
+  /* The watch page's sticky touch marker bar (about 61px) sits under the top bar on phones and
+     tablets: keep focused content clear of both (WCAG 2.4.11). */
+  @media (pointer: coarse) and (max-width: 1023px) {
+    html:has([data-touch-bar]) {
+      scroll-padding-top: calc(var(--topbar-height) + 4.5rem);
+    }
+  }
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-feature-settings: 'kern', 'liga';

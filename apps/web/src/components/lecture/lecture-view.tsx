@@ -378,20 +378,27 @@ export function LectureView({ lectureId }: { lectureId: string }) {
 
   if (lecture.isPending) {
     return (
-      <Skeleton label="Loading lecture" className="space-y-4">
-        <Skeleton className="h-4 w-24" />
-        <Skeleton className="h-9 w-96 max-w-full" />
-        <Skeleton className="h-32 w-full" />
-      </Skeleton>
+      <>
+        <PageChrome crumbs={[{ label: 'Lecture' }]} />
+        <Skeleton label="Loading lecture" className="space-y-4">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-9 w-96 max-w-full" />
+          <Skeleton className="h-32 w-full" />
+        </Skeleton>
+      </>
     )
   }
   if (lecture.isError) {
     return (
-      <ErrorState
-        title="Couldn't load this lecture"
-        error={lecture.error}
-        onRetry={() => lecture.refetch()}
-      />
+      <>
+        <PageChrome crumbs={[{ label: 'Lecture' }]} />
+        <ErrorState
+          pageTitle
+          title="Couldn't load this lecture"
+          error={lecture.error}
+          onRetry={() => lecture.refetch()}
+        />
+      </>
     )
   }
 

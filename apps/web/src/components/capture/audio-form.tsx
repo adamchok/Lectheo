@@ -82,8 +82,12 @@ export function AudioForm({ missing, isSample, createDraft }: DraftFormProps) {
       {progress !== null && (
         <div className="space-y-1">
           <Progress value={Math.round(progress * 100)} aria-label="Upload progress" />
-          <p className="text-muted-foreground text-xs tabular-nums" aria-live="polite">
+          <p className="text-muted-foreground text-xs tabular-nums">
             {progress < 1 ? `Uploading… ${Math.round(progress * 100)}%` : 'Uploaded'}
+          </p>
+          {/* Announce quarters only, not every percent. */}
+          <p className="sr-only" role="status">
+            {progress < 1 ? `Uploading, ${Math.floor(progress * 4) * 25}%` : 'Uploaded'}
           </p>
         </div>
       )}

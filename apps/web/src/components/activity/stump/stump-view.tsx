@@ -147,7 +147,7 @@ function StumpForm({ draft, onChange, onSubmit, pending, revising }: StumpFormPr
         )}
       </div>
       {/* Always mounted, so the wait message is announced when it appears. */}
-      <p role="status" className="text-muted-foreground text-body-sm empty:hidden">
+      <p role="status" className="text-muted-foreground text-body-sm">
         {pending ? 'The referee and the AI are both thinking. This takes about 15 seconds.' : ''}
       </p>
     </form>

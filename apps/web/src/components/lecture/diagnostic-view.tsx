@@ -255,14 +255,16 @@ function QuestionCard({ sessionId, question, isLast, onAnswered, onNext }: Quest
   // 1–4 rate confidence, then A–E pick an option, only while focus is inside this question
   // (WCAG 2.1.4); never while typing or with a modifier held.
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.shiftKey || !isBareShortcut(event.nativeEvent)) return
+    if (!isBareShortcut(event.nativeEvent)) return
     if (!options) {
-      const next = confidenceForKey(event.key)
+      // By physical key, so AZERTY layouts (digits behind Shift) work too.
+      const next = confidenceForKey(event.code)
       if (!next) return
       event.preventDefault()
       handleRate(next)
       return
     }
+    if (event.shiftKey) return
     const option = options[LETTERS.indexOf(event.key.toUpperCase() as (typeof LETTERS)[number])]
     if (!option || feedback) return
     event.preventDefault()

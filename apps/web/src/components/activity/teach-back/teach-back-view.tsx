@@ -275,14 +275,20 @@ export function TeachBackView({ activity }: { activity: ActivityResponse }) {
             <CharCount length={draft.length} max={MAX_MESSAGE_CHARS} />
             {notice && <Notice>{notice}</Notice>}
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-caption text-muted-foreground">
+              <p id="teach-back-submit-reason" className="text-caption text-muted-foreground">
                 {submit.isPending
                   ? 'Grading takes a few seconds.'
                   : awaitingRetry && !hasNewExplanation
                     ? `Explain a bit more to ${PERSONA} before your second try.`
                     : 'Enter to send · Shift+Enter for a new line'}
               </p>
-              <Button type="button" variant="outline" onClick={done} disabled={!canSubmit}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={done}
+                disabled={!canSubmit}
+                aria-describedby="teach-back-submit-reason"
+              >
                 {submit.isPending ? (
                   <>
                     <Spinner />

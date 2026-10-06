@@ -15,6 +15,8 @@ export interface ErrorStateProps {
   description?: ReactNode
   onRetry?: () => void
   action?: ReactNode
+  /** The page failed as a whole: the title is its h1. */
+  pageTitle?: boolean
   className?: string
 }
 
@@ -46,8 +48,10 @@ export function ErrorState({
   description,
   onRetry,
   action,
+  pageTitle = false,
   className,
 }: ErrorStateProps) {
+  const Title = pageTitle ? 'h1' : 'p'
   const requestId = isApiClientError(error) ? error.requestId : undefined
   // A missing (or someone else's) resource won't load on retry: offer a way out instead.
   const notFound = isApiClientError(error) && error.code === 'not_found'
@@ -71,7 +75,7 @@ export function ErrorState({
         <CircleX aria-hidden className="size-5" />
       </span>
       <div className="max-w-md space-y-1">
-        <p className="font-medium">{title}</p>
+        <Title className="font-medium">{title}</Title>
         <p className="text-muted-foreground text-sm text-pretty">
           {description ?? errorMessage(error)}
         </p>

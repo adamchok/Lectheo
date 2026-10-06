@@ -105,7 +105,10 @@ export function useLecture(lectureId: string | undefined) {
     if (!was || !status || !POLLING_LECTURE_STATUSES.includes(was)) return
     if (POLLING_LECTURE_STATUSES.includes(status)) return
     void queryClient.invalidateQueries({ queryKey: queryKeys.courses, exact: true })
-    if (courseId) void queryClient.invalidateQueries({ queryKey: queryKeys.courseMap(courseId) })
+    if (courseId) {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.courseMap(courseId) })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.nextStep(courseId) })
+    }
     void queryClient.invalidateQueries({
       queryKey: [...queryKeys.lecture(lectureId ?? ''), 'transcript'],
     })
@@ -297,7 +300,8 @@ export function useProcessLecture() {
     onSuccess: (_result, { lectureId }) =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.lecture(lectureId) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.courses, exact: true }),
+        // Prefix: the course list plus every course's map and next step.
+        queryClient.invalidateQueries({ queryKey: queryKeys.courses }),
       ]),
   })
 }

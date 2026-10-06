@@ -2,7 +2,7 @@
 
 import type { ActivityType, MasteryState } from '@lectheo/contracts'
 import { MessagesSquare, SearchCheck, Shuffle, Swords, type LucideIcon } from 'lucide-react'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { useStartPractice } from '@/client/practice'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -28,9 +28,15 @@ export interface PracticeButtonsProps {
 }
 
 /** All four practice types for one concept (F4); the clicked one shows "Preparing…". */
-export function PracticeButtons({ conceptId, conceptName, mastery, transfer }: PracticeButtonsProps) {
+export function PracticeButtons({
+  conceptId,
+  conceptName,
+  mastery,
+  transfer,
+}: PracticeButtonsProps) {
   const { startPractice, isPending } = useStartPractice()
   const [clicked, setClicked] = useState<ActivityType | null>(null)
+  const preparingId = useId()
   const shown = PRACTICE.filter((p) => p.enabled && (p.type !== 'transfer' || transfer))
   if (shown.length === 0) return null
 
@@ -44,8 +50,10 @@ export function PracticeButtons({ conceptId, conceptName, mastery, transfer }: P
             variant="outline"
             size="sm"
             pending={pending}
-            // The others stay focusable but inert while one starts (one activity at a time).
+            // The others stay focusable but inert while one starts (one activity at a time); the
+            // visible "Preparing…" on the clicked one is their reason.
             aria-disabled={isPending && !pending ? true : undefined}
+            aria-describedby={isPending && !pending ? preparingId : undefined}
             onClick={() => {
               if (isPending) return
               setClicked(type)
@@ -53,7 +61,7 @@ export function PracticeButtons({ conceptId, conceptName, mastery, transfer }: P
             }}
           >
             <Icon aria-hidden />
-            {pending ? 'Preparing…' : ACTIVITY_LABELS[type]}
+            {pending ? <span id={preparingId}>Preparing…</span> : ACTIVITY_LABELS[type]}
             {conceptName && <span className="sr-only">: {conceptName}</span>}
             {type === 'stump' && (
               <Badge variant="secondary" className="text-label rounded-sm px-1.5 py-0">

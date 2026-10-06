@@ -28,20 +28,27 @@ export function ActivityView({ activityId }: { activityId: string }) {
 
   if (activity.isPending) {
     return (
-      <Skeleton label="Loading activity" className="mx-auto max-w-reading space-y-4">
-        <Skeleton className="h-3 w-24" />
-        <Skeleton className="h-7 w-80 max-w-full" />
-        <Skeleton className="h-64 w-full rounded-lg" />
-      </Skeleton>
+      <>
+        <PageChrome crumbs={[{ label: 'Practice' }]} />
+        <Skeleton label="Loading activity" className="mx-auto max-w-reading space-y-4">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-7 w-80 max-w-full" />
+          <Skeleton className="h-64 w-full rounded-lg" />
+        </Skeleton>
+      </>
     )
   }
   if (activity.isError) {
     return (
-      <ErrorState
-        title="Couldn't load this activity"
-        error={activity.error}
-        onRetry={() => activity.refetch()}
-      />
+      <>
+        <PageChrome crumbs={[{ label: 'Practice' }]} />
+        <ErrorState
+          pageTitle
+          title="Couldn't load this activity"
+          error={activity.error}
+          onRetry={() => activity.refetch()}
+        />
+      </>
     )
   }
 

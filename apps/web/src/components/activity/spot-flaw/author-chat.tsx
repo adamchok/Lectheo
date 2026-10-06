@@ -124,7 +124,9 @@ export function AuthorChat({
             onChange={(e) => setDraft(e.target.value)}
             maxLength={MAX_CHARS}
             autoComplete="off"
-            disabled={blocked}
+            // Not disabled: disabling the focused field drops keyboard focus to <body>.
+            readOnly={blocked}
+            aria-disabled={blocked || undefined}
             placeholder={outOfTurns ? 'No questions left' : 'Ask about their reasoning…'}
           />
           <Button type="submit" disabled={blocked || pending || draft.trim() === ''}>

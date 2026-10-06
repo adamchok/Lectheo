@@ -86,7 +86,7 @@ describe('AuthorChat', () => {
     expect(onMarker).not.toHaveBeenCalled()
   })
 
-  it('restores the draft when asking fails, and disables input with no turns left', async () => {
+  it('restores the draft when asking fails, and makes the input read-only with no turns left', async () => {
     onAsk.mockRejectedValueOnce(new Error('boom'))
     act(() => root.render(<Harness onAsk={onAsk} onMarker={onMarker} />))
     type('Is 3 right?')
@@ -94,7 +94,9 @@ describe('AuthorChat', () => {
     expect(input().value).toBe('Is 3 right?')
 
     act(() => root.render(<Harness onAsk={onAsk} onMarker={onMarker} turnsLeft={0} />))
-    expect(input().disabled).toBe(true)
+    // Read-only, not disabled: a disabled focused field would drop focus to <body>.
+    expect(input().readOnly).toBe(true)
+    expect(input().getAttribute('aria-disabled')).toBe('true')
     expect(container.textContent).toContain('No questions left')
   })
 })

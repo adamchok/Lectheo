@@ -127,10 +127,25 @@ export function CourseView({ courseId }: { courseId: string }) {
   )
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
-  if (map.isPending) return <CourseSkeleton />
+  if (map.isPending) {
+    return (
+      <>
+        <PageChrome crumbs={[{ label: 'Course' }]} />
+        <CourseSkeleton />
+      </>
+    )
+  }
   if (map.isError) {
     return (
-      <ErrorState title="Couldn't load this course" error={map.error} onRetry={() => map.refetch()} />
+      <>
+        <PageChrome crumbs={[{ label: 'Course' }]} />
+        <ErrorState
+          pageTitle
+          title="Couldn't load this course"
+          error={map.error}
+          onRetry={() => map.refetch()}
+        />
+      </>
     )
   }
 
@@ -155,7 +170,10 @@ export function CourseView({ courseId }: { courseId: string }) {
         crumbs={[{ label: course.title, href: `/courses/${course.id}` as Route }]}
         courseId={course.id}
         actions={
-          FEATURES.conceptMapCanvas ? <ViewToggle view={view} onChange={changeView} /> : undefined
+          // No concepts means no map: hide the toggle rather than show "Map" pressed over a list.
+          FEATURES.conceptMapCanvas && nodes.length > 0 ? (
+            <ViewToggle view={activeView} onChange={changeView} />
+          ) : undefined
         }
       />
       <PageHeader

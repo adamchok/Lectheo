@@ -38,20 +38,27 @@ export function LectureFrame({
 
   if (lecture.isPending) {
     return (
-      <Skeleton label="Loading lecture" className={cn('space-y-4', frame)}>
-        <Skeleton className="h-3 w-24" />
-        <Skeleton className="h-7 w-96 max-w-full" />
-        <Skeleton className="aspect-video w-full rounded-lg" />
-      </Skeleton>
+      <>
+        <PageChrome crumbs={[{ label: 'Lecture' }]} />
+        <Skeleton label="Loading lecture" className={cn('space-y-4', frame)}>
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-7 w-96 max-w-full" />
+          <Skeleton className="aspect-video w-full rounded-lg" />
+        </Skeleton>
+      </>
     )
   }
   if (lecture.isError) {
     return (
-      <ErrorState
-        title="Couldn't load this lecture"
-        error={lecture.error}
-        onRetry={() => lecture.refetch()}
-      />
+      <>
+        <PageChrome crumbs={[{ label: 'Lecture' }]} />
+        <ErrorState
+          pageTitle
+          title="Couldn't load this lecture"
+          error={lecture.error}
+          onRetry={() => lecture.refetch()}
+        />
+      </>
     )
   }
 
