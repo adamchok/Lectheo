@@ -55,7 +55,7 @@ Part of the architecture set: [[Lectheo Architecture]] · [[Lectheo API Spec]] �
 | Database, Storage, Auth | **Supabase via the Vercel Marketplace**: Postgres, private Storage, **Google OAuth + anonymous (sample) users** | `@supabase/supabase-js` 2.117 / `@supabase/ssr` 0.12 | One integration, env vars auto-synced, no separate account. **Data API off, RLS deny-all.** |
 | ORM | **Drizzle** + `postgres` (postgres.js) via the transaction pooler (`prepare: false`, `max: 3`) | 0.45.x / 3.4.x | Typed SQL, migrations as code. |
 | Bot protection | **Cloudflare Turnstile** | – | Free. Protects the sample-account button. |
-| Transcript parsing | Own small VTT/SRT/TXT/Teams `.docx` parser (`packages/domain`); `.docx` unzipped server-side with `fflate` | – | Simple formats. Pure and tested. |
+| Transcript parsing | Own small VTT/SRT/TXT parser (`packages/domain`), no zip dependency. Teams `.docx` dropped 7 Oct 2026: one timestamp per speaker turn breaks marker alignment; Teams offers `.vtt` | – | Simple formats. Pure and tested. |
 | Validation | **Zod 4** | 4.x | API input, LLM output and JSON columns share schemas. |
 | Client storage | **IndexedDB** (`idb-keyval`) | – | Marker queue and recording pieces survive crashes. |
 | Tests | **Vitest** (domain, contracts, server services on in-process **PGlite**), **Playwright** (judge path, `AI_FAKE=1`, local Supabase), eval **scripts** (CSV output) | Vitest 5 / Playwright 1.63 | Right-sized: unit and DB tests need no Docker. |
@@ -182,7 +182,7 @@ Format: context → decision → consequences. All **Accepted, 4 Oct 2026** (v2 
   - Audio is deleted after transcription, and the remote transcript is deleted at AssemblyAI.
 - **Consequences:**
   - \+ Faster, cheaper, more accurate timing, better privacy.
-  - − Must handle transcript format quirks (VTT/SRT/TXT and Teams .docx shipped).
+  - − Must handle transcript format quirks (VTT/SRT/TXT shipped; Teams .docx dropped 7 Oct 2026: one timestamp per speaker turn breaks marker alignment, Teams offers .vtt, and no zip dependency is needed).
   - *As built: slide keyterms aren't sent, because slides input (Should) was cut.*
 - **Alternative:** Deepgram Nova-3 (keyterms capped at 500 tokens), if AssemblyAI is down.
 

@@ -31,7 +31,7 @@ The foundation is on `main`. Each workstream below runs in its own git worktree 
 
 ## Should (after Must is solid, in order)
 record-live (`/lectures/[id]/record`, recorder reducer + IndexedDB pieces) → stump-the-ai → transfer →
-slides input → transcript correction → Teams .docx → own-course dedupe → persona picker.
+slides input → transcript correction → own-course dedupe → persona picker.
 
 ## Merge rules
 - **Contracts first:** a workstream that needs a contract change lands it in a small PR first (or

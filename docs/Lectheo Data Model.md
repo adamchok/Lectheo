@@ -377,7 +377,7 @@ Windows older than 24 h are pruned on each sample sign-in.
 | Bucket | Path | Limits |
 |---|---|---|
 | `audio` | `{userId}/{lectureId}` | Types `audio/webm`, `audio/ogg`, `audio/mpeg`, `audio/mp4` (m4a), `audio/wav`. Per-tier size enforced at **signed-URL creation**: sample ≤ 20 MB, Google ≤ 50 MB (bucket max 50 MB). Deleted after transcription |
-| `transcripts` | `{userId}/{lectureId}.{vtt,srt,txt,docx}` | ≤ 2 MB. Kept until the lecture is deleted |
+| `transcripts` | `{userId}/{lectureId}.{vtt,srt,txt}` | ≤ 2 MB. Kept until the lecture is deleted |
 | `assets` | `{userId}/{lectureId}/slides.pdf` | ≤ 20 MB, ≤ 60 pages (Should; bucket exists, not used yet) |
 
 Video files are **never** uploaded: imported video plays from the local file.

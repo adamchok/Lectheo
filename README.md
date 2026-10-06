@@ -77,7 +77,7 @@ watch test loads YouTube (or the MP3 fallback), so it needs internet. First run:
 | Google sign-in: name, email, Google account id (`openid email profile` only) | Supabase Auth, `profiles` | You delete your account (account menu) |
 | Courses, lectures, transcript segments | `courses`, `lectures`, `transcript_segments` | You delete the lecture or course |
 | Uploaded audio | Supabase Storage, `audio` bucket | Transcription finishes |
-| Uploaded transcript files (`.vtt`, `.srt`, `.txt`, Teams `.docx`) | Supabase Storage, `transcripts` bucket | You delete the lecture or course |
+| Uploaded transcript files (`.vtt`, `.srt`, `.txt`) | Supabase Storage, `transcripts` bucket | You delete the lecture or course |
 | Your markers ("lost" / "important") | `markers`, `marker_concepts` | You delete the lecture or course |
 | Generated concept map and questions | `concepts`, `concept_edges`, `concept_occurrences`, `items`, `item_secrets` | You delete the lecture or course |
 | Your answers, confidence ratings, practice chats | `diagnostic_sessions`, `diagnostic_responses`, `activities`, `messages`, `attempts` | You delete the lecture or course |
