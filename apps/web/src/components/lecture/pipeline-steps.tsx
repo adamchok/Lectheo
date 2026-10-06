@@ -59,13 +59,15 @@ export function StepList({ lecture }: { lecture: LectureResponse }) {
     return i === done && failedAt < 0 ? 'current' : 'pending'
   }
   return (
-    <ol className="space-y-2 text-sm">
+    // role="list": Safari drops list semantics from styled lists.
+    <ol role="list" className="space-y-2 text-sm">
       {steps.map((step, i) => {
         const state = stateOf(i)
         const Icon = STEP_ICONS[state]
         return (
           <li
             key={step}
+            aria-current={state === 'current' ? 'step' : undefined}
             className={cn(
               'flex items-center gap-2',
               state === 'pending' && 'text-muted-foreground',

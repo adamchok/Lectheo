@@ -22,7 +22,8 @@ export interface LectureWithCourse {
 const isUuid = (id: string): boolean => z.uuid().safeParse(id).success
 
 /** The CS50 library belongs to the sample experience (F0.7): sample and owner accounts only. */
-export const canReadLibrary = (actor: Actor): boolean => actor.kind !== 'google'
+export const canReadLibrary = (actor: Actor): boolean =>
+  actor.kind === 'sample' || actor.kind === 'owner'
 
 /** SQL condition on `courses` for the read rule. Every read path uses this, never its own. */
 export const readableCourse = (actor: Actor) =>

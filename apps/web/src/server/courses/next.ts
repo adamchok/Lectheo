@@ -53,6 +53,7 @@ const loadLectureFlags = (db: DbLike, courseId: string, userId: string) =>
       source: lectures.source,
       status: lectures.status,
       durationMs: lectures.durationMs,
+      media: lectures.media,
       hasMarkers: sql<boolean>`exists (select 1 from markers m
         where m.lecture_id = "lectures"."id" and m.user_id = ${userId} and m.deleted_at is null)`,
       hasSession: sql<boolean>`exists (select 1 from diagnostic_sessions s
@@ -71,10 +72,21 @@ type LectureFlags = Awaited<ReturnType<typeof loadLectureFlags>>[number]
 const lectureTitle = (l: Pick<LectureFlags, 'source' | 'seq' | 'title'>): string =>
   l.source === 'library' ? `Lecture ${l.seq}` : l.title
 
+/**
+ * What the student will actually watch: library lectures play only the media window
+ * (`startMs..endMs`, e.g. 45 min of a 2 h video); otherwise the whole recording.
+ */
+export function watchMs(l: Pick<LectureFlags, 'durationMs' | 'media'>): number | null {
+  const start = l.media?.startMs
+  const end = l.media?.endMs
+  if (typeof start === 'number' && typeof end === 'number' && end > start) return end - start
+  return l.durationMs
+}
+
 const lectureRef = (l: LectureFlags): LectureRef => ({
   lectureId: l.id,
   title: lectureTitle(l),
-  durationMs: l.durationMs,
+  durationMs: watchMs(l),
 })
 
 /**
@@ -90,6 +102,9 @@ function lectureSteps(rows: LectureFlags[]) {
       .filter((l) => l.status === 'processing' || l.status === 'map_ready')
       .map(lectureRef),
     failed: rows.filter((l) => l.status === 'failed').map(lectureRef),
+    unfinished: rows
+      .filter((l) => l.status === 'draft' || l.status === 'uploading')
+      .map(lectureRef),
     unwatched: ready
       .filter((l) => l.source === 'library' && !l.hasMarkers && !l.hasSession)
       .map(lectureRef),
@@ -200,6 +215,7 @@ export async function getNextStep(
     unwatchedLibraryLectures: steps.unwatched,
     pendingDiagnostics: steps.pending,
     failedLectures: steps.failed,
+    unfinishedLectures: steps.unfinished,
     nextLectureSeq: nextLectureSeq(course, rows),
     stumpEnabled: FEATURES.stump,
     rankedConcepts: [],

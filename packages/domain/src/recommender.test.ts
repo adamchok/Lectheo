@@ -143,6 +143,7 @@ describe('dashboardNextStep', () => {
     activityTypes: new Map(),
     stumpEnabled: true,
     failedLectures: [],
+    unfinishedLectures: [],
     nextLectureSeq: null,
   }
   const valid = (step: unknown) => expect(NextStepResponse.safeParse(step).success).toBe(true)
@@ -274,6 +275,9 @@ describe('dashboardNextStep', () => {
   it('then a failed lecture, then adding a lecture: never "all caught up"', () => {
     const failed = dashboardNextStep({ ...base, failedLectures: [{ lectureId: L3, title: 'Week 3' }], nextLectureSeq: 4 })
     expect(failed).toMatchObject({ kind: 'processing', lectureId: L3, reason: 'Processing Week 3 stopped. Open it to try again.' })
+
+    const unfinished = dashboardNextStep({ ...base, unfinishedLectures: [{ lectureId: L3, title: 'Week 3' }], nextLectureSeq: 4 })
+    expect(unfinished).toMatchObject({ kind: 'processing', lectureId: L3, reason: 'Finish adding Week 3.' })
 
     const next = dashboardNextStep({ ...base, nextLectureSeq: 4 })
     expect(next).toEqual({ kind: 'add_lecture', reason: 'Add Lecture 4 to keep going.', evidence: [], estimateMinutes: null, payoff: null, alsoWorthDoing: [] })

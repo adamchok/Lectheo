@@ -169,16 +169,16 @@ Joins concepts, edges, layout, this user's markers and **mastery computed on rea
 
 | Field | Meaning |
 |---|---|
-| `kind` | `processing`: a lecture of the student's is in the pipeline (`processing` or `map_ready`; the dashboard shows its steps), or, when nothing else is left, one whose processing failed. `add_lecture`: nothing left to do in the course (replaced `none`). |
+| `kind` | `processing`: a lecture of the student's is in the pipeline (`processing` or `map_ready`; the dashboard shows its steps), or, when nothing else is left, one whose processing failed (to retry) or that is still being added (`draft`/`uploading`: "Finish adding Week 1"). `add_lecture`: nothing left to do in the course (replaced `none`). |
 | `reason` | The card's headline, written for the student (see the examples below). |
 | `evidence` | 0–2 items `{ kind: "marked_lost"|"marked_important"|"confident_mistake"|"wrong"|"partial", text, source?: { lectureId, tMs } }`, strongest first. Built from the student's own markers and attempts only. |
-| `estimateMinutes` | Watch: the lecture's duration. Diagnostic: 3. Spot the flaw, teach-back, transfer, Stump: 5. `null` for `processing` and `add_lecture`. |
+| `estimateMinutes` | Watch: the part that plays (`media.endMs − media.startMs` for library lectures, else the recording's duration). Diagnostic: 3. Spot the flaw, teach-back, transfer, Stump: 5. `null` for `processing` and `add_lecture`. |
 | `payoff` | One line on what finishing the step changes, or `null`. Rules in [[Lectheo Architecture#6.3 Practice recommender|Architecture §6.3]]. |
 | `alsoWorthDoing` | 0–2 items `{ conceptId, conceptName, state, confidentMistake, activityType, reason }`: the next ranked concepts after the top one. Empty unless `kind = "activity"`. |
 
 Examples:
 - `{ kind: "watch", reason: "Lecture 5 is ready. Watch it and tap when you're lost.", evidence: [], estimateMinutes: 45, payoff: "Your marks decide what the diagnostic asks." }`
-- `{ kind: "activity", activityType: "spot_flaw", conceptName: "Hash tables", reason: "You were sure about hash tables, but got it wrong. Let's fix that.", evidence: [{ kind: "confident_mistake", text: "Sure but wrong, twice, in the diagnostic" }, { kind: "marked_lost", text: "You marked I'm lost at 12:41 in Lecture 5", source: { lectureId: "…", tMs: 761000 } }], estimateMinutes: 5, payoff: "A correct answer here clears the confident mistake." }`
+- `{ kind: "activity", activityType: "spot_flaw", conceptName: "Hash tables", reason: "You were sure about Hash tables, but got it wrong. Let's fix that.", evidence: [{ kind: "confident_mistake", text: "Sure but wrong, twice, in the diagnostic" }, { kind: "marked_lost", text: "You marked I'm lost at 12:41 in Lecture 5", source: { lectureId: "…", tMs: 761000 } }], estimateMinutes: 5, payoff: "A correct answer here clears the confident mistake." }`
 
 ---
 

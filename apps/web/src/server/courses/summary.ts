@@ -43,7 +43,7 @@ const courseColumns = (userId: string) => ({
   attribution: courses.attribution,
   lectureCount: sql<number>`(select count(*) from lectures l
     where l.course_id = "courses"."id")`.mapWith(Number),
-  lastActiveMs: lastActiveMs(userId),
+  lastActiveMs: lastActiveMs(userId).as('last_active_ms'),
 })
 
 type CourseRow = Pick<Course, 'id' | 'title' | 'kind' | 'attribution'> & {
@@ -96,7 +96,8 @@ async function summarize(db: DbLike, userId: string, rows: CourseRow[]): Promise
 export async function listCourseSummaries(db: DbLike, actor: Actor): Promise<CourseSummary[]> {
   const order = canReadLibrary(actor)
     ? [asc(courses.kind), asc(courses.createdAt), asc(courses.id)]
-    : [sql`${lastActiveMs(actor.userId)} desc nulls last`, desc(courses.createdAt), asc(courses.id)]
+    : // The select's alias: computed once per course.
+      [sql`"last_active_ms" desc nulls last`, desc(courses.createdAt), asc(courses.id)]
   const rows = await db
     .select(courseColumns(actor.userId))
     .from(courses)

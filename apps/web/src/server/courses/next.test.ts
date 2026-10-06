@@ -96,6 +96,20 @@ describe('GET /courses/{id}/next', () => {
     expect(step.reason).toContain('You were sure about Loops')
   })
 
+  it('estimates a watch by the part that plays, not the whole video', async () => {
+    // L5-like: a 2:03:50 video that plays 1:16:30–2:01:30.
+    await f.exec(`
+      UPDATE lectures SET duration_ms = 7430000,
+        media = '{"youtubeId":"x","startMs":4590000,"endMs":7290000}'::jsonb
+      WHERE id = '${ID.L1}';
+      UPDATE lectures SET duration_ms = 600000 WHERE id = '${ID.L2}';
+    `)
+    expect((await getNextStep(ACTOR_A, ID.LIB, f.db)).estimateMinutes).toBe(45)
+    await addMarker(f, { lectureId: ID.L1, userId: ID.A })
+    // No media window: the recording's own length.
+    expect((await getNextStep(ACTOR_A, ID.LIB, f.db)).estimateMinutes).toBe(10)
+  })
+
   it('sends an undiagnosed personal lecture to the diagnostic', async () => {
     expect(await getNextStep(ACTOR_A, ID.P, f.db)).toMatchObject({
       kind: 'diagnostic',
@@ -215,6 +229,18 @@ describe('GET /courses/{id}/next', () => {
         estimateMinutes: null,
       })
     })
+
+    it.each(['draft', 'uploading'])(
+      'asks to finish a %s lecture, not to add the next one',
+      async (status) => {
+        await addLecture(status)
+        expect(await getNextStep(ACTOR_G, COURSE, f.db)).toMatchObject({
+          kind: 'processing',
+          lectureId: LECTURE,
+          reason: 'Finish adding Week 1.',
+        })
+      },
+    )
 
     it('points at a failed lecture instead of a dead end', async () => {
       await addLecture('failed')

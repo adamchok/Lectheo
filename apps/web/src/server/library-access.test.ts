@@ -60,6 +60,9 @@ describe('library access by account kind', () => {
         ('${SESSION}', '${ID.G}', '${ID.L1}', '{}');
     `)
     await expect(getActivity(ACTOR_G, ACTIVITY, f.db)).rejects.toMatchObject(notFound)
+    // Replaying the create (same id) mustn't reveal the library concept either.
+    const replay = { id: ACTIVITY, conceptId: ID.C1, type: 'teach_back' as const }
+    await expect(createActivity(ACTOR_G, replay, f.db)).rejects.toMatchObject(notFound)
     await expect(getSession(ACTOR_G, SESSION, f.db)).rejects.toMatchObject(notFound)
     await expect(getResults(ACTOR_G, SESSION, f.db)).rejects.toMatchObject(notFound)
   })

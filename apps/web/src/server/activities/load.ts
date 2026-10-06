@@ -90,7 +90,8 @@ export async function buildContext(
   concept?: ConceptRow,
 ): Promise<ActivityContext> {
   const [conceptRow, item] = await Promise.all([
-    concept ?? loadConceptById(db, activity.conceptId),
+    // Same read rule as a new activity: a leftover row on unreadable (library) content is a 404.
+    concept ?? loadConceptForRead(db, actor, activity.conceptId),
     loadItem(db, activity.itemId),
   ])
   let secrets: Promise<ItemSecretsRow> | undefined
@@ -104,10 +105,4 @@ export async function buildContext(
     secrets: () => (secrets ??= loadSecrets(db, item)),
     visibleMessages: () => visibleMessages(db, activity.id),
   }
-}
-
-async function loadConceptById(db: DbLike, id: string): Promise<ConceptRow> {
-  const [row] = await db.select().from(concepts).where(eq(concepts.id, id)).limit(1)
-  if (!row) throw notFound()
-  return row
 }

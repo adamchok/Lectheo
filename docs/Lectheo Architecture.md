@@ -384,13 +384,14 @@ dashboard "Next step" (for that course): processing lecture (show steps) → unw
                  → pending diagnostic → top concept
 no courses (Google first run) → no next step; the first-run screen replaces the card
 all concepts green → Stump the AI on the mastered concept practiced longest ago
-then a lecture whose processing failed (kind processing, to retry)
+then a lecture whose processing failed (kind processing, to retry), then one still being added
+                 (draft/uploading: "Finish adding …")
 nothing at all left → add_lecture ("Add Lecture N+1" in an own course / "Add your next lecture")
 ```
 
 **Card content ([[Lectheo Product Spec#F0. Accounts, sample account and dashboard — Must|F0.10–F0.12]]).** The response carries the evidence, estimate and payoff, so the card never computes them. The rules are pure functions in `packages/domain/src/recommender.ts`; `server/courses/next.ts` only gathers data:
 - **Evidence** (≤ 2, strongest first): confident mistake → wrong or partial in the latest attempt ("Partial in Spot the flaw") → a *lost* marker linked to the concept (with its lecture moment) → an *important* marker. Only the student's own data.
-- **Estimate:** watch = lecture duration (`null` when unknown); diagnostic = 3 min; any practice activity = 5 min. Fixed values, revisited once real timings exist.
+- **Estimate:** watch = the part that plays (the library's media window, else the recording's duration; `null` when unknown); diagnostic = 3 min; any practice activity = 5 min. Fixed values, revisited once real timings exist.
 - **Payoff:** confident mistake → "A correct answer here clears the confident mistake." · red → "A correct answer moves it to Getting there." · amber with one independent type done → "One more independent win in a different activity → Mastered." · watch → "Your marks decide what the diagnostic asks." · diagnostic → "Finds the mistakes you're sure about." · Stump on a green concept → "The hardest test there is: write a question the AI can't answer."
 - **Also worth doing:** ranked concepts 2 and 3 from the same ranking, each with its own next activity type and reason.
 

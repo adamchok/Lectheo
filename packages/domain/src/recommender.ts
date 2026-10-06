@@ -174,6 +174,8 @@ export interface NextStepInput {
   readonly stumpEnabled: boolean
   /** The student's lectures whose processing failed, in course order. */
   readonly failedLectures: readonly LectureRef[]
+  /** The student's lectures still being added (draft or uploading), in course order. */
+  readonly unfinishedLectures: readonly LectureRef[]
   /** Seq for "Add Lecture N", or null when the course doesn't number lectures (library). */
   readonly nextLectureSeq: number | null
 }
@@ -207,7 +209,7 @@ const noExtras = () => ({
 /**
  * Dashboard "Next step" card (F0.4, F0.9–F0.12, Architecture §6.3): processing lecture →
  * unwatched library lecture → pending diagnostic → top concept → Stump on the concept mastered
- * longest ago → failed lecture → add a lecture. Never a dead end.
+ * longest ago → failed lecture → unfinished (draft) lecture → add a lecture. Never a dead end.
  */
 export function dashboardNextStep(input: NextStepInput): NextStepResponse {
   const processing = input.processingLectures[0]
@@ -251,6 +253,10 @@ export function dashboardNextStep(input: NextStepInput): NextStepResponse {
       `Processing ${failed.title} stopped. Open it to try again.`,
       null,
     )
+  }
+  const unfinished = input.unfinishedLectures[0]
+  if (unfinished) {
+    return lectureStep('processing', unfinished, `Finish adding ${unfinished.title}.`, null)
   }
   return {
     ...noExtras(),

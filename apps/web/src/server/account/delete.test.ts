@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { Actor } from '../auth'
 import {
   ACTOR_A,
   ACTOR_S,
@@ -11,6 +12,9 @@ import {
 } from '../courses/test-fixtures'
 import type { RemoveObjects } from '../lectures/write'
 import { deleteAccount } from './delete'
+
+/* The course fixture's A is an owner account (it reads the library); deletion is Google-only. */
+const GOOGLE_A: Actor = { ...ACTOR_A, kind: 'google' }
 
 let f: Fixture
 const deps = {
@@ -84,7 +88,7 @@ describe('DELETE /me', () => {
         'usage_counters',
       ]),
     )
-    await deleteAccount(ACTOR_A, f.db, deps)
+    await deleteAccount(GOOGLE_A, f.db, deps)
 
     expect(await rowsOfA()).toEqual({ llm_calls: 1 })
     expect(deps.removeUserObjects).toHaveBeenCalledWith(ID.A)
@@ -123,7 +127,7 @@ describe('DELETE /me', () => {
         VALUES ('0190a000-0000-7000-8000-0000000000c2', 'personal', '${ID.A}', 'Chem', now() - interval '1 day');
       UPDATE lectures SET status = 'map_ready' WHERE id = '${ID.PL2}';
     `)
-    await expect(deleteAccount(ACTOR_A, f.db, deps)).rejects.toMatchObject({
+    await expect(deleteAccount(GOOGLE_A, f.db, deps)).rejects.toMatchObject({
       code: 'already_processing',
     })
     expect((await rowsOfA()).courses).toBe(2)
@@ -133,24 +137,24 @@ describe('DELETE /me', () => {
 
   it('finishes on retry after Storage failed', async () => {
     deps.removeUserObjects.mockRejectedValueOnce(new Error('storage down'))
-    await expect(deleteAccount(ACTOR_A, f.db, deps)).rejects.toThrow('storage down')
+    await expect(deleteAccount(GOOGLE_A, f.db, deps)).rejects.toThrow('storage down')
     // Courses are gone, but the profile (and so the session) remains for the retry.
     expect((await rowsOfA()).profiles).toBe(1)
     expect(deps.deleteAuthUser).not.toHaveBeenCalled()
 
-    await deleteAccount(ACTOR_A, f.db, deps)
+    await deleteAccount(GOOGLE_A, f.db, deps)
     expect(await rowsOfA()).toEqual({ llm_calls: 1 })
     expect(deps.deleteAuthUser).toHaveBeenCalledOnce()
   })
 
   it('finishes on retry after the auth user deletion failed', async () => {
     deps.deleteAuthUser.mockRejectedValueOnce(new Error('auth down'))
-    await expect(deleteAccount(ACTOR_A, f.db, deps)).rejects.toThrow('auth down')
+    await expect(deleteAccount(GOOGLE_A, f.db, deps)).rejects.toThrow('auth down')
     expect(await rowsOfA()).toEqual({ llm_calls: 1 })
 
     // The session is still valid, so getActor() recreates an empty profile for the retry.
     await f.exec(`INSERT INTO profiles (id, kind) VALUES ('${ID.A}', 'google')`)
-    await deleteAccount(ACTOR_A, f.db, deps)
+    await deleteAccount(GOOGLE_A, f.db, deps)
     expect(await rowsOfA()).toEqual({ llm_calls: 1 })
     expect(deps.deleteAuthUser).toHaveBeenCalledTimes(2)
   })
