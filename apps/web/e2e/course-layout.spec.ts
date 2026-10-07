@@ -26,6 +26,8 @@ test('node opens a sheet over the full-width map; Esc closes it; markers sit bel
 
   const canvas = page.locator('.react-flow')
   const markers = page.getByRole('region', { name: 'Your markers' })
+  // Measure once the canvas replaced its loading skeleton.
+  await expect(page.locator('.react-flow__node').first()).toBeVisible()
   await expect(markers).toBeVisible()
   const [mapBox, markersBox] = await Promise.all([canvas.boundingBox(), markers.boundingBox()])
   // Full width: no 352px column beside the map; Your markers below it, as wide.
