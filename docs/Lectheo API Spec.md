@@ -256,7 +256,7 @@ The Study brief ([[Lectheo Product Spec#F9. Study mode — Must|F9]]). `200 { le
 
 ### `POST /lectures/{id}/diagnostic`
 Creates, or returns the active, session for (user, lecture) from **verified** items. Items this user has already seen are excluded.
-`200 { sessionId, items: [{ id, conceptId, stem, position }], maxFollowUps: 2, note? }`. Options are **not** included. `note` explains a shorter diagnostic (fewer than 3 verified items) or a general check (no markers).
+`200 { sessionId, items: [{ id, conceptId, stem, position }], maxFollowUps: 2, note? }`. Options are **not** included. `note` explains a shorter diagnostic (fewer than 3 verified items) or a general check (no markers). *(decided 7 Oct 2026, to be built)* ([[Lectheo Product Spec#F3. Adaptive, confidence-rated diagnostic — Must|F3.9–F3.11]]): optional body `{ round: "core" | "rest" }` (default `core`). `core` spreads baseline concepts one per chapter after the marked ones. `rest` plans one unseen verified item per concept of the lecture that is still *Not tested* for this user, in chapter order, at most 8; nothing left → `409 nothing_to_test`. The one-active-session rule is unchanged.
 
 ### `GET /diagnostic/{sid}`
 Resume: `{ sessionId, status, items: [{ id, stem, position, isFollowUp, confidence?, answered, correct? }] }`
@@ -285,6 +285,8 @@ The item must belong to the session (planned or follow-up), otherwise `404`. A s
 ### `GET /diagnostic/{sid}/results`
 Ordered confident mistakes → wrong → unsure-right → right:
 `200 { findings: [{ itemId, conceptId, conceptName, finding, confidence, source }], summary: {…}, note?: "No flags this time — here's a general check." }`
+
+*(decided 7 Oct 2026, to be built)* ([[Lectheo Product Spec#F3. Adaptive, confidence-rated diagnostic — Must|F3.9–F3.11]]): adds `coverage: { tested, total, noQuestion, untested, byChapter: [{ chapterId, title, tested, total }] }` for the lecture (any round, any activity: *tested* = mastery state is not *Not tested*). `untested` counts concepts *Test the rest* can still ask about (`noQuestion` ones excluded); `byChapter` is `[]` without chapters.
 
 ---
 

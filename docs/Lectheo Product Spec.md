@@ -148,6 +148,9 @@ There are four ways to add a lecture. All of them feed the same pipeline after t
 | F3.6 | Results are ordered: confident mistakes → wrong → unsure-but-right → right. | Must |
 | F3.7 | Only questions that passed **independent verification** are shown ([[#8. Product quality rules\|§8.1]]). If fewer than 3 verified questions exist, the diagnostic runs shorter and says so. | Must |
 | F3.8 | Results set the initial mastery state ([[#F6. Mastery map — Must\|F6]]) and the practice order ([[#F4. Understanding-level practice\|F4]]). | Must |
+| F3.9 | *(decided 7 Oct 2026, to be built)* **Baseline spread across the lecture:** after marked concepts (F3.1 order unchanged), unmarked baseline concepts are taken **one per chapter in turn** (chapter order, learning order inside a chapter), so a run without marks no longer asks only about the first minutes. Lectures without chapters spread evenly through lecture order. | Must |
+| F3.10 | *(decided 7 Oct 2026, to be built)* **Coverage and "test the rest":** the results show "Tested 6 of 14 concepts" and, per chapter, "Chapter 3 · 2 of 3 tested". If any concept of the lecture is still *Not tested*, the results end with **Test the other 8 →**, which starts a new round of one question per untested concept (in chapter order, at most 8 per round, repeatable) under the same rules: confidence first, immediate feedback, follow-ups (max 2 per round), verified items only. The first round stays short and targeted. | Must |
+| F3.11 | *(decided 7 Oct 2026, to be built)* **Every concept can be tested:** the pipeline already drafts two diagnostic questions per concept for user lectures (the CS50 library has them too). A concept left with no verified question after the redraft round counts as "No checked question yet" in the coverage line, never as tested, and is skipped by *Test the rest*. | Must |
 
 ### F4. Understanding-level practice
 
@@ -363,7 +366,7 @@ Full analysis, profiles, feature matrix and sources: **[[Lectheo Competition]]**
 
 **In scope (Must):** sign-in page (Google + sample account); dashboard; CS50 library with watch mode; import recording + transcript; audio and transcript upload; markers; concept map + list view; adaptive diagnostic; spot the flaw; teach-back; Socratic feedback; mastery map; consent, deletion and limits; Study mode ([[#F9. Study mode — Must|F9]], built 7 Oct 2026); chapters ([[#F11. Chapters — Must|F11]], built 7 Oct 2026).
 
-**Decided 7 Oct 2026, to be built:** Study redesign ([[#F9. Study mode — Must|F9.9–F9.15]]: by chapter, outline, *Explain in depth*); course page layout ([[#F2. Concept map — Must|F2.10–F2.11]]: full-width map, markers timeline below it).
+**Decided 7 Oct 2026, to be built:** Study redesign ([[#F9. Study mode — Must|F9.9–F9.15]]: by chapter, outline, *Explain in depth*); course page layout ([[#F2. Concept map — Must|F2.10–F2.11]]: full-width map, markers timeline below it); diagnostic coverage ([[#F3. Adaptive, confidence-rated diagnostic — Must|F3.9–F3.11]]: baseline spread across chapters, *Test the rest*).
 
 **Built 7 Oct 2026:** YouTube lectures ([[#F10. YouTube lectures — Should (after a spike)|F10]], Should), behind the `FEATURE_YOUTUBE_LECTURES` switch; F10.9 passed after the review.
 
@@ -422,6 +425,8 @@ Full analysis, profiles, feature matrix and sources: **[[Lectheo Competition]]**
 - [x] **Product name: Lectheo** (decided 4 Oct 2026). When checked, lectheo.com was unregistered and github.com/lectheo was free; register both. Search engines may correct it to near-misses (Lecto, LectO, Lectio), so always write "Lectheo (LEK-thee-oh)" in the README and demo video.
 - [ ] Final tagline.
 - [ ] Any evidence from 3–5 real students that they would tap "I'm lost" during a lecture? (Strengthens Real-World Impact.)
+
+*Decided on 7 Oct 2026:* **Diagnostic coverage** (F3.9–F3.11): a 3–6 question first round can leave most of a long lecture untested, and without marks it only asked about the start. Baseline questions are now spread one per chapter, the results show how many concepts were tested (overall and per chapter), and **Test the other N** runs further rounds on untested concepts only. Rejected: testing every concept every time (long, and marks would stop mattering). No extra cost: user lectures already get two diagnostic questions per concept.
 
 *Decided on 7 Oct 2026:* **Study redesign and course layout** (F9.9–F9.15, F2.10–F2.11): the brief is organised by chapter (a concept sits where it first appears) with a sticky outline, all key points kept, quieter blocks and "Watch from 12:52 · 1 min 30 s". Each concept gets a collapsed **Explain in depth** (how it works, worked example, common mistakes, connects to), written from the lecture with segment citations, generated in the pipeline in parallel with items (≈ $0.10 per lecture), never shown 🔒 data, and **no outside links** (models invent URLs). This reverses F9.9's "no new AI text": key points alone were too thin to prepare for the diagnosis. The course page gives the map the full width (node panel as a sheet) and moves *Your markers* below it, on the real lecture length with chapter ticks, because the 352px column squeezed the map and made marker dots overlap.
 
