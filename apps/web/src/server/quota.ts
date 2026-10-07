@@ -7,7 +7,7 @@ import { ApiError } from './errors'
 /* Per-user daily quotas and the global spend governor (Architecture §9.2). */
 
 const MB = 1024 * 1024
-const MINUTE_MS = 60_000
+export const MINUTE_MS = 60_000
 
 export type Tier = 'sample' | 'google'
 
@@ -26,6 +26,8 @@ export const GOVERNOR = {
   hourlyIntakePauseUsd: 3,
   intakePauseFraction: 0.75,
   aiPauseFraction: 0.95,
+  /** Google key (F10): ≥ 25% of its budget in one hour also pauses new YouTube lectures. */
+  googleHourlyPauseFraction: 0.25,
 } as const
 
 /** ponytail: the `owner` account uses the Google tier. */
@@ -155,21 +157,32 @@ export async function evaluateSpend(
 
 /**
  * The direct Google key's own cap (ADR-017, F10.9): its calls are logged with gateway_key
- * 'google', outside the prod gateway budget. At 75 % new YouTube lectures are refused; at 100 %
- * transcription calls stop. Other features never look at it.
+ * 'google', outside the prod gateway budget. At 75 % (or 25 % within the last hour) new YouTube
+ * lectures and their transcription Retries are refused; at 100 % transcription calls stop.
+ * Other features never look at it.
+ * ponytail: a check, not a reservation; concurrent starts can overshoot by the transcriptions
+ * already running (≤ ~$0.85 each). The hourly pause bounds a burst; the Google budget alert backs it.
  */
 export async function googleSpend(
   db: DbLike,
   budgetUsd: number,
+  now = new Date(),
 ): Promise<{ spentUsd: number; intakePaused: boolean; exhausted: boolean }> {
+  const hourAgo = new Date(now.getTime() - 60 * MINUTE_MS)
   const [row] = await db
-    .select({ total: sql<string>`coalesce(sum(${llmCalls.costUsd}), 0)` })
+    .select({
+      total: sql<string>`coalesce(sum(${llmCalls.costUsd}), 0)`,
+      lastHour: sql<string>`coalesce(sum(${llmCalls.costUsd}) filter (where ${gte(llmCalls.createdAt, hourAgo)}), 0)`,
+    })
     .from(llmCalls)
     .where(eq(llmCalls.gatewayKey, 'google'))
   const spentUsd = Number(row?.total ?? 0)
+  const lastHourUsd = Number(row?.lastHour ?? 0)
   return {
     spentUsd,
-    intakePaused: spentUsd >= GOVERNOR.intakePauseFraction * budgetUsd,
+    intakePaused:
+      spentUsd >= GOVERNOR.intakePauseFraction * budgetUsd ||
+      lastHourUsd >= GOVERNOR.googleHourlyPauseFraction * budgetUsd,
     exhausted: spentUsd >= budgetUsd,
   }
 }

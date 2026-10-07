@@ -22,7 +22,7 @@ import {
   submitTranscriptionStep,
   type PollStatus,
 } from './transcribe'
-import { transcribeVideoStep } from './transcribe-video'
+import { transcribeVideoStep, type VideoProgress } from './transcribe-video'
 
 /*
  * Workflow steps ('use step', ADR-002): full Node access, retried on error (FatalError skips the
@@ -84,9 +84,10 @@ export async function fetchTranscript(lectureId: string): Promise<void> {
   await fetchTranscriptStep(appDb(), lectureId, sttClient())
 }
 
-export async function transcribeVideo(lectureId: string): Promise<void> {
+/** One wave of chunks per call; the workflow repeats it until `done`. */
+export async function transcribeVideo(lectureId: string): Promise<VideoProgress> {
   'use step'
-  await transcribeVideoStep(appDb(), lectureId)
+  return transcribeVideoStep(appDb(), lectureId)
 }
 
 export async function extractConcepts(lectureId: string): Promise<void> {

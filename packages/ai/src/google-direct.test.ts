@@ -69,9 +69,12 @@ describe('transcriber role: never the AI Gateway (ADR-017)', () => {
       videoMetadata: { startOffset: '4350s', endOffset: '4470s' },
     })
     expect(body.contents[0].parts[1].text).toContain('between 1:12:30 and 1:14:30')
+    expect(body.contents[0].parts[1].text).toContain('clean verbatim')
     expect(body.generationConfig).toMatchObject({
       mediaResolution: 'MEDIA_RESOLUTION_LOW',
       responseMimeType: 'application/json',
+      maxOutputTokens: 8_192,
+      thinkingConfig: { thinkingBudget: 1_024 },
     })
   })
 
@@ -97,7 +100,7 @@ describe('transcriber: llm_calls logging', () => {
       task: 'transcribeChunk',
       role: 'transcriber',
       model: 'gemini-3.8-flash',
-      promptVersion: 'transcribe-chunk@1',
+      promptVersion: 'transcribe-chunk@2',
       gatewayKey: 'google',
       inputTokens: 11_000,
       outputTokens: 1_500,
@@ -135,6 +138,28 @@ describe('transcriber: retries', () => {
     const res = await runTask(transcribeChunkTask, INPUT, rec.ctx({ fetch }))
     expect(res.outcome).toBe('ok')
     expect(fetch).toHaveBeenCalledTimes(3)
+  })
+
+  it('retries 500 and 504 too', async () => {
+    const fetch = scriptedFetch([() => status(500), () => status(504), () => ok()])
+    const rec = recorder()
+    await runTask(transcribeChunkTask, INPUT, rec.ctx({ fetch }))
+    expect(fetch).toHaveBeenCalledTimes(3)
+  })
+
+  it('stops retrying once the caller has aborted (the step deadline)', async () => {
+    const deadline = new AbortController()
+    const fetch = scriptedFetch([
+      () => {
+        deadline.abort()
+        return status(503)
+      },
+    ])
+    const rec = recorder()
+    await expect(
+      runTask(transcribeChunkTask, INPUT, rec.ctx({ fetch, abortSignal: deadline.signal })),
+    ).rejects.toBeInstanceOf(GoogleHttpError)
+    expect(fetch).toHaveBeenCalledTimes(1)
   })
 
   it('gives up after four 503s', async () => {

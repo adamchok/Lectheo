@@ -9,15 +9,18 @@ import type { Actor } from '../auth'
 import { appDb, type DbLike } from '../db'
 import { serverEnv } from '../env'
 import { ApiError, notFound } from '../errors'
+import { youtubeLecturesEnabled } from '../features'
 import { loadCourseForWrite } from '../ownership'
 import { assertGoogleIntakeOpen, consume, MEDIA_LIMITS, tierOf } from '../quota'
 import {
+  cachedRefusal,
   checkVideo,
   requireYoutubeId,
   youtubeClient,
   type YoutubeClient,
   type YoutubeVideo,
 } from '../youtube'
+import { takeRateLimit, YOUTUBE_CREATE_LIMIT } from '../rate-limit'
 import { toLectureDto } from './read'
 
 /* POST /lectures (API Spec §5, F0.7, F1.5–F1.7, F8.3, F10.2–F10.4). */
@@ -53,6 +56,7 @@ export async function createLecture(
   youtube?: YoutubeClient,
 ): Promise<LectureDto> {
   if (input.source === 'live') throw notFound()
+  if (input.source === 'youtube' && !youtubeLecturesEnabled()) throw notFound()
   const existing = await findOwned(db, actor, input.id)
   if (existing !== undefined) return existing
 
@@ -100,9 +104,9 @@ export async function createLecture(
 }
 
 /**
- * F10.3–F10.4 on the server (never trust the preview the client saw): the Google spend cap, then
- * every Data API check. Too long for a sample account → 403 like any other source; any other
- * refusal → 422 with the reason in plain words.
+ * F10.3–F10.5 on the server (never trust the preview the client saw): the Google spend cap, then
+ * every Data API check and a cached verdict. Too long → 403 (sample) or 413 like any other
+ * source; any other refusal → 422 with `details.reason` and the reason in plain words.
  */
 async function checkYoutube(
   actor: Actor,
@@ -111,8 +115,13 @@ async function checkYoutube(
   client: YoutubeClient,
 ): Promise<YoutubeVideo> {
   await assertGoogleIntakeOpen(db, serverEnv().GOOGLE_AI_BUDGET_USD)
-  const video = await client.video(requireYoutubeId(url))
-  const reason = checkVideo(video, tierOf(actor))
+  const videoId = requireYoutubeId(url)
+  // Refused creates cost nothing in quota, so they're metered here (Data API: 10k units a day).
+  if (!(await takeRateLimit(db, `youtube-create:${actor.userId}`, YOUTUBE_CREATE_LIMIT))) {
+    throw new ApiError('rate_limited', 'Too many YouTube lectures at once. Try again shortly.')
+  }
+  const video = await client.video(videoId)
+  const reason = checkVideo(video, tierOf(actor)) ?? (await cachedRefusal(db, videoId))
   if (video && reason === 'too_long') assertDuration(actor, video.durationMs)
   if (!video || reason) {
     const maxMinutes = MEDIA_LIMITS[tierOf(actor)].maxDurationMs / MINUTE_MS
@@ -154,5 +163,9 @@ export function assertDuration(actor: Actor, durationMs: number): void {
       details,
     )
   }
-  throw new ApiError('payload_too_large', `Lectures can be up to ${limit / HOUR_MS} hours long.`, details)
+  throw new ApiError(
+    'payload_too_large',
+    `Lectures can be up to ${limit / HOUR_MS} hours long.`,
+    details,
+  )
 }

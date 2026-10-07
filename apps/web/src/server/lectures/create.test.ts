@@ -8,6 +8,7 @@ import {
   type Fixture,
   ID,
 } from '../courses/test-fixtures'
+import { resetEnvCache } from '../env'
 import { fakeYoutubeClient } from '../youtube'
 import { createLecture, type CreateLectureInput } from './create'
 
@@ -123,9 +124,9 @@ describe('POST /lectures', () => {
       code: 'payload_too_large',
       status: 413,
     })
-    await expect(
-      createLecture(ACTOR_A, imp(NEW, 3 * 60 * MIN, ID.P), f.db),
-    ).rejects.toMatchObject({ code: 'payload_too_large' })
+    await expect(createLecture(ACTOR_A, imp(NEW, 3 * 60 * MIN, ID.P), f.db)).rejects.toMatchObject({
+      code: 'payload_too_large',
+    })
     // Rejected before the quota is touched: the sample account can still add one.
     expect(await createLecture(ACTOR_S, imp(NEW, 19 * MIN), f.db)).toMatchObject({ id: NEW })
   })
@@ -148,6 +149,8 @@ describe('POST /lectures, source youtube (F10.2–F10.4)', () => {
       gatewayKey,
       costUsd,
       outcome: 'ok',
+      // Older than an hour: this test is about the total, not the hourly cap.
+      createdAt: new Date(Date.now() - 2 * 60 * MIN),
     })
   const create = (actor = ACTOR_A, over: Partial<CreateLectureInput> = {}) =>
     createLecture(actor, yt(over), f.db, new Date(), fakeYoutubeClient)
@@ -187,6 +190,37 @@ describe('POST /lectures, source youtube (F10.2–F10.4)', () => {
     })
     expect(await f.db.select().from(lectures).where(eq(lectures.id, NEW))).toHaveLength(0)
     expect(await lecturesUsed(ID.A)).toBe(0)
+  })
+
+  it('refuses a video with a cached verdict (no speech) before any spend', async () => {
+    await f.exec(`INSERT INTO youtube_transcripts (video_id, model, prompt_version, duration_ms,
+      cues, refusal) VALUES ('6Svu_ae5ebk', 'fake', 'transcribe-chunk@2', 1, '[]'::jsonb,
+      'no_speech')`)
+    await expect(create()).rejects.toMatchObject({
+      code: 'unprocessable_input',
+      details: { reason: 'no_speech' },
+    })
+    expect(await lecturesUsed(ID.A)).toBe(0)
+  })
+
+  it('rate-limits YouTube creates (refusals use no quota): 10 per 10 minutes', async () => {
+    for (let i = 0; i < 10; i++) {
+      await expect(
+        create(ACTOR_A, { youtubeUrl: 'https://youtu.be/fakeNoEmbed' }),
+      ).rejects.toMatchObject({ code: 'unprocessable_input' })
+    }
+    await expect(create()).rejects.toMatchObject({ code: 'rate_limited' })
+  })
+
+  it('404 while YouTube lectures are switched off (like `live`)', async () => {
+    vi.stubEnv('FEATURE_YOUTUBE_LECTURES', '0')
+    resetEnvCache()
+    try {
+      await expect(create()).rejects.toMatchObject({ code: 'not_found' })
+    } finally {
+      vi.unstubAllEnvs()
+      resetEnvCache()
+    }
   })
 
   it('422 for a link that is not a YouTube video', async () => {

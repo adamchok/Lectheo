@@ -78,6 +78,7 @@ export function WatchPlayer({ media, title = 'Lecture video', ...events }: Watch
             rel="noopener noreferrer"
           >
             Open on YouTube
+            <span className="sr-only"> (opens in a new tab)</span>
             <ArrowUpRight aria-hidden />
           </a>
         </Button>

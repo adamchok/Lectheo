@@ -3,7 +3,7 @@ import { Ms } from '../common'
 
 /* GET /youtube/preview (F10.2–F10.3): the link check before any AI spend. */
 
-/** Why a video can't be added, in the order the server checks them (F10.3). */
+/** Why a video can't be added, in the order the server checks them (F10.3, F10.5). */
 export const YOUTUBE_REFUSALS = [
   'not_found',
   'private',
@@ -13,6 +13,8 @@ export const YOUTUBE_REFUSALS = [
   'too_short',
   'too_long',
   'not_english',
+  /** A transcription of this video already found no speech (cached verdict, F10.5). */
+  'no_speech',
 ] as const
 export const YoutubeRefusal = z.enum(YOUTUBE_REFUSALS)
 export type YoutubeRefusal = z.infer<typeof YoutubeRefusal>
@@ -30,6 +32,17 @@ export const YoutubePreviewResponse = z.object({
   reason: YoutubeRefusal.optional(),
 })
 export type YoutubePreviewResponse = z.infer<typeof YoutubePreviewResponse>
+
+/**
+ * transcribeVideo failure codes a Retry can't change (the same video gives the same result), so
+ * no free Retry is offered or accepted for them (F10.5).
+ */
+export const FINAL_VIDEO_FAILURES: readonly string[] = [
+  'no_speech',
+  'not_english',
+  'transcript_incomplete',
+  'video_unavailable',
+]
 
 /** Shortest video worth a concept map (F10.3). */
 export const YOUTUBE_MIN_DURATION_MS = 5 * 60_000
@@ -54,5 +67,7 @@ export function youtubeRefusalMessage(reason: YoutubeRefusal, maxMinutes: number
       return `This video is longer than your limit of ${limit}.`
     case 'not_english':
       return 'This video isn’t in English. Lectheo works with English lectures for now.'
+    case 'no_speech':
+      return 'We couldn’t find speech in this video.'
   }
 }

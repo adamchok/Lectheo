@@ -118,7 +118,7 @@ Benchmarks used (checked 4 Oct 2026):
 | Teach-back (~4 turns + 1 judge call) | Sonnet + Sol | ≈ $0.05 |
 | Transfer / Stump (beta) | Sol / Sonnet + Sol ×2 | ≈ $0.03 / $0.07 |
 | On-demand item (if the bank runs out) | Sonnet + Sol | ≈ $0.05 |
-| YouTube lecture transcript [[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]] | Gemini 3.8 Flash, direct key | ≈ $0.42 per hour of video (2-hour max ≈ $0.85; $0.39/h measured on MIT 6.006); cached per video; capped by `GOOGLE_AI_BUDGET_USD` (default $10) |
+| YouTube lecture transcript [[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]] | Gemini 3.8 Flash, direct key | ≈ $0.42 per hour of video (2-hour max ≈ $0.85; $0.35/h measured on MIT 6.006); cached per video; capped by `GOOGLE_AI_BUDGET_USD` (default $10) |
 | **Judge path** (diagnostic + spot the flaw + teach-back) | | **≈ $0.10–0.15** |
 
 ### Budget ($50) and enforcement
@@ -308,13 +308,13 @@ Format: context → decision → consequences. All **Accepted, 4 Oct 2026** (v2 
 - **Context:** Students study from long YouTube lectures. Every Lectheo feature needs a timestamped transcript, and YouTube's captions can't be used: scraping breaks YouTube's terms and is blocked from cloud servers, the Data API only lets owners download captions, and downloading audio breaks the terms too.
 - **Decision:**
   - `gemini-3.8-flash` reads the public YouTube URL (Google's own feature) through the **direct Google API** and returns timestamped cues in **2-minute clips**, run in parallel and stitched. The spike (7 Oct 2026, `docs/spikes/youtube-transcripts.md`) showed the AI Gateway passes the link but ignores the clip offsets, billing the whole video (653k tokens for a 2-hour lecture) and timing out, so the gateway is not used for this role.
-  - The direct client lives inside `packages/ai` behind `runTask`, writes every call to `llm_calls` (priced from Google's token counts) so the spend governor counts it, and can't fall back to the gateway. The Google project runs on the paid tier with a budget alert (~$10). *As built:* the `transcriber` role is marked `direct: 'google'` in `packages/ai/src/models.ts`; `runTask` sends it to `google-direct.ts` (REST `generateContent`), rows carry `gateway_key = 'google'`, and `GOOGLE_AI_BUDGET_USD` caps them (75% → no new YouTube lectures, 100% → no transcription).
+  - The direct client lives inside `packages/ai` behind `runTask`, writes every call to `llm_calls` (priced from Google's token counts) so the spend governor counts it, and can't fall back to the gateway. The Google project runs on the paid tier with a budget alert (~$10). *As built:* the `transcriber` role is marked `direct: 'google'` in `packages/ai/src/models.ts`; `runTask` sends it to `google-direct.ts` (REST `generateContent`), rows carry `gateway_key = 'google'`, and `GOOGLE_AI_BUDGET_USD` caps them (75% or 25% in an hour → no new YouTube lectures, 100% → no transcription). Each clip is capped at 8,192 output tokens with a 1,024-token thinking budget; the prompt asks for clean verbatim (`transcribe-chunk@2`).
   - The YouTube Data API checks the video (public or unlisted, embeddable, not live, length, language) before any AI spend.
   - Transcripts are cached by video id; the video only ever plays through the embed.
   - Gated by a spike ([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]].1), **passed 7 Oct 2026**: 5.5% word errors, p95 drift 2.6 s, $0.42 per hour, 40 s for a 60-minute video. Longer clips drift ~10 s per minute, hence 2 minutes.
 - **Consequences:**
   - \+ No files to find; creators keep their views; no media handling on our side.
-  - − Depends on one Google feature and a second AI key outside the gateway. Quality was measured on one lecture; the second (F10.9, MIT 6.006) scored 12.6% word errors and p95 drift 6.5 s, below the targets, mostly fillers the reference captions omit. English only in v1.
+  - − Depends on one Google feature and a second AI key outside the gateway. Quality was measured on one lecture; the second (F10.9, MIT 6.006) passed with the clean-verbatim prompt: 9.5% word errors, p95 drift 2.8 s. English only in v1.
 - **Rejected:** caption scraping, the YouTube captions API, downloading audio for AssemblyAI.
 
 ---

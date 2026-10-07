@@ -31,11 +31,11 @@ export class GoogleHttpError extends Error {
   }
 }
 
-/** "High demand" (503) and rate limits (429) pass; anything else is the request's fault. */
-const RETRY_STATUSES = new Set([429, 503])
+/** Rate limits and server-side failures pass; any other 4xx is the request's (or video's) fault. */
+const RETRY_STATUSES = new Set([429, 500, 502, 503, 504])
 const MAX_ATTEMPTS = 4
 /** A 2-minute clip answers in 10–40 s (spike); this bounds a hung request. */
-const REQUEST_TIMEOUT_MS = 180_000
+const REQUEST_TIMEOUT_MS = 90_000
 
 interface GoogleResponse {
   candidates?: { content?: { parts?: { text?: string }[] } }[]
@@ -81,7 +81,11 @@ async function callOnce(
         contents: [{ role: 'user', parts: request.parts }],
         generationConfig: request.generationConfig,
       }),
-      signal: ctx.abortSignal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      // The caller's deadline (the pipeline step's) and this request's own timeout.
+      signal: AbortSignal.any([
+        AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        ...(ctx.abortSignal ? [ctx.abortSignal] : []),
+      ]),
     },
   )
   const body = (await response.json().catch(() => ({}))) as GoogleResponse
@@ -102,7 +106,8 @@ async function callWithRetry(
     try {
       return await callOnce(request, ctx)
     } catch (error) {
-      if (attempt >= MAX_ATTEMPTS || !isRetryable(error)) throw error
+      const stopped = ctx.abortSignal?.aborted ?? false
+      if (stopped || attempt >= MAX_ATTEMPTS || !isRetryable(error)) throw error
       await sleep(base * 2 ** (attempt - 1))
     }
   }

@@ -36,6 +36,7 @@ describe('stamps', () => {
     expect(stampToMs('1:02:03')).toBe(3_723_000)
     expect(stampToMs('12:30')).toBe(750_000)
     expect(stampToMs('7.5')).toBe(7_500)
+    expect(stampToMs('00:10:03,500')).toBe(603_500)
     expect(formatStamp(3_723_999)).toBe('1:02:03')
   })
 
@@ -108,6 +109,25 @@ describe('stitchChunks (spike boundary cases)', () => {
     expect(chunksToRetry([{ chunk: chunk(0), cues: out.slice(0, 2) }])).toEqual([])
   })
 
+  it('caps a slipped cue end to its chunk (review: 0:19:47 → 1:20:00)', () => {
+    const out = stitchChunks([{ chunk: chunk(18, 20), cues: [cue(1187, 4800, 'one two three')] }])
+    expect(out[0]).toEqual({ startMs: 1_187_000, endMs: 20 * MIN + 2000, text: 'one two three' })
+  })
+
+  it('re-times an end before its start by length', () => {
+    const out = stitchChunks([{ chunk: chunk(0), cues: [cue(30, 10, 'one two')] }])
+    expect(out[0]).toEqual({ startMs: 30_000, endMs: 30_700, text: 'one two' })
+  })
+
+  it('never re-times a cue before the previous one at the chunk end', () => {
+    // The previous cue sits past the chunk end (+2 s grace); the slipped cue must follow it.
+    const out = stitchChunks([
+      { chunk: chunk(0), cues: [cue(121, 125, 'a'), cue(9000, 9001, 'b')] },
+    ])
+    expect(out[1]?.startMs).toBeGreaterThanOrEqual(out[0]?.startMs ?? 0)
+    expect(checkVideoCues(out, 2 * MIN + 5000)).toEqual([])
+  })
+
   it('re-times a cue that starts before the previous one', () => {
     const out = stitchChunks([{ chunk: chunk(0), cues: [cue(50, 60, 'b'), cue(40, 45, 'a')] }])
     expect(out[1]?.startMs).toBe(60_000)
@@ -145,10 +165,19 @@ describe('checkVideoCues', () => {
 
   it('reports out-of-order cues, cues past the end and large gaps', () => {
     expect(checkVideoCues([cue(10, 12, 'a'), cue(5, 6, 'b')], 60_000)).toHaveLength(1)
-    expect(checkVideoCues([cue(70, 71, 'a')], 60_000)).toEqual(['cue 0 starts outside the video'])
-    expect(checkVideoCues([cue(0, 5, 'a'), cue(400, 405, 'b')], 600_000)).toEqual([
-      'no speech for 7 min at cue 1',
+    expect(checkVideoCues([cue(70, 71, 'a')], 60_000)).toEqual([
+      'cue 0 starts outside the video',
+      'cue 0 ends outside the video',
     ])
+    expect(checkVideoCues([cue(10, 4800, 'a')], 60_000)).toEqual(['cue 0 ends outside the video'])
+    expect(checkVideoCues([cue(0, 5, 'a'), cue(700, 705, 'b')], 900_000)).toEqual([
+      'no speech for 12 min at cue 1',
+    ])
+  })
+
+  it('accepts a long silence covered by chunks that came back empty twice', () => {
+    const cues = [cue(0, 5, 'a'), cue(700, 705, 'b')]
+    expect(checkVideoCues(cues, 900_000, [chunk(2, 4), chunk(4, 6), chunk(6, 8)])).toEqual([])
   })
 })
 

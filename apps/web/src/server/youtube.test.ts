@@ -1,6 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ACTOR_A, ACTOR_S, createFixture, type Fixture } from './courses/test-fixtures'
+import { resetEnvCache } from './env'
+import { youtubeLecturesEnabled } from './features'
 import {
+  cachedClient,
   checkVideo,
   dataApiClient,
   parseIsoDuration,
@@ -50,6 +53,7 @@ describe('parseIsoDuration', () => {
     expect(parseIsoDuration('PT10M13S')).toBe(613_000)
     expect(parseIsoDuration('P0D')).toBe(0)
     expect(parseIsoDuration('P1DT1S')).toBe(86_401_000)
+    expect(parseIsoDuration('P1W')).toBe(7 * 86_400_000)
   })
 })
 
@@ -99,6 +103,10 @@ describe('F10.3 checks through the (fake) Data API', () => {
     expect(await verdict([item({ privacyStatus: 'unlisted', lang: 'en-US' })])).toBeNull()
   })
 
+  it('no language set is not a refusal: the transcript is checked for English instead', async () => {
+    expect(await verdict([item({ lang: null })])).toBeNull()
+  })
+
   it.each([
     ['not_found', []],
     ['private', [item({ privacyStatus: 'private' })]],
@@ -109,7 +117,6 @@ describe('F10.3 checks through the (fake) Data API', () => {
     ['too_short', [item({ duration: 'PT4M59S' })]],
     ['too_long', [item({ duration: 'PT2H0M1S' })]],
     ['not_english', [item({ lang: 'fr' })]],
-    ['not_english', [item({ lang: null })]],
   ] as const)('%s', async (reason, items) => {
     expect(await verdict([...items])).toBe(reason)
   })
@@ -126,6 +133,14 @@ describe('F10.3 checks through the (fake) Data API', () => {
     expect(String(url)).not.toContain('secret-key')
     expect(String(url)).toContain('part=contentDetails,status,snippet')
     expect(init?.headers).toEqual({ 'x-goog-api-key': 'secret-key' })
+  })
+
+  it('reuses an answer for 10 minutes (Data API quota)', async () => {
+    const fetch = fakeDataApi([item({})])
+    const client = cachedClient(dataApiClient('key', fetch))
+    await client.video(ID)
+    await client.video(ID)
+    expect(fetch).toHaveBeenCalledTimes(1)
   })
 
   it('a Data API failure is upstream_unavailable', async () => {
@@ -173,6 +188,16 @@ describe('previewVideo', () => {
     })
   })
 
+  it('names a cached verdict (no speech) before any spend', async () => {
+    await f.exec(`INSERT INTO youtube_transcripts (video_id, model, prompt_version, duration_ms,
+      cues, refusal) VALUES ('${ID}', 'fake', 'transcribe-chunk@2', 1, '[]'::jsonb, 'no_speech')`)
+    const client = dataApiClient('key', fakeDataApi([item({})]))
+    expect(await previewVideo(ACTOR_A, ID, client, f.db)).toMatchObject({
+      ok: false,
+      reason: 'no_speech',
+    })
+  })
+
   it('422 for a link that is not a YouTube video, without calling the Data API', async () => {
     const fetch = fakeDataApi([item({})])
     await expect(
@@ -189,5 +214,37 @@ describe('previewVideo', () => {
     })
     // Another user is unaffected.
     await expect(previewVideo(ACTOR_S, ID, client, f.db)).resolves.toMatchObject({ videoId: ID })
+  })
+})
+
+describe('the F10 switch', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    resetEnvCache()
+  })
+  const env = (vars: Record<string, string>) => {
+    for (const [k, v] of Object.entries(vars)) vi.stubEnv(k, v)
+    resetEnvCache()
+  }
+
+  it('is off unless FEATURE_YOUTUBE_LECTURES=1, and then answers 404', async () => {
+    env({ FEATURE_YOUTUBE_LECTURES: '0' })
+    expect(youtubeLecturesEnabled()).toBe(false)
+    const f = await createFixture()
+    await expect(
+      previewVideo(ACTOR_A, ID, dataApiClient('k', fakeDataApi([])), f.db),
+    ).rejects.toMatchObject({ code: 'not_found' })
+  })
+
+  it('outside AI_FAKE, needs both the YouTube and the Gemini key', () => {
+    env({
+      FEATURE_YOUTUBE_LECTURES: '1',
+      AI_FAKE: '0',
+      YOUTUBE_API_KEY: 'y',
+      GOOGLE_GENERATIVE_AI_API_KEY: '',
+    })
+    expect(youtubeLecturesEnabled()).toBe(false)
+    env({ GOOGLE_GENERATIVE_AI_API_KEY: 'g' })
+    expect(youtubeLecturesEnabled()).toBe(true)
   })
 })

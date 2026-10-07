@@ -19,6 +19,10 @@ export const SAMPLE_SIGNIN_LIMIT: RateLimit = { limit: 5, windowMs: 10 * 60_000 
 export const TRANSCRIPT_UPLOAD_LIMIT: RateLimit = { limit: 10, windowMs: 10 * 60_000 }
 /** YouTube link checks per user (GET /youtube/preview): each one is a Data API call. */
 export const YOUTUBE_PREVIEW_LIMIT: RateLimit = { limit: 30, windowMs: 10 * 60_000 }
+/** YouTube lecture creates per user (POST /lectures source youtube): refusals use no quota. */
+export const YOUTUBE_CREATE_LIMIT: RateLimit = { limit: 10, windowMs: 10 * 60_000 }
+/** F10.5 refunds per user per day (no speech / not English), so refunds can't loop. */
+export const YOUTUBE_REFUND_LIMIT: RateLimit = { limit: 1, windowMs: 24 * 60 * 60_000 }
 
 /** Counts one request for `key`; false once the window's count exceeds the limit. */
 export async function takeRateLimit(

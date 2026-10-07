@@ -15,8 +15,11 @@ const EARLY_GRACE_MS = 1_000
 const LATE_GRACE_MS = 2_000
 /** Stamps this far before the chunk mean the model answered clip-relative. */
 const RELATIVE_STAMP_SLACK_MS = 60_000
-/** "No large gaps" (F10.5): a silence longer than this between cues fails the transcript. */
-export const MAX_TRANSCRIPT_GAP_MS = 5 * 60_000
+/**
+ * "No large gaps" (F10.5): a silence longer than this between cues fails the transcript, unless
+ * chunks still empty after the retry pass (real silence: an exam, a demo) cover it.
+ */
+export const MAX_TRANSCRIPT_GAP_MS = 10 * 60_000
 
 export interface VideoChunk {
   readonly startMs: number
@@ -46,11 +49,12 @@ export function chunkPlan(durationMs: number, chunkMs = VIDEO_CHUNK_MS): VideoCh
   return chunks
 }
 
-/** "1:02:03" → 3_723_000. Non-numeric parts make NaN (dropped by stampCues). */
+/** "1:02:03" or "00:10:03,500" → ms. Non-numeric parts make NaN (dropped by stampCues). */
 export function stampToMs(stamp: string): number {
   return Math.round(
     stamp
       .trim()
+      .replace(',', '.')
       .split(':')
       .reduce((acc, part) => acc * 60 + Number(part), 0) * 1000,
   )
@@ -104,14 +108,22 @@ export function stitchChunks(parts: readonly ChunkCues[]): Cue[] {
       const dupe = i === 0 && lastWord !== '' && normWord(ws[0]) === lastWord
       const text = (dupe ? ws.slice(1) : ws).join(' ')
       if (!text) return
+      const retimedEnd = (startMs: number): number =>
+        Math.min(startMs + words(text).length * MS_PER_WORD, Math.max(chunk.endMs, startMs))
       const trusted = inChunk(cue.startMs, chunk) && cue.startMs >= (last?.startMs ?? 0)
       if (trusted) {
-        kept.push({ startMs: cue.startMs, endMs: Math.max(cue.endMs, cue.startMs), text })
+        // A slipped end ("0:19:47 → 1:20:00") is capped to the chunk, else re-timed by length.
+        const capped = Math.min(cue.endMs, chunk.endMs + LATE_GRACE_MS)
+        const endMs = capped >= cue.startMs ? capped : retimedEnd(cue.startMs)
+        kept.push({ startMs: cue.startMs, endMs, text })
         return
       }
-      const startMs = Math.min(Math.max(last?.endMs ?? chunk.startMs, chunk.startMs), chunk.endMs)
-      const endMs = Math.min(startMs + words(text).length * MS_PER_WORD, chunk.endMs)
-      kept.push({ startMs, endMs, text })
+      // Never before the previous cue, even when it already sits at the chunk end.
+      const startMs = Math.max(
+        Math.min(Math.max(last?.endMs ?? chunk.startMs, chunk.startMs), chunk.endMs),
+        last?.startMs ?? 0,
+      )
+      kept.push({ startMs, endMs: retimedEnd(startMs), text })
     })
   }
   return kept
@@ -138,11 +150,25 @@ export function chunksToRetry(parts: readonly ChunkCues[]): number[] {
   })
 }
 
+/** How much of [from, to) the given chunks cover. */
+function covered(from: number, to: number, chunks: readonly VideoChunk[]): number {
+  return chunks.reduce(
+    (sum, c) => sum + Math.max(0, Math.min(to, c.endMs) - Math.max(from, c.startMs)),
+    0,
+  )
+}
+
 /**
- * F10.5's checks on the stitched transcript: in order, inside the video, no large gaps.
+ * F10.5's checks on the stitched transcript: in order, inside the video (start and end), no
+ * large gaps. `silent` = chunks still empty after the retry pass; the gaps they cover are real
+ * silence (an exam, a demo).
  * Returns the problems found ([] when valid).
  */
-export function checkVideoCues(cues: readonly Cue[], durationMs: number): string[] {
+export function checkVideoCues(
+  cues: readonly Cue[],
+  durationMs: number,
+  silent: readonly VideoChunk[] = [],
+): string[] {
   const problems: string[] = []
   cues.forEach((c, i) => {
     const prev = cues[i - 1]
@@ -150,8 +176,12 @@ export function checkVideoCues(cues: readonly Cue[], durationMs: number): string
     if (c.startMs < 0 || c.startMs > durationMs + LATE_GRACE_MS) {
       problems.push(`cue ${i} starts outside the video`)
     }
-    if (prev && c.startMs - prev.endMs > MAX_TRANSCRIPT_GAP_MS) {
-      problems.push(`no speech for ${Math.round((c.startMs - prev.endMs) / 60_000)} min at cue ${i}`)
+    if (c.endMs < c.startMs || c.endMs > durationMs + LATE_GRACE_MS) {
+      problems.push(`cue ${i} ends outside the video`)
+    }
+    const gap = prev ? c.startMs - prev.endMs - covered(prev.endMs, c.startMs, silent) : 0
+    if (gap > MAX_TRANSCRIPT_GAP_MS) {
+      problems.push(`no speech for ${Math.round(gap / 60_000)} min at cue ${i}`)
     }
   })
   return problems

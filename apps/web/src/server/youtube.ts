@@ -8,9 +8,11 @@ import { FAKE_SILENT_VIDEO_ID } from '@lectheo/ai'
 import type { Actor } from './auth'
 import { appDb, type DbLike } from './db'
 import { isAiFake, requireEnv } from './env'
-import { ApiError } from './errors'
-import { MEDIA_LIMITS, tierOf, type Tier } from './quota'
+import { ApiError, notFound } from './errors'
+import { youtubeLecturesEnabled } from './features'
+import { MEDIA_LIMITS, MINUTE_MS, tierOf, type Tier } from './quota'
 import { takeRateLimit, YOUTUBE_PREVIEW_LIMIT } from './rate-limit'
+import { readCachedTranscript, transcriberKey } from './youtube-cache'
 
 /*
  * YouTube Data API (F10.2–F10.3, ADR-017): every check happens here, before any AI spend, since
@@ -22,6 +24,9 @@ const YOUTUBE_HOSTS = new Set(['youtube.com', 'youtube-nocookie.com'])
 /** Path forms that carry the id: /embed/ID, /shorts/ID, /live/ID, /v/ID, /e/ID. */
 const ID_PATHS = new Set(['embed', 'shorts', 'live', 'v', 'e'])
 const DATA_API = 'https://www.googleapis.com/youtube/v3/videos'
+const DATA_API_TIMEOUT_MS = 10_000
+/** videos.list answers are reused this long (the project has 10k Data API units a day). */
+const VIDEO_CACHE_MS = 10 * MINUTE_MS
 
 /**
  * The 11-character video id from any link form (watch?v=, youtu.be, &t=, a playlist entry,
@@ -48,10 +53,10 @@ export function parseYoutubeId(input: string): string | null {
 
 /** "PT1H59M36S" (ISO 8601, as the Data API sends it) → ms; 0 for live streams ("P0D"). */
 export function parseIsoDuration(iso: string): number {
-  const m = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/.exec(iso)
+  const m = /^P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/.exec(iso)
   if (!m) return 0
-  const [d, h, min, s] = m.slice(1).map((x) => Number(x ?? 0)) as [number, number, number, number]
-  return (((d * 24 + h) * 60 + min) * 60 + s) * 1000
+  const [w = 0, d = 0, h = 0, min = 0, s = 0] = m.slice(1).map((x) => Number(x ?? 0))
+  return ((((w * 7 + d) * 24 + h) * 60 + min) * 60 + s) * 1000
 }
 
 export interface YoutubeVideo {
@@ -111,7 +116,10 @@ export function dataApiClient(key: string, fetchImpl: typeof fetch = fetch): You
   return {
     async video(id) {
       const url = `${DATA_API}?part=contentDetails,status,snippet&id=${encodeURIComponent(id)}`
-      const response = await fetchImpl(url, { headers: { 'x-goog-api-key': key } })
+      const response = await fetchImpl(url, {
+        headers: { 'x-goog-api-key': key },
+        signal: AbortSignal.timeout(DATA_API_TIMEOUT_MS),
+      })
       if (!response.ok) {
         console.warn(JSON.stringify({ event: 'youtube_data_api_failed', status: response.status }))
         throw new ApiError('upstream_unavailable', "We couldn't check this video. Try again.")
@@ -122,8 +130,6 @@ export function dataApiClient(key: string, fetchImpl: typeof fetch = fetch): You
     },
   }
 }
-
-const MINUTE_MS = 60_000
 
 /** AI_FAKE test videos (e2e, tests): one per refusal; any other id is a 15-minute lecture. */
 export const FAKE_VIDEOS: Readonly<Record<string, Partial<YoutubeVideo> | null>> = {
@@ -159,9 +165,29 @@ export const fakeYoutubeClient: YoutubeClient = {
   },
 }
 
-/** Fake under AI_FAKE (tests, e2e, offline dev); otherwise the Data API. */
-export const youtubeClient = (): YoutubeClient =>
-  isAiFake() ? fakeYoutubeClient : dataApiClient(requireEnv('YOUTUBE_API_KEY'))
+/** Reuses each answer (found or not) for `ttlMs`, so re-checks of a link cost no quota. */
+export function cachedClient(inner: YoutubeClient, ttlMs = VIDEO_CACHE_MS): YoutubeClient {
+  const seen = new Map<string, { at: number; video: YoutubeVideo | null }>()
+  return {
+    async video(id) {
+      const hit = seen.get(id)
+      if (hit && Date.now() - hit.at < ttlMs) return hit.video
+      const video = await inner.video(id)
+      seen.set(id, { at: Date.now(), video })
+      return video
+    },
+  }
+}
+
+// ponytail: per server instance; a shared cache only if the Data API quota gets tight.
+let realClient: YoutubeClient | undefined
+
+/** Fake under AI_FAKE (tests, e2e, offline dev); otherwise the Data API, cached 10 minutes. */
+export function youtubeClient(): YoutubeClient {
+  if (isAiFake()) return fakeYoutubeClient
+  realClient ??= cachedClient(dataApiClient(requireEnv('YOUTUBE_API_KEY')))
+  return realClient
+}
 
 /** F10.3, in order. Public and unlisted pass; the tier caps the length (Google 2 h, sample 20 min). */
 export function checkVideo(video: YoutubeVideo | null, tier: Tier): YoutubeRefusal | null {
@@ -172,8 +198,16 @@ export function checkVideo(video: YoutubeVideo | null, tier: Tier): YoutubeRefus
   if (video.ageRestricted) return 'age_restricted'
   if (video.durationMs < YOUTUBE_MIN_DURATION_MS) return 'too_short'
   if (video.durationMs > MEDIA_LIMITS[tier].maxDurationMs) return 'too_long'
-  if (!video.audioLanguage?.toLowerCase().startsWith('en')) return 'not_english'
+  // No language set isn't a refusal: the transcript itself is checked for English (F10.3).
+  const lang = video.audioLanguage?.toLowerCase()
+  if (lang && !lang.startsWith('en')) return 'not_english'
   return null
+}
+
+/** F10.5: a cached verdict (no speech, not English) refuses the video before any spend. */
+export async function cachedRefusal(db: DbLike, videoId: string): Promise<YoutubeRefusal | null> {
+  const cached = await readCachedTranscript(db, transcriberKey(videoId))
+  return cached?.kind === 'refusal' ? cached.refusal : null
 }
 
 export const NOT_A_YOUTUBE_LINK =
@@ -193,12 +227,13 @@ export async function previewVideo(
   client: YoutubeClient = youtubeClient(),
   db: DbLike = appDb(),
 ): Promise<YoutubePreviewResponse> {
+  if (!youtubeLecturesEnabled()) throw notFound()
   if (!(await takeRateLimit(db, `youtube-preview:${actor.userId}`, YOUTUBE_PREVIEW_LIMIT))) {
     throw new ApiError('rate_limited', 'Too many link checks. Try again in a few minutes.')
   }
   const videoId = requireYoutubeId(url)
   const video = await client.video(videoId)
-  const reason = checkVideo(video, tierOf(actor))
+  const reason = checkVideo(video, tierOf(actor)) ?? (await cachedRefusal(db, videoId))
   return {
     videoId,
     title: video?.title ?? null,

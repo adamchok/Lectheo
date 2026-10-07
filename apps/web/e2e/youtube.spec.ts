@@ -19,15 +19,17 @@ test('add a YouTube lecture as a sample account and study it', async ({ page }) 
 
   // A refusal is named in plain words, and the lecture can't be added.
   await link.fill('https://www.youtube.com/watch?v=fakeNoEmbed')
-  await expect(preview.getByRole('alert')).toContainText('doesn’t allow it to play on other sites')
+  await expect(preview).toContainText('doesn’t allow it to play on other sites')
+  await expect(link).toHaveAttribute('aria-invalid', 'true')
   // Sample accounts: up to 20 minutes.
   await link.fill('https://youtu.be/fakeLong45m')
-  await expect(preview.getByRole('alert')).toContainText('longer than your limit of 20 minutes')
+  await expect(preview).toContainText('longer than your limit of 20 minutes')
 
   await link.fill('https://youtu.be/6Svu_ae5ebk?t=42')
   await expect(preview.getByText('Test lecture 6Svu_ae5ebk')).toBeVisible()
   await expect(preview.getByText('Lectheo test channel · 15 min')).toBeVisible()
-  await expect(preview.getByRole('alert')).toHaveCount(0)
+  await expect(preview).not.toContainText('limit')
+  await expect(link).not.toHaveAttribute('aria-invalid', 'true')
 
   const add = page.getByRole('button', { name: 'Add lecture' })
   await expect(add).toHaveAttribute('aria-disabled', 'true')

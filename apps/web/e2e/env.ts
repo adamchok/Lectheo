@@ -75,6 +75,8 @@ export function e2eEnv(): E2eEnv {
     NEXT_PUBLIC_TURNSTILE_SITE_KEY: TURNSTILE_TEST_SITE_KEY,
     TURNSTILE_SECRET_KEY: TURNSTILE_TEST_SECRET_KEY,
     AI_FAKE: '1',
+    // F10 is off by default; e2e covers it with the fake Data API and transcriber.
+    FEATURE_YOUTUBE_LECTURES: '1',
     AI_GATEWAY_KEY_NAME: 'dev',
     CRON_SECRET: 'e2e-cron-secret',
     PORT: String(E2E_PORT),

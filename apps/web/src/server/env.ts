@@ -25,6 +25,11 @@ const ServerEnv = z.object({
   YOUTUBE_API_KEY: optional,
   GOOGLE_GENERATIVE_AI_API_KEY: optional,
   GOOGLE_AI_BUDGET_USD: z.coerce.number().positive().default(10),
+  /** F10 switch: YouTube lectures stay hidden (404) unless this is 1 (see server/features.ts). */
+  FEATURE_YOUTUBE_LECTURES: z
+    .enum(['0', '1', 'true', 'false'])
+    .optional()
+    .transform((v) => v === '1' || v === 'true'),
   CRON_SECRET: optional,
   VERCEL_GIT_COMMIT_SHA: optional,
 })

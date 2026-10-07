@@ -3,6 +3,7 @@ import {
   AudioLines,
   FileText,
   FileVideo,
+  Link,
   MessagesSquare,
   SearchCheck,
   Shuffle,
@@ -191,6 +192,11 @@ const SOURCES = [
     icon: FileText,
     title: 'A transcript.',
     body: "Paste or upload the text. Without timestamps you can't mark moments, but you still get the map, the diagnosis and practice.",
+  },
+  {
+    icon: Link,
+    title: 'A YouTube video.',
+    body: 'Paste the link. It plays through YouTube, and Lectheo builds the map from its transcript.',
   },
 ] as const
 

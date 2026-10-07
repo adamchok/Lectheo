@@ -64,8 +64,8 @@ export const MAX_OUTPUT_TOKENS = {
   persona: 600,
   guardEscalation: 300,
   answerer: 2_000,
-  /** The spike's request shape: room for thinking on a 2-minute clip (~1.5k tokens out). */
-  transcriber: 65_000,
+  /** A 2-minute clip is ~1.5k tokens of cues; with the thinking cap this bounds a call's cost. */
+  transcriber: 8_192,
   smoke: 200,
 } as const
 

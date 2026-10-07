@@ -40,7 +40,8 @@ export function buildPrompt(input: ExtractConceptsInput): PromptSpec {
     system: SYSTEM,
     cacheKeyBlocks: [lectureContext(input.segments)],
     prompt: [
-      `Lecture: ${input.lectureTitle}`,
+      // One line: a title can come from a YouTube uploader (F10).
+      `Lecture: ${input.lectureTitle.replace(/\s+/g, ' ').trim()}`,
       `Existing course concepts:\n${existing}`,
       `Extract about ${input.targetCount} concepts (±2) and their edges.`,
       chaptersAsk(input.chapterCount),

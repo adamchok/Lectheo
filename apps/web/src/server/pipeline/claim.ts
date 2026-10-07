@@ -1,4 +1,8 @@
-import type { LectureStatus, ReprocessFromStep } from '@lectheo/contracts'
+import {
+  FINAL_VIDEO_FAILURES,
+  type LectureStatus,
+  type ReprocessFromStep,
+} from '@lectheo/contracts'
 import {
   and,
   conceptEdges,
@@ -16,9 +20,10 @@ import type { Actor } from '../auth'
 import { appDb, type DbLike } from '../db'
 import { ApiError, invalidState } from '../errors'
 import { type Lecture, loadLectureForWrite } from '../ownership'
-import { assertIntakeOpen, consume, refundUsage } from '../quota'
+import { serverEnv } from '../env'
+import { assertGoogleIntakeOpen, assertIntakeOpen, consume, refundUsage } from '../quota'
 import { dropOrphanConcepts } from './segments'
-import { sourceKind, stepsFrom } from './state'
+import { readStep, sourceKind, stepsFrom } from './state'
 
 /*
  * POST /lectures/{id}/process (API Spec §5, Architecture §4.3 "Claiming"): a guarded update plus
@@ -63,10 +68,35 @@ function assertFromFits(lecture: Lecture, from: ReprocessFrom): void {
   }
   if (kind === 'youtube' && (from === 'parseTranscript' || from === 'submitTranscription')) {
     // Its transcript comes from the video (cached); a failed transcription resumes on Retry.
-    throw invalidState('This lecture is transcribed from YouTube. Re-run it from concept extraction.')
+    throw invalidState(
+      'This lecture is transcribed from YouTube. Re-run it from concept extraction.',
+    )
   }
   if (from === 'submitTranscription' && !lecture.audioPath) {
     throw invalidState('The audio was deleted after transcription. Upload it again to re-run.')
+  }
+}
+
+/**
+ * YouTube lectures (F10, review): a Retry that would transcribe again is refused when the result
+ * can't change, and otherwise obeys the Google spend cap like a new YouTube lecture, so one
+ * student can't drain GOOGLE_AI_BUDGET_USD with free Retries.
+ */
+async function assertYoutubeClaim(
+  db: DbLike,
+  lecture: Lecture,
+  from: ReprocessFrom | undefined,
+): Promise<void> {
+  if (lecture.source !== 'youtube') return
+  const failedTranscription =
+    lecture.status === 'failed' && lecture.error?.step === 'transcribeVideo'
+  if (!from && failedTranscription && FINAL_VIDEO_FAILURES.includes(lecture.error?.code ?? '')) {
+    throw invalidState(
+      'This video can’t be transcribed. Try another video, or upload a transcript.',
+    )
+  }
+  if ((await readStep(db, lecture.id, 'transcribeVideo'))?.status !== 'done') {
+    await assertGoogleIntakeOpen(db, serverEnv().GOOGLE_AI_BUDGET_USD)
   }
 }
 
@@ -158,6 +188,7 @@ export async function claimLecture(
   const { lecture } = await loadLectureForWrite(actor, lectureId, db)
   await assertIntakeOpen(db)
   if (from) assertFromFits(lecture, from)
+  await assertYoutubeClaim(db, lecture, from)
   const claimable = from ? [...CLAIMABLE, 'map_ready' as const] : CLAIMABLE
   let claimed: boolean
   try {

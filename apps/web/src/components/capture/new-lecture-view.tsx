@@ -62,8 +62,11 @@ type CaptureTab = 'import' | 'audio' | 'transcript' | 'youtube'
 const isCaptureTab = (value: string): value is CaptureTab =>
   ['import', 'audio', 'transcript', 'youtube'].includes(value)
 
-/** /lectures/new: "add your own lecture" (F0.7, F1 modes B and D, F1.11, F10). */
-export function NewLectureView() {
+/**
+ * /lectures/new: "add your own lecture" (F0.7, F1 modes B and D, F1.11, F10). `youtube`: the F10
+ * switch (server/features.ts), read by the page on the server.
+ */
+export function NewLectureView({ youtube: youtubeEnabled }: { youtube: boolean }) {
   const me = useMe()
   const courses = useCourses()
   const consent = useConsent()
@@ -102,7 +105,7 @@ export function NewLectureView() {
   const course: CourseChoice =
     usable ?? (firstCourse ? { kind: 'existing', id: firstCourse.id } : { kind: 'new', title: '' })
   // A YouTube lecture takes the video's title by default and asks its own consent (F10.4).
-  const youtube = tab === 'youtube'
+  const youtube = youtubeEnabled && tab === 'youtube'
   const missing = [
     course.kind === 'new' && !course.title.trim() && 'name the course',
     !youtube && !title.trim() && 'add a title',
@@ -153,11 +156,17 @@ export function NewLectureView() {
           <Input
             id="lecture-title"
             required={!youtube}
-            placeholder={youtube ? 'Defaults to the video’s title' : 'e.g. Week 6 · Trees'}
+            placeholder={youtube ? undefined : 'e.g. Week 6 · Trees'}
             maxLength={200}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
+            aria-describedby={youtube ? 'lecture-title-help' : undefined}
           />
+          {youtube && (
+            <p id="lecture-title-help" className="text-caption text-muted-foreground">
+              Defaults to the video’s title.
+            </p>
+          )}
         </div>
       </div>
       {!youtube && <ConsentCheckbox consent={consent} />}
@@ -166,7 +175,8 @@ export function NewLectureView() {
         onValueChange={(value) => isCaptureTab(value) && setTab(value)}
         className="bg-card rounded-xl border p-4 sm:p-6"
       >
-        <TabsList className="flex-wrap">
+        {/* Four tabs wrap onto two rows on narrow screens; the list grows with them. */}
+        <TabsList className="flex-wrap group-data-[orientation=horizontal]/tabs:h-auto">
           <TabsTrigger value="import">
             <FileVideo aria-hidden />
             Recording + transcript
@@ -179,10 +189,12 @@ export function NewLectureView() {
             <FileText aria-hidden />
             Transcript only
           </TabsTrigger>
-          <TabsTrigger value="youtube">
-            <Link aria-hidden />
-            From YouTube
-          </TabsTrigger>
+          {youtubeEnabled && (
+            <TabsTrigger value="youtube">
+              <Link aria-hidden />
+              From YouTube
+            </TabsTrigger>
+          )}
         </TabsList>
         <TabsContent value="import" forceMount className={tabPanelClass}>
           <ImportForm
@@ -196,9 +208,11 @@ export function NewLectureView() {
         <TabsContent value="transcript" forceMount className={tabPanelClass}>
           <TranscriptForm {...formProps} />
         </TabsContent>
-        <TabsContent value="youtube" forceMount className={tabPanelClass}>
-          <YoutubeForm {...formProps} />
-        </TabsContent>
+        {youtubeEnabled && (
+          <TabsContent value="youtube" forceMount className={tabPanelClass}>
+            <YoutubeForm {...formProps} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   )

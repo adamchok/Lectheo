@@ -1,5 +1,5 @@
 {
-  "id": "e4fcf3d6-b2fe-448d-8659-76576bbc076e",
+  "id": "efe2fa94-a39a-40bb-a08a-d853569243a8",
   "prevId": "d0e41a37-d295-46a3-82e3-4b1a4fb8a960",
   "version": "7",
   "dialect": "postgresql",
@@ -2397,25 +2397,13 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.youtube_transcripts": {
-      "name": "youtube_transcripts",
+    "public.youtube_transcript_chunks": {
+      "name": "youtube_transcript_chunks",
       "schema": "",
       "columns": {
         "video_id": {
           "name": "video_id",
           "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "duration_ms": {
-          "name": "duration_ms",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "cues": {
-          "name": "cues",
-          "type": "jsonb",
           "primaryKey": false,
           "notNull": true
         },
@@ -2431,6 +2419,31 @@
           "primaryKey": false,
           "notNull": true
         },
+        "start_ms": {
+          "name": "start_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "end_ms": {
+          "name": "end_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cues": {
+          "name": "cues",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2441,7 +2454,83 @@
       },
       "indexes": {},
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "youtube_transcript_chunks_video_id_model_prompt_version_start_ms_end_ms_pk": {
+          "name": "youtube_transcript_chunks_video_id_model_prompt_version_start_ms_end_ms_pk",
+          "columns": [
+            "video_id",
+            "model",
+            "prompt_version",
+            "start_ms",
+            "end_ms"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.youtube_transcripts": {
+      "name": "youtube_transcripts",
+      "schema": "",
+      "columns": {
+        "video_id": {
+          "name": "video_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prompt_version": {
+          "name": "prompt_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "duration_ms": {
+          "name": "duration_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cues": {
+          "name": "cues",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "refusal": {
+          "name": "refusal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "youtube_transcripts_video_id_model_prompt_version_pk": {
+          "name": "youtube_transcripts_video_id_model_prompt_version_pk",
+          "columns": [
+            "video_id",
+            "model",
+            "prompt_version"
+          ]
+        }
+      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},

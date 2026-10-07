@@ -1,6 +1,11 @@
 'use client'
 
-import type { LectureResponse, LectureSource, PipelineStep } from '@lectheo/contracts'
+import {
+  FINAL_VIDEO_FAILURES,
+  type LectureResponse,
+  type LectureSource,
+  type PipelineStep,
+} from '@lectheo/contracts'
 import { ClipboardCheck, Network, Play, RotateCw, Sparkles } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
@@ -111,6 +116,9 @@ function FailedPanel({ lecture }: { lecture: LectureResponse }) {
   const processLecture = useProcessLecture()
   const step = lecture.error?.step ?? ''
   const label = STEP_LABELS[step as PipelineStep] ?? 'Processing'
+  // A YouTube video that can't be transcribed won't change on Retry: offer another lecture.
+  const final =
+    step === 'transcribeVideo' && FINAL_VIDEO_FAILURES.includes(lecture.error?.code ?? '')
   return (
     <ErrorState
       title={`Processing stopped at: ${label}`}
@@ -125,18 +133,24 @@ function FailedPanel({ lecture }: { lecture: LectureResponse }) {
         </>
       }
       action={
-        <Button
-          onClick={() =>
-            processLecture.mutate({
-              lectureId: lecture.id,
-              from: retryFrom(step, lecture.error?.code ?? '', lecture.source),
-            })
-          }
-          disabled={processLecture.isPending}
-        >
-          {processLecture.isPending ? <Spinner /> : <RotateCw aria-hidden />}
-          Retry
-        </Button>
+        final ? (
+          <Button asChild variant="outline">
+            <Link href={'/lectures/new' as Route}>Add another lecture</Link>
+          </Button>
+        ) : (
+          <Button
+            onClick={() =>
+              processLecture.mutate({
+                lectureId: lecture.id,
+                from: retryFrom(step, lecture.error?.code ?? '', lecture.source),
+              })
+            }
+            disabled={processLecture.isPending}
+          >
+            {processLecture.isPending ? <Spinner /> : <RotateCw aria-hidden />}
+            Retry
+          </Button>
+        )
       }
     />
   )

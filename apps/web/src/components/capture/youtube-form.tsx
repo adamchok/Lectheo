@@ -19,11 +19,14 @@ import { useBuildMap } from './use-build-map'
 const CHECK_DELAY_MS = 400
 const MINUTE_MS = 60_000
 
-/** "1 h 59 min", "15 min". */
+/** "15 min", "1 h 59 min", "2 hours" (as in the refusal messages). */
 function formatLength(ms: number): string {
   const minutes = Math.round(ms / MINUTE_MS)
   const h = Math.floor(minutes / 60)
-  return h > 0 ? `${h} h ${minutes % 60} min` : `${minutes} min`
+  const m = minutes % 60
+  if (h === 0) return `${m} min`
+  if (m > 0) return `${h} h ${m} min`
+  return h === 1 ? '1 hour' : `${h} hours`
 }
 
 /** The link as it was when typing paused (an empty link clears it at once). */
@@ -39,10 +42,18 @@ function useSettled(value: string): string {
 interface PreviewCardProps {
   preview: YoutubePreviewResponse
   maxMinutes: number
+  /** Id of the refusal text, which the link field points to (`aria-describedby`). */
+  refusalId: string
 }
 
-function PreviewCard({ preview, maxMinutes }: PreviewCardProps) {
+function PreviewCard({ preview, maxMinutes, refusalId }: PreviewCardProps) {
   const refusal = preview.reason ? youtubeRefusalMessage(preview.reason, maxMinutes) : null
+  const meta = [
+    preview.channel,
+    preview.durationMs === null ? null : formatLength(preview.durationMs),
+  ]
+    .filter(Boolean)
+    .join(' · ')
   return (
     <div className="flex gap-4 rounded-lg border p-3" data-testid="youtube-preview">
       {preview.thumbnailUrl && (
@@ -57,13 +68,10 @@ function PreviewCard({ preview, maxMinutes }: PreviewCardProps) {
       )}
       <div className="min-w-0 space-y-1">
         {preview.title && <p className="line-clamp-2 font-medium break-words">{preview.title}</p>}
-        {preview.channel && preview.durationMs !== null && (
-          <p className="text-caption text-muted-foreground">
-            {preview.channel} · {formatLength(preview.durationMs)}
-          </p>
-        )}
+        {meta && <p className="text-caption text-muted-foreground">{meta}</p>}
+        {/* No role="alert": the surrounding live region already announces it. */}
         {refusal && (
-          <p role="alert" className="text-destructive flex items-start gap-1.5 text-sm">
+          <p id={refusalId} className="text-destructive flex items-start gap-1.5 text-sm">
             <CircleX aria-hidden className="mt-0.5 size-4 shrink-0" />
             {refusal}
           </p>
@@ -85,11 +93,16 @@ export function YoutubeForm({ missing, isSample, createDraft }: DraftFormProps) 
   const preview = useYoutubePreview(url)
   const showPending = useDelayedPending(preview.isFetching)
   const maxMinutes = isSample ? 20 : 120
-  const video = preview.data?.ok ? preview.data : null
+  // The preview is of the link as it was when typing paused; never submit a different one.
+  const settled = link.trim() === url && !preview.isFetching
+  const video = settled && preview.data?.ok ? preview.data : null
+  const refused = settled && Boolean(preview.data?.reason)
 
   const blockers = [
     ...missing,
-    ...(video ? [] : ['paste a link to a video that can be added']),
+    ...(video
+      ? []
+      : [settled ? 'paste a link to a video that can be added' : 'wait for the link check']),
     ...(consent ? [] : ['confirm you’re using it for your own study']),
   ]
 
@@ -126,13 +139,21 @@ export function YoutubeForm({ missing, isSample, createDraft }: DraftFormProps) 
           required
           placeholder="https://www.youtube.com/watch?v=…"
           value={link}
-          onChange={(e) => setLink(e.target.value)}
-          aria-invalid={Boolean(linkError) || undefined}
-          aria-describedby={describedBy(`${id}-help`, linkError && `${id}-link-error`)}
+          onChange={(e) => {
+            setLink(e.target.value)
+            setError(null)
+          }}
+          aria-invalid={Boolean(linkError) || refused || undefined}
+          aria-describedby={describedBy(
+            `${id}-help`,
+            linkError && `${id}-link-error`,
+            refused && `${id}-refusal`,
+          )}
         />
         <p id={`${id}-help`} className="text-caption text-muted-foreground">
-          A public lecture in English, 5 minutes to {formatLength(maxMinutes * MINUTE_MS)}. Only the
-          link goes to Google to transcribe it; the video is never downloaded.
+          A public or unlisted lecture in English, 5 minutes to{' '}
+          {formatLength(maxMinutes * MINUTE_MS)}. Only the link goes to Google to transcribe it; the
+          video is never downloaded.
         </p>
         {linkError && (
           <p id={`${id}-link-error`} role="alert" className="text-destructive text-sm">
@@ -147,7 +168,9 @@ export function YoutubeForm({ missing, isSample, createDraft }: DraftFormProps) 
             <Skeleton className="h-5 flex-1" />
           </Skeleton>
         )}
-        {preview.data && <PreviewCard preview={preview.data} maxMinutes={maxMinutes} />}
+        {preview.data && (
+          <PreviewCard preview={preview.data} maxMinutes={maxMinutes} refusalId={`${id}-refusal`} />
+        )}
       </div>
       <div className="flex items-start gap-3 rounded-lg border p-4">
         <Checkbox

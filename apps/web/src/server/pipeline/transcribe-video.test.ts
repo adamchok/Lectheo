@@ -1,4 +1,4 @@
-import { FAKE_SILENT_VIDEO_ID } from '@lectheo/ai'
+import { FAKE_SILENT_VIDEO_ID, FatalTaskError, GoogleHttpError } from '@lectheo/ai'
 import { llmCalls, uuidv7 } from '@lectheo/db'
 import type { Cue, VideoChunk } from '@lectheo/domain'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -40,6 +40,25 @@ async function addYoutubeLecture(videoId = VIDEO, durationMs = 15 * MIN): Promis
   return id
 }
 
+/** Calls the step as the workflow does, until `done` (or it throws). Returns the calls made. */
+async function runToDone(lectureId: string, transcriber?: ChunkTranscriber): Promise<number> {
+  for (let calls = 1; calls <= 20; calls++) {
+    if ((await transcribeVideoStep(f.db, lectureId, transcriber)) === 'done') return calls
+  }
+  throw new Error('transcribeVideo never finished')
+}
+
+const googleSpend = (costUsd: number, createdAt = new Date()) =>
+  f.db.insert(llmCalls).values({
+    task: 'transcribeChunk',
+    role: 'transcriber',
+    model: 'gemini-3.8-flash',
+    promptVersion: 'transcribe-chunk@2',
+    gatewayKey: 'google',
+    costUsd,
+    outcome: 'ok',
+    createdAt,
+  })
 const setLecturesUsed = (count: number) =>
   f.exec(`INSERT INTO usage_counters (user_id, day, metric, count)
     VALUES ('${ID.A}', '${TODAY}', 'lectures', ${count})
@@ -58,11 +77,21 @@ const segmentCount = async (lectureId: string) =>
       `SELECT count(*)::int AS n FROM transcript_segments WHERE lecture_id = '${lectureId}'`,
     )
   )[0]?.n
+interface CacheRow {
+  video_id: string
+  model: string
+  prompt_version: string
+  refusal: string | null
+  cues: Cue[]
+}
 const cacheRows = () =>
-  rows<{ video_id: string; model: string; cues: Cue[] }>(
+  rows<CacheRow>(
     f,
-    'SELECT video_id, model, cues FROM youtube_transcripts',
+    'SELECT video_id, model, prompt_version, refusal, cues FROM youtube_transcripts',
   )
+const chunkCount = async () =>
+  (await rows<{ n: number }>(f, 'SELECT count(*)::int AS n FROM youtube_transcript_chunks'))[0]?.n
+const callCount = async () => (await f.db.select().from(llmCalls)).length
 
 /** Speech every 10 s across a chunk (video timeline). */
 const speech = (chunk: VideoChunk, text = 'And so a pointer stores the address of a value.') =>
@@ -72,25 +101,25 @@ const speech = (chunk: VideoChunk, text = 'And so a pointer stores the address o
     text,
   }))
 
-describe('transcribeVideo: cache by video id (F10.6)', () => {
-  it('miss: transcribes every chunk via the transcriber role, caches, writes segments', async () => {
+describe('transcribeVideo: cache (F10.6)', () => {
+  it('miss: chunks via the transcriber role, cached under model and prompt version', async () => {
     const lectureId = await addYoutubeLecture()
-    expect(await transcribeVideoStep(f.db, lectureId)).toEqual({ cues: 60, cached: false })
-
+    expect(await runToDone(lectureId)).toBe(2) // one wave of 8 chunks, then stitch
     expect(await segmentCount(lectureId)).toBeGreaterThan(0)
     const [cache] = await cacheRows()
-    expect(cache).toMatchObject({ video_id: VIDEO, model: 'fake' })
+    expect(cache).toMatchObject({
+      video_id: VIDEO,
+      model: 'fake',
+      prompt_version: 'transcribe-chunk@2',
+      refusal: null,
+    })
     expect(cache?.cues.at(-1)?.endMs).toBeLessThanOrEqual(15 * MIN)
-    const [lecture] = await rows<{ has_timestamps: boolean; duration_ms: number }>(
-      f,
-      `SELECT has_timestamps, duration_ms FROM lectures WHERE id = '${lectureId}'`,
-    )
-    expect(lecture).toEqual({ has_timestamps: true, duration_ms: 15 * MIN })
+    expect(await chunkCount()).toBe(0) // in-progress chunks go once the transcript is cached
   })
 
   it('miss: one llm_calls row per 2-minute chunk, paid by the Google key, owner billed', async () => {
     const lectureId = await addYoutubeLecture()
-    await transcribeVideoStep(f.db, lectureId)
+    await runToDone(lectureId)
     const calls = await f.db.select().from(llmCalls)
     // 15 min → 0–2, 2–4, …, 12–14, 14–15: eight chunks.
     expect(calls).toHaveLength(8)
@@ -107,30 +136,63 @@ describe('transcribeVideo: cache by video id (F10.6)', () => {
   })
 
   it('hit: a second lecture of the same video reuses the transcript without AI calls', async () => {
-    await transcribeVideoStep(f.db, await addYoutubeLecture())
-    const callsBefore = (await f.db.select().from(llmCalls)).length
+    await runToDone(await addYoutubeLecture())
+    const before = await callCount()
     const second = await addYoutubeLecture()
     const transcriber = vi.fn<ChunkTranscriber>()
-
-    expect(await transcribeVideoStep(f.db, second, transcriber)).toEqual({ cues: 60, cached: true })
+    expect(await runToDone(second, transcriber)).toBe(1)
     expect(transcriber).not.toHaveBeenCalled()
-    expect((await f.db.select().from(llmCalls)).length).toBe(callsBefore)
+    expect(await callCount()).toBe(before)
     expect(await segmentCount(second)).toBeGreaterThan(0)
-    expect(await cacheRows()).toHaveLength(1)
   })
 
-  it('a fake transcript never serves a real run (cache rows are per model)', async () => {
-    await f.exec(`INSERT INTO youtube_transcripts (video_id, duration_ms, cues, model, prompt_version)
-      VALUES ('${VIDEO}', ${15 * MIN}, '[]'::jsonb, 'gemini-3.8-flash', 'transcribe-chunk@1')`)
+  it('a row from another model or prompt version is never served', async () => {
+    await f.exec(`INSERT INTO youtube_transcripts (video_id, model, prompt_version, duration_ms, cues)
+      VALUES ('${VIDEO}', 'fake', 'transcribe-chunk@1', ${15 * MIN}, '[]'::jsonb),
+             ('${VIDEO}', 'gemini-3.8-flash', 'transcribe-chunk@2', ${15 * MIN}, '[]'::jsonb)`)
     const transcriber = vi.fn<ChunkTranscriber>(async (chunk) => speech(chunk))
-    const result = await transcribeVideoStep(f.db, await addYoutubeLecture(), transcriber)
-    expect(result.cached).toBe(false)
+    await runToDone(await addYoutubeLecture(), transcriber)
     expect(transcriber).toHaveBeenCalled()
+    expect(await cacheRows()).toHaveLength(3)
   })
 })
 
-describe('transcribeVideo: chunks, stitching and checks (F10.5)', () => {
-  it('runs 2-minute chunks and retries an empty chunk between chunks with speech once', async () => {
+describe('transcribeVideo: durable waves (F10.5)', () => {
+  it('runs at most 10 chunks per call and stores each as it finishes', async () => {
+    let inFlight = 0
+    let peak = 0
+    const transcriber = vi.fn<ChunkTranscriber>(async (chunk) => {
+      inFlight += 1
+      peak = Math.max(peak, inFlight)
+      await new Promise((resolve) => setTimeout(resolve, 2))
+      inFlight -= 1
+      return speech(chunk)
+    })
+    const lectureId = await addYoutubeLecture(VIDEO, 60 * MIN)
+    expect(await transcribeVideoStep(f.db, lectureId, transcriber)).toBe('pending')
+    expect(await chunkCount()).toBe(10)
+    expect(await runToDone(lectureId, transcriber)).toBe(3) // 20 more chunks, then stitch
+    expect(peak).toBe(10)
+    expect(transcriber).toHaveBeenCalledTimes(30)
+  })
+
+  it('a transient failure leaves only that chunk for the next wave; finished ones stay', async () => {
+    let failOnce = true
+    const transcriber = vi.fn<ChunkTranscriber>(async (chunk) => {
+      if (chunk.startMs === 2 * MIN && failOnce) {
+        failOnce = false
+        throw new GoogleHttpError(503, 'high demand')
+      }
+      return speech(chunk)
+    })
+    const lectureId = await addYoutubeLecture(VIDEO, 6 * MIN)
+    expect(await transcribeVideoStep(f.db, lectureId, transcriber)).toBe('pending')
+    expect(await chunkCount()).toBe(2)
+    await runToDone(lectureId, transcriber)
+    expect(transcriber.mock.calls.map(([c]) => c.startMs / MIN)).toEqual([0, 2, 4, 2])
+  })
+
+  it('retries an empty chunk between chunks with speech once', async () => {
     let emptyOnce = true
     const transcriber = vi.fn<ChunkTranscriber>(async (chunk) => {
       if (chunk.startMs === 2 * MIN && emptyOnce) {
@@ -139,84 +201,88 @@ describe('transcribeVideo: chunks, stitching and checks (F10.5)', () => {
       }
       return speech(chunk)
     })
-    const lectureId = await addYoutubeLecture(VIDEO, 6 * MIN)
-    await transcribeVideoStep(f.db, lectureId, transcriber)
+    await runToDone(await addYoutubeLecture(VIDEO, 6 * MIN), transcriber)
     expect(transcriber.mock.calls.map(([c]) => c.startMs / MIN)).toEqual([0, 2, 4, 2])
     expect((await cacheRows())[0]?.cues.some((c) => c.startMs === 2 * MIN)).toBe(true)
   })
 
-  it('at most 10 chunks are in flight at once', async () => {
-    let inFlight = 0
-    let peak = 0
-    const transcriber: ChunkTranscriber = async (chunk) => {
-      inFlight += 1
-      peak = Math.max(peak, inFlight)
-      await new Promise((resolve) => setTimeout(resolve, 5))
-      inFlight -= 1
+  it('a chunk whose output failed its checks twice counts as empty and is retried once', async () => {
+    const transcriber = vi.fn<ChunkTranscriber>(async (chunk) => {
+      if (chunk.startMs === 2 * MIN) throw new FatalTaskError('transcribeChunk', ['bad'])
       return speech(chunk)
-    }
-    await transcribeVideoStep(f.db, await addYoutubeLecture(VIDEO, 60 * MIN), transcriber)
-    expect(peak).toBe(10)
+    })
+    await runToDone(await addYoutubeLecture(VIDEO, 6 * MIN), transcriber)
+    expect(transcriber.mock.calls.filter(([c]) => c.startMs === 2 * MIN)).toHaveLength(2)
   })
 
-  it('a transcript with a large gap fails without caching (Retry transcribes again)', async () => {
-    const transcriber: ChunkTranscriber = async (chunk) =>
-      chunk.startMs === 0 || chunk.startMs >= 10 * MIN ? speech(chunk) : []
-    const lectureId = await addYoutubeLecture(VIDEO, 15 * MIN)
-    await expect(transcribeVideoStep(f.db, lectureId, transcriber)).rejects.toThrow(
-      'transcript_incomplete',
+  it('Google refusing the video (4xx) fails at once and aborts the rest of the wave', async () => {
+    const signals: AbortSignal[] = []
+    const transcriber: ChunkTranscriber = async (chunk, signal) => {
+      signals.push(signal)
+      if (chunk.startMs === 0) throw new GoogleHttpError(403, 'The caller does not have permission')
+      await new Promise((resolve) => setTimeout(resolve, 20))
+      return speech(chunk)
+    }
+    await expect(transcribeVideoStep(f.db, await addYoutubeLecture(), transcriber)).rejects.toThrow(
+      'video_unavailable',
     )
-    expect(await cacheRows()).toHaveLength(0)
+    expect(signals.every((s) => s.aborted)).toBe(true)
+  })
+
+  it('a long silence (empty chunks after the retry pass) is not a gap failure', async () => {
+    const transcriber: ChunkTranscriber = async (chunk) =>
+      chunk.startMs === 0 || chunk.startMs >= 26 * MIN ? speech(chunk) : []
+    await runToDone(await addYoutubeLecture(VIDEO, 30 * MIN), transcriber)
+    expect((await cacheRows())[0]?.refusal).toBeNull()
   })
 })
 
-describe('transcribeVideo: no speech refunds the lecture (F10.5)', () => {
-  it('fails with the plain-words message and gives the day’s lecture back, once', async () => {
+describe('transcribeVideo: no speech, not English (F10.5)', () => {
+  it('fails in plain words, refunds once and caches the verdict', async () => {
     await setLecturesUsed(3)
     const lectureId = await addYoutubeLecture(FAKE_SILENT_VIDEO_ID)
 
-    await expect(transcribeVideoStep(f.db, lectureId)).rejects.toThrow(NO_SPEECH_MESSAGE)
+    await expect(runToDone(lectureId)).rejects.toThrow(NO_SPEECH_MESSAGE)
     expect(await lecturesUsed()).toBe(2)
     const [step] = await rows<{ output: { error: { code: string }; refunded: boolean } }>(
       f,
       `SELECT output FROM pipeline_steps WHERE lecture_id = '${lectureId}'`,
     )
     expect(step?.output).toMatchObject({ error: { code: 'no_speech' }, refunded: true })
+    expect(await cacheRows()).toMatchObject([{ refusal: 'no_speech', cues: [] }])
 
-    // Retrying the failed step doesn't refund the same lecture twice.
+    // Running the step again refunds nothing more and spends nothing: the verdict is cached.
+    const before = await callCount()
     await expect(transcribeVideoStep(f.db, lectureId)).rejects.toThrow('no_speech')
     expect(await lecturesUsed()).toBe(2)
-    expect(await cacheRows()).toHaveLength(0)
+    expect(await callCount()).toBe(before)
+  })
+
+  it('refunds at most one lecture per student per day', async () => {
+    await setLecturesUsed(3)
+    const silence: ChunkTranscriber = async () => []
+    await expect(runToDone(await addYoutubeLecture('silentVid01'), silence)).rejects.toThrow()
+    await expect(runToDone(await addYoutubeLecture('silentVid02'), silence)).rejects.toThrow()
+    expect(await lecturesUsed()).toBe(2)
   })
 
   it('a transcript that is not English fails, refunded, even when the Data API said en', async () => {
     await setLecturesUsed(1)
     const transcriber: ChunkTranscriber = async (chunk) =>
       speech(chunk, 'Nous allons parler de la mémoire et des pointeurs dans ce cours.')
-    await expect(
-      transcribeVideoStep(f.db, await addYoutubeLecture(), transcriber),
-    ).rejects.toThrow('not_english')
+    await expect(runToDone(await addYoutubeLecture(), transcriber)).rejects.toThrow('not_english')
     expect(await lecturesUsed()).toBe(0)
+    expect((await cacheRows())[0]?.refusal).toBe('not_english')
   })
 })
 
 describe('transcribeVideo: the Google spend cap', () => {
   it('stops transcription at 100 % of GOOGLE_AI_BUDGET_USD without pausing other AI', async () => {
-    await f.db.insert(llmCalls).values({
-      task: 'transcribeChunk',
-      role: 'transcriber',
-      model: 'gemini-3.8-flash',
-      promptVersion: 'transcribe-chunk@1',
-      gatewayKey: 'google',
-      costUsd: 10,
-      outcome: 'ok',
-    })
-    await expect(transcribeVideoStep(f.db, await addYoutubeLecture())).rejects.toThrow(
-      'intake_paused',
-    )
-    const blocked = await rows<{ outcome: string; gateway_key: string }>(
+    await googleSpend(10)
+    await expect(runToDone(await addYoutubeLecture())).rejects.toThrow('intake_paused')
+    const blocked = await rows<{ gateway_key: string }>(
       f,
-      `SELECT outcome, gateway_key FROM llm_calls WHERE outcome = 'budget_blocked'`,
+      `SELECT gateway_key FROM llm_calls WHERE outcome = 'budget_blocked'`,
     )
     expect(blocked.length).toBeGreaterThan(0)
     expect(blocked.every((r) => r.gateway_key === 'google')).toBe(true)
@@ -228,9 +294,9 @@ describe('transcribeVideo: the Google spend cap', () => {
   })
 })
 
-describe('processLecture for a YouTube lecture', () => {
-  it('transcribeVideo → the normal steps → ready', async () => {
-    const lectureId = await addYoutubeLecture()
+describe('processLecture and Retry for a YouTube lecture', () => {
+  it('transcribeVideo waves → the normal steps → ready', async () => {
+    const lectureId = await addYoutubeLecture(VIDEO, 30 * MIN)
     await claimLecture(ACTOR_A, lectureId, undefined, f.db)
     expect(await processLecture(lectureId)).toBe('ready')
     const steps = await rows<{ step: string }>(
@@ -248,8 +314,36 @@ describe('processLecture for a YouTube lecture', () => {
     await expect(claimLecture(ACTOR_A, lectureId, 'parseTranscript', f.db)).rejects.toMatchObject({
       code: 'invalid_state',
     })
-    await expect(claimLecture(ACTOR_A, lectureId, 'extractConcepts', f.db)).resolves.toMatchObject(
-      { reprocessCharged: true },
-    )
+    await expect(claimLecture(ACTOR_A, lectureId, 'extractConcepts', f.db)).resolves.toMatchObject({
+      reprocessCharged: true,
+    })
+  })
+
+  it('a plain Retry is refused when the transcription failed for good', async () => {
+    const lectureId = await addYoutubeLecture(FAKE_SILENT_VIDEO_ID)
+    await claimLecture(ACTOR_A, lectureId, undefined, f.db)
+    expect(await processLecture(lectureId)).toBe('failed')
+    await expect(claimLecture(ACTOR_A, lectureId, undefined, f.db)).rejects.toMatchObject({
+      code: 'invalid_state',
+    })
+  })
+
+  it('a Retry that would transcribe again obeys the Google cap', async () => {
+    const lectureId = await addYoutubeLecture()
+    await f.exec(`UPDATE lectures SET status = 'failed',
+      error = '{"step":"transcribeVideo","code":"transcription_stalled","message":"x"}'::jsonb
+      WHERE id = '${lectureId}'`)
+    await googleSpend(7.5, new Date(Date.now() - 120 * MIN))
+    await expect(claimLecture(ACTOR_A, lectureId, undefined, f.db)).rejects.toMatchObject({
+      code: 'intake_paused',
+    })
+  })
+
+  it('the hourly Google cap also pauses (25 % of the budget within an hour)', async () => {
+    const lectureId = await addYoutubeLecture()
+    await googleSpend(2.5)
+    await expect(claimLecture(ACTOR_A, lectureId, undefined, f.db)).rejects.toMatchObject({
+      code: 'intake_paused',
+    })
   })
 })
