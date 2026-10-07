@@ -150,7 +150,7 @@ Joins concepts, edges, layout, this user's markers and **mastery computed on rea
   "course": { "id": "…", "title": "CS50x 2026", "kind": "library",
               "attribution": { "text": "CS50x 2026 by Harvard University, CC BY-NC-SA 4.0. Adapted by Lectheo.", "url": "https://cs50.harvard.edu/x/license/" } },
   "lectures": [{ "id": "…", "title": "Lecture 5 · Data Structures", "seq": 5, "status": "ready", "hasTimestamps": true,
-                "durationMs": 2700000, "chapterStartsMs": [0, 410000, 1215000] }],
+                "startMs": 0, "durationMs": 2700000, "chapterStartsMs": [0, 410000, 1215000] }],
   "nodes": [{
     "id": "c_…", "name": "Hash tables", "summary": "…", "lectureIds": ["…"],
     "mastery": { "state": "red", "confidentMistake": true, "reasons": ["Sure and wrong in Diagnostic (twice)"] },
@@ -165,7 +165,7 @@ Joins concepts, edges, layout, this user's markers and **mastery computed on rea
 }
 ```
 
-*(decided 7 Oct 2026, to be built)* ([[Lectheo Product Spec#F2. Concept map — Must|F2.10–F2.11]]): `lectures[].durationMs` (the playable window, or the last segment's end; `null` without timestamps) and `chapterStartsMs` feed the full-width *Your markers* timeline. `moments` are this user's markers on the concept ("▶ 12:41" links). `sources` are where the lecture teaches it ([[Lectheo Product Spec#F2. Concept map — Must|F2.4]]): up to 3, most salient first. `position` is `null` before the layout exists.
+([[Lectheo Product Spec#F2. Concept map — Must|F2.10–F2.11]]) `lectures[].startMs`, `durationMs` and `chapterStartsMs` feed the full-width *Your markers* timeline, all in media time like markers' `tMs`: `startMs` is a library window's `media.startMs` (else 0); `durationMs` is the playable window (`media.endMs − media.startMs`), else the recording or YouTube length, else the last segment's end, and `null` without timestamps; `chapterStartsMs` is each chapter's first segment start (`[]` without chapters). `moments` are this user's markers on the concept ("▶ 12:41" links). `sources` are where the lecture teaches it ([[Lectheo Product Spec#F2. Concept map — Must|F2.4]]): up to 3, most salient first. `position` is `null` before the layout exists.
 
 ### `GET /courses/{courseId}/next`
 `200 { kind: "processing"|"study"|"watch"|"diagnostic"|"activity"|"add_lecture", lectureId?, conceptId?, conceptName?, activityType?, reason, evidence, estimateMinutes, payoff, alsoWorthDoing }` (F0.9–F0.12, `packages/contracts/src/api/courses.ts`; rules in `packages/domain/src/recommender.ts`).

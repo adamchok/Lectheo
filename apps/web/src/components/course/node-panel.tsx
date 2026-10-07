@@ -68,6 +68,18 @@ export interface NodePanelProps {
 export function NodePanel({ concept, map, onClose }: NodePanelProps) {
   const headingRef = useRef<HTMLHeadingElement>(null)
   useEffect(() => headingRef.current?.focus(), [concept.id])
+  // Esc closes the sheet wherever focus is, on the map or in the panel (F2.10).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing) return
+      // Esc in a text field (a native search input) clears it; it doesn't close the sheet.
+      if ((e.target as Element | null)?.closest?.('input, textarea, select, [contenteditable]'))
+        return
+      onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   const lectureById = new Map(map.lectures.map((l) => [l.id, l]))
   const nameById = new Map(map.nodes.map((n) => [n.id, n.name]))
@@ -92,7 +104,6 @@ export function NodePanel({ concept, map, onClose }: NodePanelProps) {
   return (
     <aside
       aria-labelledby="node-panel-heading"
-      onKeyDown={(e) => e.key === 'Escape' && onClose()}
       className="bg-card border-border w-full space-y-4 rounded-lg border p-5"
     >
       <div className="flex items-start justify-between gap-3">

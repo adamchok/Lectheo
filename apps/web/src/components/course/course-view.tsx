@@ -4,7 +4,7 @@ import type { CourseMapResponse } from '@lectheo/contracts'
 import { Info, List, Network } from 'lucide-react'
 import type { Route } from 'next'
 import dynamic from 'next/dynamic'
-import { useState } from 'react'
+import { useState, type KeyboardEvent } from 'react'
 import { pluralize } from '@/client/format'
 import { useCourseMap } from '@/client/queries'
 import { ErrorState } from '@/components/error-state'
@@ -35,8 +35,19 @@ const VIEW_KEY = 'lectheo.courseView'
 /** Below this many concepts the map gets an explanatory note (F2.9). */
 const SMALL_MAP = 3
 
+const WIDE = '(min-width: 768px)'
 /** Phones start on the list: a fitted map of 15+ nodes is unreadable at 375px. */
-const defaultView = (): View => (window.matchMedia('(min-width: 768px)').matches ? 'map' : 'list')
+const defaultView = (): View => (window.matchMedia(WIDE).matches ? 'map' : 'list')
+
+const SHEET_ID = 'node-sheet'
+const nodeElement = (id: string) =>
+  document.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(id)}"]`)
+
+/** Focus was in the sheet, on a map node, or nowhere: closing may move it back to the node. */
+function focusWasOnMap(): boolean {
+  const active = document.activeElement
+  return !active || active === document.body || !!active.closest(`#${SHEET_ID}, .react-flow__node`)
+}
 
 function storedView(): View {
   try {
@@ -98,27 +109,6 @@ function ViewToggle({ view, onChange }: { view: View; onChange: (view: View) => 
   )
 }
 
-interface SideColumnProps {
-  map: CourseMapResponse
-  selectedId: string | null
-  onClose: () => void
-}
-
-/** The right column: the open concept's panel, else the lecture timeline (Design System §4). */
-function SideColumn({ map, selectedId, onClose }: SideColumnProps) {
-  const selected = map.nodes.find((n) => n.id === selectedId)
-  return (
-    <div className="space-y-6 lg:sticky lg:top-[calc(var(--topbar-height)+1rem)]">
-      {selected ? (
-        <NodePanel concept={selected} map={map} onClose={onClose} />
-      ) : (
-        <LectureTimeline map={map} />
-      )}
-      {map.course.kind === 'library' && <LicenseNotice />}
-    </div>
-  )
-}
-
 /** /courses/[id]: concept map + accessible list view (F2, F2.8). */
 export function CourseView({ courseId }: { courseId: string }) {
   const map = useCourseMap(courseId)
@@ -151,19 +141,36 @@ export function CourseView({ courseId }: { courseId: string }) {
   }
 
   const { course, nodes, lectures } = map.data
+  const selected = nodes.find((n) => n.id === selectedId)
   const counts = countMastery(nodes.map((node) => node.mastery.state))
   const activeView: View = FEATURES.conceptMapCanvas && nodes.length > 0 ? view : 'list'
 
   const changeView = (next: View) => {
+    setSelectedId(null)
     setView(next)
     rememberView(next)
   }
-  // Closing the panel returns focus to its node (F2.8).
+  // Closing the panel returns focus to its node (F2.8), unless focus had moved elsewhere (a
+  // timeline dot). Focus first: re-rendering the nodes briefly hides them while React Flow
+  // re-measures, and a hidden node can't take focus. Below md the map is inert behind the sheet
+  // until that render, so lift it now.
   const closePanel = () => {
-    const id = selectedId
+    const node = selectedId && focusWasOnMap() ? nodeElement(selectedId) : null
+    node?.closest('[inert]')?.removeAttribute('inert')
+    node?.focus()
     setSelectedId(null)
-    document.querySelector<HTMLElement>(`.react-flow__node[data-id="${id}"]`)?.focus()
   }
+  // React Flow blurs a selected node on Esc (one frame later), which would drop the focus we
+  // restore: handle Esc on a node here, before React Flow sees it.
+  const onMapKeyDownCapture = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Escape' || !selectedId) return
+    if (!(event.target as HTMLElement).closest('.react-flow__node')) return
+    event.stopPropagation()
+    closePanel()
+  }
+  // ponytail: read at render (selection changes re-render); a resize while open keeps the old value.
+  // Below md the sheet covers the whole map, so the nodes behind it leave the tab order.
+  const mapHidden = !!selected && typeof window !== 'undefined' && !window.matchMedia(WIDE).matches
 
   return (
     <>
@@ -176,9 +183,7 @@ export function CourseView({ courseId }: { courseId: string }) {
             {FEATURES.conceptMapCanvas && nodes.length > 0 && (
               <ViewToggle view={activeView} onChange={changeView} />
             )}
-            {course.kind === 'personal' && (
-              <CourseActions course={course} lectures={lectures} />
-            )}
+            {course.kind === 'personal' && <CourseActions course={course} lectures={lectures} />}
           </>
         }
       />
@@ -190,22 +195,30 @@ export function CourseView({ courseId }: { courseId: string }) {
 
       <MasteryBar counts={counts} className="mb-8 max-w-xl" />
 
-      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_var(--panel-width)]">
-        <div className="min-w-0 space-y-3">
-          {activeView === 'map' ? (
-            <>
-              {nodes.length < SMALL_MAP && <SmallMapNote />}
-              <ConceptMap map={map.data} selectedId={selectedId} onOpen={setSelectedId} />
-            </>
-          ) : (
-            <ConceptList map={map.data} />
-          )}
-        </div>
-        <SideColumn
-          map={map.data}
-          selectedId={activeView === 'map' ? selectedId : null}
-          onClose={closePanel}
-        />
+      <div className="space-y-8">
+        {activeView === 'map' ? (
+          <div className="space-y-3">
+            {nodes.length < SMALL_MAP && <SmallMapNote />}
+            {/* F2.10: full-width map; the open concept is a sheet over its right side. */}
+            <div className="relative" onKeyDownCapture={onMapKeyDownCapture}>
+              <div inert={mapHidden}>
+                <ConceptMap map={map.data} selectedId={selectedId} onOpen={setSelectedId} />
+              </div>
+              {selected && (
+                <div
+                  id={SHEET_ID}
+                  className="absolute inset-y-3 right-3 max-w-[calc(100%-1.5rem)] w-panel overflow-y-auto rounded-lg shadow-lg"
+                >
+                  <NodePanel concept={selected} map={map.data} onClose={closePanel} />
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <ConceptList map={map.data} />
+        )}
+        <LectureTimeline map={map.data} />
+        {course.kind === 'library' && <LicenseNotice />}
       </div>
     </>
   )

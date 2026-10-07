@@ -5,7 +5,12 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ConceptMap, edgeHandles } from './concept-map'
-import { LectureTimeline } from './lecture-timeline'
+import {
+  clusterMarkers,
+  LectureTimeline,
+  lectureAxis,
+  type TimelineMarker,
+} from './lecture-timeline'
 import { TaughtAt } from './node-panel'
 
 declare global {
@@ -32,7 +37,18 @@ function node(id: string, name: string, extra: Partial<MapNode> = {}): MapNode {
 
 const map: CourseMapResponse = {
   course: { id: 'course', title: 'CS50', kind: 'library', attribution: null },
-  lectures: [{ id: L1, title: 'Lecture 1', seq: 1, status: 'ready', hasTimestamps: true }],
+  lectures: [
+    {
+      id: L1,
+      title: 'Lecture 1',
+      seq: 1,
+      status: 'ready',
+      hasTimestamps: true,
+      startMs: 0,
+      durationMs: 600_000,
+      chapterStartsMs: [0, 300_000],
+    },
+  ],
   nodes: [
     node('arrays', 'Arrays', {
       position: { x: 0, y: 200 },
@@ -73,6 +89,54 @@ describe('LectureTimeline', () => {
     expect(links[0]?.getAttribute('href')).toBe(`/lectures/${L1}?t=61000#transcript`)
     expect(links[0]?.getAttribute('aria-label')).toMatch(/^Lost at /)
     expect(links[1]?.getAttribute('aria-label')).toMatch(/^Important at .*, unlinked$/)
+  })
+
+  it('runs over the real lecture length with chapter ticks and start/end times (F2.11)', () => {
+    act(() => root.render(<LectureTimeline map={map} />))
+    // The first chapter starts the lecture: one tick, at 5:00.
+    const ticks = [...container.querySelectorAll<HTMLElement>('[data-testid="chapter-tick"]')]
+    expect(ticks.map((t) => t.style.left)).toEqual(['50%'])
+    // Screen readers get the range in the list's name, not as bare times.
+    expect(
+      container.querySelector('ul[aria-label^="Markers in"]')?.getAttribute('aria-label'),
+    ).toMatch(/^Markers in Lecture 1, .+ to .+$/)
+    expect(container.textContent).toContain('0:00')
+    expect(container.textContent).toContain('10:00')
+  })
+})
+
+describe('clusterMarkers', () => {
+  const at = (id: string, tMs: number): TimelineMarker => ({
+    id,
+    lectureId: L1,
+    kind: 'lost',
+    tMs,
+    unlinked: false,
+  })
+  // A library window: 10:00 to 40:00 of the video.
+  const axis = { startMs: 600_000, endMs: 2_400_000 }
+  const markers = [at('a', 600_000), at('b', 1_500_000), at('c', 1_530_000), at('d', 2_400_000)]
+
+  it('places markers relative to the lecture start', () => {
+    const [, mid] = clusterMarkers(markers, axis, 3000)
+    expect(mid?.leftPct).toBe(50)
+  })
+
+  it('keeps the first and last dot inside the track', () => {
+    const clusters = clusterMarkers(markers, axis, 1000)
+    expect(clusters[0]?.leftPct).toBeCloseTo(1.6)
+    expect(clusters.at(-1)?.leftPct).toBeCloseTo(98.4)
+  })
+
+  it('clusters close markers on a narrow track and splits them on a wide one', () => {
+    // 30 s apart: 5 px at 300 px wide (one dot), 50 px at 3000 px wide (two).
+    expect(clusterMarkers(markers, axis, 300).map((c) => c.markers.length)).toEqual([1, 2, 1])
+    expect(clusterMarkers(markers, axis, 3000).map((c) => c.markers.length)).toEqual([1, 1, 1, 1])
+  })
+
+  it('falls back to just past the last marker without a lecture length', () => {
+    const lecture = { ...map.lectures[0]!, startMs: 600_000, durationMs: null }
+    expect(lectureAxis(lecture, [at('a', 700_000)])).toEqual({ startMs: 600_000, endMs: 705_000 })
   })
 })
 

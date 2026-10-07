@@ -414,7 +414,7 @@ nothing at all left → add_lecture ("Add Lecture N+1" in an own course / "Add y
 | `/` | Public landing and sign-in: Continue with Google · Try the sample account (Turnstile). Signed-in visitors are redirected to `/dashboard` (`proxy.ts`) |
 | `/privacy`, `/terms` | Legal pages |
 | `/dashboard` | Course cards, lecture list and status, "Next step" card, account menu (sample label + Reset; *Delete account* for Google accounts). Google first run: an empty first-run screen with *Add your first lecture* |
-| `/courses/[id]` | Concept map (React Flow, stored ELK layout) + list view toggle + lecture timeline with unlinked markers |
+| `/courses/[id]` | Full-width concept map (React Flow, stored ELK layout; node panel as a sheet over it) + list view toggle + *Your markers* timeline below, with unlinked markers |
 | `/lectures/new` | Add lecture: Import recording · Upload audio · Paste or upload transcript, with the consent checkbox (Record live is not built) |
 | `/lectures/[id]/watch` | Watch mode (YouTube or local file) with L/I marking, side panel with **Transcript \| Chapters** tabs, a progress bar with chapter ticks, *play this chapter only* and chapter-level marks ([[Lectheo Product Spec#F11. Chapters — Must|F11]]). `?t=` starts at a moment |
 | `/lectures/[id]` | **Study** ([[Lectheo Product Spec#F9. Study mode — Must|F9]]) once the map exists: the reading brief with inline clips, concept marks and *Test me*. Otherwise, or with `?view=transcript` (or a `?t=` deep link), processing progress (2 s polling) and the transcript. A **Study \| Watch \| Transcript** switch in the top bar |

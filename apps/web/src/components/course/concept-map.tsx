@@ -7,12 +7,13 @@ import {
   Controls,
   MarkerType,
   ReactFlow,
+  useReactFlow,
   type Edge,
   type NodeTypes,
 } from '@xyflow/react'
 import { NODE_HEIGHT, NODE_WIDTH } from '@lectheo/domain'
 import { useTheme } from 'next-themes'
-import { useMemo, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, type KeyboardEvent } from 'react'
 import { RELATION_LABELS } from '@/lib/labels'
 import { ConceptNode, conceptAriaLabel, type ConceptFlowNode } from './concept-node'
 
@@ -95,6 +96,34 @@ function toFlowEdges(edges: readonly MapEdge[], positions: Map<string, Point>): 
     }))
 }
 
+const FIT_PADDING = 0.15
+/** Gap between the fitted nodes and the sheet's left edge. */
+const SHEET_GAP_PX = 24
+
+/**
+ * Refits when the node sheet opens or closes (F2.10), leaving room on the right for the sheet so
+ * no node hides under it. Phones skip it: there the sheet covers the whole map.
+ */
+function FitBesideSheet({ open }: { open: boolean }) {
+  const { fitView } = useReactFlow()
+  const mounted = useRef(false)
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true
+      return
+    }
+    if (!window.matchMedia('(min-width: 768px)').matches) return
+    const css = getComputedStyle(document.documentElement).getPropertyValue('--panel-width')
+    const right = `${(Number.parseFloat(css) || 352) + SHEET_GAP_PX}px` as const
+    void fitView({
+      padding: open
+        ? { top: FIT_PADDING, bottom: FIT_PADDING, left: FIT_PADDING, right }
+        : FIT_PADDING,
+    })
+  }, [open, fitView])
+  return null
+}
+
 export interface ConceptMapProps {
   map: CourseMapResponse
   selectedId: string | null
@@ -136,13 +165,14 @@ export function ConceptMap({ map, selectedId, onOpen }: ConceptMapProps) {
         nodesConnectable={false}
         edgesFocusable={false}
         fitView
-        fitViewOptions={{ padding: 0.15 }}
+        fitViewOptions={{ padding: FIT_PADDING }}
         minZoom={0.2}
         colorMode={resolvedTheme === 'dark' ? 'dark' : 'light'}
         aria-label="Concept map"
       >
         <Background gap={24} />
         <Controls showInteractive={false} />
+        <FitBesideSheet open={selectedId !== null} />
       </ReactFlow>
     </div>
   )

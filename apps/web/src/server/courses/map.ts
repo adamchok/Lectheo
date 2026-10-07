@@ -22,14 +22,15 @@ import { excerpt } from '../activities/sources'
 import type { Actor } from '../auth'
 import { appDb, type DbLike } from '../db'
 import { FEATURES } from '../features'
+import { type LectureLengthInput, playableWindow } from '../lectures/length'
 import { loadMasteryForUser } from '../mastery'
 import { loadCourseForRead, type Course } from '../ownership'
 import { toAttribution } from './summary'
 
 /*
- * GET /courses/{id}/map (API Spec §4). 7 queries in 3 round trips: the ownership check; then
- * lectures, concepts⋈occurrences, edges, markers⟕marker_concepts and occurrences⋈segments in
- * parallel; then attempts
+ * GET /courses/{id}/map (API Spec §4). 8 queries in 3 round trips: the ownership check; then
+ * lectures, concepts⋈occurrences, edges, markers⟕marker_concepts, occurrences⋈segments and
+ * per-lecture segment times in parallel; then attempts
  * (plus one courses.layout write for a personal course whose graph changed since its layout).
  * 🔒 concepts.key_points is never selected.
  */
@@ -52,6 +53,8 @@ const loadLectures = (db: DbLike, courseId: string) =>
       seq: lectures.seq,
       status: lectures.status,
       hasTimestamps: lectures.hasTimestamps,
+      media: lectures.media,
+      durationMs: lectures.durationMs,
     })
     .from(lectures)
     .where(eq(lectures.courseId, courseId))
@@ -132,6 +135,36 @@ const loadSources = (db: DbLike, courseId: string) =>
     )
     .where(eq(concepts.courseId, courseId))
     .orderBy(desc(conceptOccurrences.salience), asc(lectures.seq), asc(transcriptSegments.idx))
+
+/**
+ * Per lecture: its last segment's end and its chapters' start times (F2.11), in one pass over the
+ * course's segments.
+ */
+const loadSegmentTimes = (db: DbLike, courseId: string) =>
+  db
+    .select({
+      lectureId: lectures.id,
+      lastEndMs: sql<number>`max(${transcriptSegments.endMs})`,
+      chapterStartsMs: sql<number[] | null>`array_agg(${transcriptSegments.startMs}
+        ORDER BY ${transcriptSegments.idx}) FILTER (WHERE ${transcriptSegments.idx} IN
+        (SELECT (c->>'startIdx')::int FROM jsonb_array_elements(${lectures.chapters}) c))`,
+    })
+    .from(transcriptSegments)
+    .innerJoin(lectures, eq(lectures.id, transcriptSegments.lectureId))
+    .where(eq(lectures.courseId, courseId))
+    .groupBy(lectures.id)
+
+type SegmentTimes = Awaited<ReturnType<typeof loadSegmentTimes>>[number]
+
+/** The timeline's axis for one lecture (F2.11), in media time; none without timestamps. */
+export function lectureTimes(
+  lecture: LectureLengthInput & { hasTimestamps: boolean },
+  segments: Pick<SegmentTimes, 'lastEndMs' | 'chapterStartsMs'> | undefined,
+): { startMs: number; durationMs: number | null; chapterStartsMs: number[] } {
+  if (!lecture.hasTimestamps) return { startMs: 0, durationMs: null, chapterStartsMs: [] }
+  const window = playableWindow(lecture, segments?.lastEndMs ?? null)
+  return { ...window, chapterStartsMs: segments?.chapterStartsMs ?? [] }
+}
 
 type SourceRow = Awaited<ReturnType<typeof loadSources>>[number]
 
@@ -219,13 +252,17 @@ export async function getCourseMap(
   db: DbLike = appDb(),
 ): Promise<CourseMapResponse> {
   const course: Course = await loadCourseForRead(actor, courseId, db)
-  const [lectureRows, conceptRows, edges, markerRows, sourceRows] = await Promise.all([
-    loadLectures(db, course.id),
-    loadConcepts(db, course.id),
-    loadEdges(db, course.id),
-    loadMarkers(db, course.id, actor.userId),
-    loadSources(db, course.id),
-  ])
+  const [lectureRows, conceptRows, edges, markerRows, sourceRows, segmentTimes] = await Promise.all(
+    [
+      loadLectures(db, course.id),
+      loadConcepts(db, course.id),
+      loadEdges(db, course.id),
+      loadMarkers(db, course.id, actor.userId),
+      loadSources(db, course.id),
+      loadSegmentTimes(db, course.id),
+    ],
+  )
+  const timesByLecture = new Map(segmentTimes.map((t) => [t.lectureId, t]))
   const grouped = groupConcepts(conceptRows)
   const mastery = await loadMasteryForUser(db, actor.userId, [...grouped.keys()])
   const moments = momentsByConcept(markerRows)
@@ -257,7 +294,10 @@ export async function getCourseMap(
       kind: course.kind,
       attribution: toAttribution(course.attribution),
     },
-    lectures: lectureRows,
+    lectures: lectureRows.map(({ media, durationMs, ...l }) => ({
+      ...l,
+      ...lectureTimes({ ...l, media, durationMs }, timesByLecture.get(l.id)),
+    })),
     nodes,
     edges,
     unlinkedMarkers: unlinked(markerRows, lectureRows),

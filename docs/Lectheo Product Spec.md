@@ -133,8 +133,8 @@ There are four ways to add a lecture. All of them feed the same pipeline after t
 | F2.7 | **Deduplicate:** new concepts are matched against existing ones in the course. | Should (own courses) |
 | F2.8 | **Accessible alternative:** a list view of concepts with state, markers and links. The map is keyboard-navigable. | Must |
 | F2.9 | Edge case: a lecture with very little conceptual content (e.g. an admin session) shows a short map with an explanatory empty state rather than inventing concepts. | Must |
-| F2.10 | *(decided 7 Oct 2026, to be built)* **The map gets the full content width.** Clicking a node opens the concept panel as a sheet over the map's right side (`panel-width`, closed with Esc or ✕) instead of a permanent column. Phones: one column, the panel as a full-height sheet, as today. | Must |
-| F2.11 | *(decided 7 Oct 2026, to be built)* **Your markers** (the per-lecture L/I timeline, F2.3) moves below the map at full width. Each track runs over the **real lecture length** with its start and end time under it, shows the lecture's **chapter ticks**, and keeps its dots inside the track. Fewer dots cluster because the track is about three times wider. | Must |
+| F2.10 | *(built 8 Oct 2026)* **The map gets the full content width.** Clicking a node opens the concept panel as a sheet over the map's right side (`panel-width`, closed with Esc or ✕) instead of a permanent column. Phones: one column, the panel as a full-height sheet, as today. | Must |
+| F2.11 | *(built 8 Oct 2026)* **Your markers** (the per-lecture L/I timeline, F2.3) moves below the map at full width. Each track runs over the **real lecture length** with its start and end time under it, shows the lecture's **chapter ticks**, and keeps its dots inside the track. Fewer dots cluster because the track is about three times wider. | Must |
 
 ### F3. Adaptive, confidence-rated diagnostic — Must
 
@@ -366,9 +366,7 @@ Full analysis, profiles, feature matrix and sources: **[[Lectheo Competition]]**
 
 **In scope (Must):** sign-in page (Google + sample account); dashboard; CS50 library with watch mode; import recording + transcript; audio and transcript upload; markers; concept map + list view; adaptive diagnostic; spot the flaw; teach-back; Socratic feedback; mastery map; consent, deletion and limits; Study mode ([[#F9. Study mode — Must|F9]], built 7 Oct 2026, redesigned the same day: F9.9–F9.15); chapters ([[#F11. Chapters — Must|F11]], built 7 Oct 2026).
 
-**Decided 7 Oct 2026, to be built:** course page layout ([[#F2. Concept map — Must|F2.10–F2.11]]: full-width map, markers timeline below it).
-
-**Built 8 Oct 2026:** diagnostic coverage ([[#F3. Adaptive, confidence-rated diagnostic — Must|F3.9–F3.11]]: baseline spread across chapters, coverage on the results, *Test the rest*).
+**Built 8 Oct 2026:** course page layout ([[#F2. Concept map — Must|F2.10–F2.11]]: full-width map, markers timeline below it); diagnostic coverage ([[#F3. Adaptive, confidence-rated diagnostic — Must|F3.9–F3.11]]: baseline spread across chapters, coverage on the results, *Test the rest*).
 
 **Built 7 Oct 2026:** YouTube lectures ([[#F10. YouTube lectures — Should (after a spike)|F10]], Should), behind the `FEATURE_YOUTUBE_LECTURES` switch; F10.9 passed after the review.
 
@@ -455,6 +453,8 @@ Recorded at submission (6 Oct 2026). Each deviation is deliberate; evidence is i
 | F0.9 | When processing reaches `map_ready` the map opens | The processing card offers **Open the map** at `map_ready`; the dashboard never navigates on its own. | The page is safe to leave and the student may be elsewhere; moving them without a click would be surprising. |
 | F0.12 | Stump on the concept **mastered longest ago** | Stump on the mastered concept **practiced longest ago** (oldest latest attempt), `packages/domain/src/recommender.ts`. A lecture whose processing failed (to retry), then one still being added (*Finish adding …*), is offered before *add a lecture*. | Close enough for spacing practice without replaying every attempt to find when each concept turned green. |
 | F2.2 | About 1 concept per 3 minutes (min 3, max 20) | The pipeline follows the rule (`packages/domain/src/scale.ts`). The **CS50 library** has 6 concepts per 45-minute window, where the rule gives about 15. | The library curriculum is fixed: the item bank's stable ids, the seed student and the e2e judge path depend on it. Six well-verified concepts per lecture beat fifteen thinner ones for a two-minute judge path. Student-added lectures get the full rule. |
+| F2.10 | The panel is a sheet over the map's right side; phones get a full-height sheet | A non-modal card over the map (`panel-width`, `shadow-lg`): on wider screens the map stays usable behind it (another node swaps the panel) and refits so no node sits under the sheet. Esc closes it wherever focus is; focus returns to the node only if it was in the sheet or on the map. On phones it covers the map's full height and width, and the map is `inert` while it is open. | No new sheet component or focus trap; the panel already moves focus to its heading and back to the node on close. |
+| F2.11 | Map `lectures[]` adds `durationMs` and `chapterStartsMs` | Also adds `startMs` (where the lecture starts in media time: a library window's start, else 0). Start and end times under each track are media times, like the dots' "12:41" titles and links. Without a length (no timestamps) the track runs to just past the last marker and shows no times. | Markers' `tMs` are media time; a library window starts mid-video, so the client needs the offset to place dots on the real axis. |
 | F7.1 | Library processed from the official subtitles **and slides** | Built from the official timestamped subtitles only (`scripts/seed-library.ts`). | Slides input is a Should in the decision log (§10). Every concept and item cites subtitle timestamps, so grounding is checkable without slides. |
 
 Built on 6 Oct 2026: F0.4 (the dashboard follows the student's own course), F0.6 (self-serve *Delete account*), F0.7 (rename and delete own courses; the CS50 library is visible to sample and owner accounts only), F0.8 (first-run screen), F0.9 (processing steps on the dashboard), F0.10–F0.12 (why, how long, payoff, *Also worth doing*, no dead end) and F8.2 (delete course and delete account).
@@ -463,7 +463,7 @@ Built on 7 Oct 2026: F9 (Study mode: the lecture brief, concept marks, Test me, 
 
 Also built on 7 Oct 2026: F10 (YouTube lectures: the *From YouTube* tab, Data API checks, the direct-Google `transcriber`, the `transcribeVideo` step with its per-video cache, the embed in Watch and Study with *Open on YouTube*). F10.9 passed on MIT 6.006 after the review (see F10.9). It is switched on with `FEATURE_YOUTUBE_LECTURES=1`.
 
-Built on 8 Oct 2026: F3.9–F3.11 (diagnostic coverage: baseline spread across chapters, the coverage line on the results, *Test the rest* rounds, *No checked question yet*). Their as-built notes are in the F3 table.
+Built on 8 Oct 2026: F3.9–F3.11 (diagnostic coverage: baseline spread across chapters, the coverage line on the results, *Test the rest* rounds, *No checked question yet*). Their as-built notes are in the F3 table. Also F2.10–F2.11 (the course page: full-width map with the node panel as a sheet, *Your markers* below it on the real lecture length); their deviations are in the table above.
 
 ### Should items: built or cut
 
