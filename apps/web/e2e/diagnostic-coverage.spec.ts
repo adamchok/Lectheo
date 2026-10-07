@@ -50,6 +50,15 @@ async function answerAllRight(page: Page): Promise<void> {
   await expect(results).toBeVisible()
 }
 
+/** "Tested 6 of 14 concepts" → 6. */
+async function testedCount(page: Page): Promise<number> {
+  const line = page
+    .getByRole('region', { name: 'Coverage' })
+    .getByText(/^Tested \d+ of \d+ concepts$/)
+  await expect(line).toBeVisible()
+  return Number((await line.textContent())?.match(/^Tested (\d+)/)?.[1])
+}
+
 test('coverage after a core round, then Test the rest asks only untested concepts', async ({
   page,
 }) => {
@@ -60,17 +69,28 @@ test('coverage after a core round, then Test the rest asks only untested concept
   await answerAllRight(page)
 
   const coverage = page.getByRole('region', { name: 'Coverage' })
-  await expect(coverage.getByText(/^Tested \d+ of \d+ concepts$/)).toBeVisible()
-  await expect(coverage.getByText(/^Chapter 1 · \d+ of \d+ tested$/)).toBeVisible()
+  const testedAfterCore = await testedCount(page)
+  await expect(coverage.getByText(/^Chapter 1: .+ · \d+ of \d+ tested$/)).toBeVisible()
   await expect(page.getByRole('link', { name: /see it on the map/i })).toBeVisible()
 
   const restPlanned = plannedConcepts(page)
-  await page.getByRole('button', { name: /^test (the other \d+|8 more)/i }).click()
+  const testRest = page.getByRole('link', {
+    name: /^test (the other \d+ concepts|8 more|the last)/i,
+  })
+  await testRest.click()
   await expect(page).toHaveURL(new RegExp(`/lectures/${L5}/diagnostic\\?round=rest$`))
   const rest = await restPlanned
   expect(rest.size).toBeGreaterThan(0)
   expect([...rest].filter((id) => core.has(id))).toEqual([])
 
   await answerAllRight(page)
-  await expect(coverage.getByText(/^Tested \d+ of \d+ concepts$/)).toBeVisible()
+  expect(await testedCount(page)).toBe(testedAfterCore + rest.size)
+  // L5 has at most 8 untested concepts after the core round, so one rest round covers them.
+  await expect(testRest).toHaveCount(0)
+
+  // Rest → rest: nothing left to test; focus lands on the finished card, not <body>.
+  await page.reload()
+  const finished = page.getByRole('heading', { name: /finished this diagnostic/i })
+  await expect(finished).toBeFocused()
+  await expect(page.getByText(/every concept with a checked question/i)).toBeVisible()
 })

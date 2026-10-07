@@ -91,11 +91,21 @@ export async function loadResponses(db: DbLike, sessionId: string): Promise<Resp
 }
 
 /**
+ * Items of this lecture, or of the lecture that introduced the item's concept once that lecture
+ * is `ready` (a recurring concept's questions live there; F3.10–F3.11). Never an unfinished
+ * lecture, so source links always open a finished one.
+ */
+export const fromLectureOrIntroducer = (lectureId: string) =>
+  sql`("items"."lecture_id" = ${lectureId} or exists (select 1 from concepts c
+        join lectures l on l.id = c.first_lecture_id
+        where c.id = "items"."concept_id" and l.id = "items"."lecture_id"
+        and l.status = 'ready'))`
+
+/**
  * Verified diagnostic MCQs the user has never seen: not used by any of their activities, not
  * planned in nor answered in any of their diagnostics, not in `excludeIds`. Scope: this lecture's
- * items, or with `conceptIds` those concepts' items from any lecture (a recurring concept's
- * questions live in the lecture that introduced it; F3.10–F3.11), this lecture's first.
- * Then lowest variant first. Raw subqueries spell `"items"."id"` (Drizzle single-table gotcha).
+ * items, or with `conceptIds` those concepts' items from this lecture or the one that introduced
+ * them (`fromLectureOrIntroducer`), this lecture's first. Then lowest variant first. Raw subqueries spell `"items"."id"` (Drizzle single-table gotcha).
  */
 export async function unseenMcqs(
   db: DbLike,
@@ -111,7 +121,7 @@ export async function unseenMcqs(
     .where(
       and(
         opts.conceptIds
-          ? inArray(items.conceptId, [...opts.conceptIds])
+          ? and(inArray(items.conceptId, [...opts.conceptIds]), fromLectureOrIntroducer(lectureId))
           : eq(items.lectureId, lectureId),
         eq(items.kind, 'diagnostic_mcq'),
         eq(items.status, 'verified'),

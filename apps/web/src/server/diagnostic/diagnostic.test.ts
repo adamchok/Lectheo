@@ -14,8 +14,12 @@ import {
   attempts,
   diagnosticSessions,
   eq,
+  concepts,
+  conceptOccurrences,
+  inArray,
   items,
   itemSecrets,
+  lectures,
   markerConcepts,
   markers,
   profiles,
@@ -359,6 +363,9 @@ describe('coverage and Test the rest (F3.9–F3.11)', () => {
     expect(coverage.total).toBeGreaterThan(coverage.tested)
     expect(coverage.untested).toBe(coverage.total - coverage.tested - coverage.noQuestion)
     expect(coverage.byChapter.reduce((n, c) => n + c.total, 0)).toBe(coverage.total)
+    const [lecture] = await db.select().from(lectures).where(eq(lectures.id, L5))
+    const chapterIds = (lecture?.chapters ?? []).map((c) => c.id)
+    for (const c of coverage.byChapter) expect(c.number).toBe(chapterIds.indexOf(c.chapterId) + 1)
 
     const rest = await startDiagnostic(ALICE, L5, db, 'rest')
     expect(rest.sessionId).not.toBe(core.sessionId)
@@ -409,4 +416,36 @@ describe('coverage and Test the rest (F3.9–F3.11)', () => {
     expect(rest.items.map((i) => i.conceptId)).not.toContain(unasked)
     expect(rest.items).toHaveLength(coverage.untested)
   })
+
+  it("never asks a recurring concept from a lecture that isn't ready", async () => {
+    const recurring = await db
+      .select({ id: concepts.id, firstLectureId: concepts.firstLectureId })
+      .from(concepts)
+      .innerJoin(items, eq(items.conceptId, concepts.id))
+      .where(and(eq(items.kind, 'diagnostic_mcq'), inArray(concepts.id, await l5ConceptIds())))
+    const earlier = recurring.find((c) => c.firstLectureId && c.firstLectureId !== L5)
+    if (!earlier?.firstLectureId) throw new Error('no recurring concept in L5')
+    await db
+      .update(lectures)
+      .set({ status: 'processing' })
+      .where(eq(lectures.id, earlier.firstLectureId))
+
+    const core = await startDiagnostic(ALICE, L5, db)
+    await finish(ALICE, core)
+    const { coverage } = DiagnosticResultsResponse.parse(
+      await getResults(ALICE, core.sessionId, db),
+    )
+    expect(coverage.noQuestion).toBeGreaterThan(0)
+    const rest = await startDiagnostic(ALICE, L5, db, 'rest')
+    expect(rest.items.map((i) => i.conceptId)).not.toContain(earlier.id)
+  })
 })
+
+/** The concepts L5 teaches (its occurrences). */
+async function l5ConceptIds(): Promise<string[]> {
+  const rows = await db
+    .select({ id: conceptOccurrences.conceptId })
+    .from(conceptOccurrences)
+    .where(eq(conceptOccurrences.lectureId, L5))
+  return rows.map((r) => r.id)
+}

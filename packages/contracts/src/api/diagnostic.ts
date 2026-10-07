@@ -80,11 +80,13 @@ export const DiagnosticResultsResponse = z.object({
     total: z.number().int(),
     /** Untested concepts with no verified question (F3.11). */
     noQuestion: z.number().int(),
-    /** Untested concepts *Test the rest* can still ask about. */
+    /** The other untested concepts (tested + noQuestion + untested = total). */
     untested: z.number().int(),
     byChapter: z.array(
       z.object({
         chapterId: z.string(),
+        /** 1-based position in the lecture's chapters (chapters without concepts are skipped). */
+        number: z.number().int().positive(),
         title: z.string(),
         tested: z.number().int(),
         total: z.number().int(),

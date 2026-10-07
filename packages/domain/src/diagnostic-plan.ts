@@ -168,10 +168,8 @@ const byChapterOrder = <C extends { readonly chapterIndex?: number | null }>(
   )
 
 export interface CoverageConcept extends RestConcept {
-  /** The lecture has at least one verified diagnostic question on it (F3.11). */
+  /** A verified diagnostic question on it exists (F3.11). */
   readonly hasQuestion: boolean
-  /** An unseen verified question is left, so *Test the rest* can ask about it. */
-  readonly hasUnseen: boolean
 }
 
 export interface Coverage {
@@ -179,14 +177,14 @@ export interface Coverage {
   readonly total: number
   readonly noQuestion: number
   readonly untested: number
-  /** Per chapter index (only chapters with concepts), in chapter order. */
+  /** Per chapter index (only chapters with concepts, so indices can skip), in chapter order. */
   readonly byChapter: readonly { chapterIndex: number; tested: number; total: number }[]
 }
 
 /**
- * F3.10–F3.11 coverage line. A tested concept counts as tested even without a question left;
- * an untested one with no verified question counts in `noQuestion`; `untested` is what *Test the
- * rest* can still ask about.
+ * F3.10–F3.11 coverage line. Every concept is in exactly one bucket, so tested + noQuestion +
+ * untested = total: tested (any round or activity), else no verified question (`noQuestion`),
+ * else `untested`. *Test the rest* asks the untested ones it still has an unseen question for.
  */
 export function diagnosticCoverage(concepts: readonly CoverageConcept[]): Coverage {
   const chapters = new Map<number, { tested: number; total: number }>()
@@ -202,7 +200,7 @@ export function diagnosticCoverage(concepts: readonly CoverageConcept[]): Covera
     tested: concepts.filter((c) => c.tested).length,
     total: concepts.length,
     noQuestion: concepts.filter((c) => !c.tested && !c.hasQuestion).length,
-    untested: concepts.filter((c) => !c.tested && c.hasQuestion && c.hasUnseen).length,
+    untested: concepts.filter((c) => !c.tested && c.hasQuestion).length,
     byChapter: [...chapters.entries()]
       .sort(([a], [b]) => a - b)
       .map(([chapterIndex, counts]) => ({ chapterIndex, ...counts })),

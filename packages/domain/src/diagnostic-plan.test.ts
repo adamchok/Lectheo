@@ -122,28 +122,37 @@ describe('planRestRound (F3.10)', () => {
 })
 
 describe('diagnosticCoverage (F3.10–F3.11)', () => {
-  it('counts tested, no question and untested, per chapter', () => {
+  it('puts every concept in one bucket, per chapter', () => {
     const coverage = diagnosticCoverage([
-      { ...rest('a', 0, true), hasQuestion: true, hasUnseen: false },
-      { ...rest('b', 0), hasQuestion: true, hasUnseen: true },
-      { ...rest('c', 1), hasQuestion: false, hasUnseen: false },
-      { ...rest('d', 1, true), hasQuestion: false, hasUnseen: false },
-      { ...rest('e', 1), hasQuestion: true, hasUnseen: false },
+      { ...rest('a', 0, true), hasQuestion: true },
+      { ...rest('b', 0), hasQuestion: true },
+      { ...rest('c', 1), hasQuestion: false },
+      { ...rest('d', 1, true), hasQuestion: false },
+      { ...rest('e', 1), hasQuestion: true },
     ])
     expect(coverage).toEqual({
       tested: 2,
       total: 5,
       noQuestion: 1,
-      untested: 1,
+      untested: 2,
       byChapter: [
         { chapterIndex: 0, tested: 1, total: 2 },
         { chapterIndex: 1, tested: 1, total: 3 },
       ],
     })
+    expect(coverage.tested + coverage.noQuestion + coverage.untested).toBe(coverage.total)
+  })
+
+  it('keeps real chapter indices when a middle chapter has no concepts', () => {
+    const coverage = diagnosticCoverage([
+      { ...rest('a', 0), hasQuestion: true },
+      { ...rest('b', 2, true), hasQuestion: true },
+    ])
+    expect(coverage.byChapter.map((c) => c.chapterIndex)).toEqual([0, 2])
   })
 
   it('has no chapters without chapter indices', () => {
-    expect(diagnosticCoverage([{ ...rest('a', null), hasQuestion: true, hasUnseen: true }]).byChapter).toEqual([])
+    expect(diagnosticCoverage([{ ...rest('a', null), hasQuestion: true }]).byChapter).toEqual([])
   })
 })
 

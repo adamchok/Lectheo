@@ -35,7 +35,7 @@ import { SourceRef } from '@/components/source-ref'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
-import { CoverageSummary, TestRestButton } from './diagnostic-coverage'
+import { CoverageSummary, TestRestLink } from './diagnostic-coverage'
 import { LectureFrame } from './lecture-frame'
 import { Spinner } from '@/components/ui/spinner'
 
@@ -52,7 +52,7 @@ export function DiagnosticView({
       lectureId={lectureId}
       section="Diagnostic"
       reading
-      description="A few questions on this lecture's key ideas. Rate your confidence first, then pick an answer."
+      description={DESCRIPTION[round]}
     >
       {(lecture) => (
         <div>
@@ -61,6 +61,11 @@ export function DiagnosticView({
       )}
     </LectureFrame>
   )
+}
+
+const DESCRIPTION: Record<DiagnosticRound, string> = {
+  core: "A few questions on this lecture's key ideas. Rate your confidence first, then pick an answer.",
+  rest: "One question on each concept you haven't been tested on yet. Rate your confidence first, then pick an answer.",
 }
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E'] as const
@@ -111,10 +116,14 @@ function FinishedState({ lectureId, courseId, round }: FinishedStateProps) {
     round === 'rest'
       ? 'Every concept with a checked question in this lecture has been tested.'
       : "You've answered every question we have for this lecture."
+  // The runner swapped its content for this card: land focus on it, not <body>.
+  const heading = useFocusOnMount<HTMLHeadingElement>()
   return (
     <section className="bg-card space-y-4 rounded-xl border p-6 text-center shadow-sm">
       <CircleCheck aria-hidden className="text-mastery-green mx-auto size-5" />
-      <h2 className="text-title-md">You&apos;ve finished this diagnostic</h2>
+      <h2 ref={heading} tabIndex={-1} className="text-title-md">
+        You&apos;ve finished this diagnostic
+      </h2>
       <p className="text-muted-foreground text-body-sm">
         {body} Keep going with practice on the concept map.
       </p>
@@ -541,7 +550,7 @@ function DiagnosticResults({ sessionId, lectureId, courseId, answers, note }: Re
       </p>
       <CoverageSummary coverage={coverage} />
       {rest.length > 0 && (
-        <ul className="divide-y rounded-xl border">
+        <ul role="list" className="divide-y rounded-xl border">
           {rest.map((f) => (
             <li key={f.itemId} className="flex flex-wrap items-center justify-between gap-2 p-4">
               <span>
@@ -568,7 +577,7 @@ function DiagnosticResults({ sessionId, lectureId, courseId, answers, note }: Re
           </Link>
         </Button>
         {coverage.untested > 0 && (
-          <TestRestButton lectureId={lectureId} untested={coverage.untested} />
+          <TestRestLink lectureId={lectureId} untested={coverage.untested} />
         )}
         {weakest && <PracticeWeakestButton finding={weakest} />}
       </div>

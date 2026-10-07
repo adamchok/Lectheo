@@ -4,7 +4,7 @@ import { diagnosticCoverage, homeChapterIndex, learningOrder } from '@lectheo/do
 import type { DbLike } from '../db'
 import { loadPrerequisites } from '../lectures/brief'
 import { loadMasteryForUser } from '../mastery'
-import { unseenMcqs } from './shared'
+import { fromLectureOrIntroducer } from './shared'
 
 type LectureRow = typeof lectures.$inferSelect
 type ChapteredLecture = Pick<LectureRow, 'id' | 'courseId' | 'chapters' | 'hasTimestamps'>
@@ -40,8 +40,17 @@ export async function diagnosticConcepts(
       .where(eq(conceptOccurrences.lectureId, lecture.id)),
     loadPrerequisites(db, lecture.courseId),
   ])
-  const starts = chaptersOf(lecture).map((c) => c.startIdx)
+  const chapters = chaptersOf(lecture)
+  const starts = chapters.map((c) => c.startIdx)
   const firstIdx = (idxs: readonly number[]) => (idxs.length > 0 ? Math.min(...idxs) : 0)
+  // No segment in this lecture: the first chapter that lists it, as the study brief does.
+  const chapterOf = (id: string, idxs: readonly number[]): number | null =>
+    idxs.length === 0 && chapters.length > 0
+      ? Math.max(
+          0,
+          chapters.findIndex((ch) => ch.conceptIds.includes(id)),
+        )
+      : homeChapterIndex(starts, firstIdx(idxs))
   const byId = new Map(rows.map((r) => [r.id, r]))
   const order = learningOrder(
     rows.map((r) => ({ id: r.id, firstIdx: firstIdx(r.segmentIdxs) })),
@@ -50,7 +59,7 @@ export async function diagnosticConcepts(
   return order.flatMap((id) => {
     const row = byId.get(id)
     if (!row) return []
-    const chapterIndex = homeChapterIndex(starts, firstIdx(row.segmentIdxs))
+    const chapterIndex = chapterOf(id, row.segmentIdxs)
     return [{ conceptId: id, firstLectureId: row.firstLectureId, chapterIndex }]
   })
 }
@@ -76,9 +85,9 @@ export async function loadCoverage(
   if (ids.length === 0) {
     return { tested: 0, total: 0, noQuestion: 0, untested: 0, byChapter: [] }
   }
-  const [tested, verified, unseen] = await Promise.all([
+  const [tested, verified] = await Promise.all([
     testedConceptIds(db, userId, ids),
-    // Any lecture: a recurring concept's questions live where it was introduced.
+    // Same scope as Test the rest: a recurring concept's questions live where it was introduced.
     db
       .selectDistinct({ conceptId: items.conceptId })
       .from(items)
@@ -87,18 +96,16 @@ export async function loadCoverage(
           inArray(items.conceptId, ids),
           eq(items.kind, 'diagnostic_mcq'),
           eq(items.status, 'verified'),
+          fromLectureOrIntroducer(lecture.id),
         ),
       ),
-    unseenMcqs(db, userId, lecture.id, { conceptIds: ids }),
   ])
   const hasQuestion = new Set(verified.map((r) => r.conceptId))
-  const hasUnseen = new Set(unseen.map((r) => r.conceptId))
   const coverage = diagnosticCoverage(
     list.map((c) => ({
       ...c,
       tested: tested.has(c.conceptId),
       hasQuestion: hasQuestion.has(c.conceptId),
-      hasUnseen: hasUnseen.has(c.conceptId),
     })),
   )
   const chapters = chaptersOf(lecture)
@@ -106,7 +113,17 @@ export async function loadCoverage(
     ...coverage,
     byChapter: coverage.byChapter.flatMap(({ chapterIndex, tested: t, total }) => {
       const chapter = chapters[chapterIndex]
-      return chapter ? [{ chapterId: chapter.id, title: chapter.title, tested: t, total }] : []
+      return chapter
+        ? [
+            {
+              chapterId: chapter.id,
+              number: chapterIndex + 1,
+              title: chapter.title,
+              tested: t,
+              total,
+            },
+          ]
+        : []
     }),
   }
 }
