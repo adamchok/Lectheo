@@ -124,6 +124,7 @@ Lectheo is a calm, precise study workspace for CS students. It should feel like 
 | Upload | `Upload` |
 | Draft | `FilePen` |
 | Video file / audio / audio-only player | `FileVideo` / `AudioLines` / `Headphones` |
+| A YouTube link (Add lecture → From YouTube) | `Link` |
 | Transcript | `FileText` |
 | Account | `CircleUser` |
 | Theme light / dark / system | `Sun` / `Moon` / `Monitor` |

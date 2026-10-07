@@ -83,7 +83,7 @@ Part of the architecture set: [[Lectheo Architecture]] · **API Spec** · [[Lect
   /lectures/{id}/slides-upload-url  POST           (Should, not built)
   /lectures/{id}/process            POST
   /lectures/{id}/brief              GET            Study mode brief            (F9)
-  /youtube/preview?url=             GET            YouTube link check          (to be built, F10)
+  /youtube/preview?url=             GET            YouTube link check          (F10)
   /lectures/{id}/markers            GET POST
   /lectures/{id}/markers/{markerId} DELETE        (undo)
   /lectures/{id}/diagnostic         POST
@@ -190,7 +190,7 @@ Examples:
 ```json
 { "id": "uuid-v7", "courseId": "…", "title": "Week 6 – Trees", "source": "import" }
 ```
-`source`: `import` | `live` | `audio` | `transcript`. `library` can't be created at runtime. *(decided 7 Oct 2026, to be built)*: `youtube` with `youtubeUrl` ([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]]); the server re-runs the preview checks and stores `media.youtubeId`. *As built: `live` (the recorder, Should) is not built and returns `404`.*
+`source`: `import` | `live` | `audio` | `transcript` | `youtube`. `library` can't be created at runtime. `youtube` ([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]]) takes `youtubeUrl` instead of a file, and `title` is optional (it defaults to the video's title). The server re-runs the preview checks (never trusting the client), then stores `media: { youtubeId, durationMs }`. Refusals: `422 unprocessable_input` with `details.reason` and the reason in plain words; too long for a sample account → `403 sample_account_restricted`; Google spend at ≥ 75% of `GOOGLE_AI_BUDGET_USD` → `503 intake_paused`. Same daily `lectures` quota as other sources. *As built: `live` (the recorder, Should) is not built and returns `404`.*
 → `201 lecture { id, status: "draft" }`. A replay with the same `id` returns the existing lecture.
 
 ### `GET /lectures/{id}`
@@ -243,8 +243,8 @@ Undo (soft delete) → `204`.
 ### `GET /lectures/{id}/brief`
 The Study brief ([[Lectheo Product Spec#F9. Study mode — Must|F9]]). `200 { lectureId, readMinutes, videoMinutes, concepts: [{ id, name, mastery: { state, confidentMistake }, prerequisites: [{ id, name }], summary, keyPoints: [{ id, text, sources: [SourceRef] }], clips: [{ startMs, endMs }], clipMs, chapter: { id, title, startMs }, marks: { lost, important } }] }`. Concepts in learning order (prerequisites first, then first appearance). Available from `map_ready` (`409 invalid_state` before). `readMinutes` = words ÷ 200, rounded up (names, summaries and key points). No AI calls. As built: `prerequisites` lists every depends_on target in the course (it may be taught in another lecture); `keyPoints[].sources` point at the lecture the key point cites (the concept's first lecture); `clips` are the concept's source segments here, neighbours merged, so `clips[0].startMs` is its first moment; `chapter` is `null` without chapters; `videoMinutes` is `null` without playable media; `marks` counts this user's live markers here linked to the concept. Key points are the only formerly 🔒 field in any response (ADR-009 amended).
 
-### `GET /youtube/preview?url=` *(decided 7 Oct 2026, to be built)*
-([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]]) `200 { videoId, title, channel, durationMs, thumbnailUrl, ok, reason? }`. `reason`: `not_found` · `private` · `embed_disabled` · `live` · `too_short` · `too_long` (tier limit) · `not_english`. Uses the YouTube Data API (`videos.list`, server key); no AI spend.
+### `GET /youtube/preview?url=`
+([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]]) `200 { videoId, title, channel, durationMs, thumbnailUrl, ok, reason? }`. `reason`, checked in this order: `not_found` · `private` · `live` (also upcoming) · `embed_disabled` · `age_restricted` · `too_short` (< 5 min) · `too_long` (the account's tier limit) · `not_english` (`defaultAudioLanguage`, else `defaultLanguage`, must start with `en`). `title`, `channel`, `durationMs` and `thumbnailUrl` are `null` only for `not_found`. Any link form is accepted (`watch?v=`, `youtu.be`, `&t=`, a playlist entry, `m.`, embed, shorts); anything else → `422 unprocessable_input`. `429 rate_limited` past 30 checks per user per 10 minutes. Uses the YouTube Data API (`videos.list`, server key in a header); no AI spend. Under `AI_FAKE=1` a fake Data API answers (`FAKE_VIDEOS` in `server/youtube.ts`: one id per refusal).
 
 ### `GET /lectures/{id}/markers`
 `200 { data: [{ id, kind, tMs, capture, conceptIds[] }] }`. Only the caller's markers.
@@ -370,8 +370,8 @@ Anonymous sign-ins enabled. Supabase's per-IP limit is **raised from the default
 ### Cloudflare Turnstile
 Widget on the sign-in page. The server verifies the token via `POST https://challenges.cloudflare.com/turnstile/v0/siteverify`.
 
-### YouTube (watch mode: library; *(decided 7 Oct 2026, to be built)*: `youtube` lectures and Study clips)
-Embedded with the **IFrame Player API** (`youtube-nocookie.com`). The client reads `getCurrentTime()` when L or I is pressed. Video is never downloaded or re-hosted. If the embed fails, the player falls back to CS50's official MP3 (`media.fallbackAudioUrl`) in a local `<audio>` element on the same timeline.
+### YouTube (watch mode and Study clips: library and `youtube` lectures)
+Embedded with the **IFrame Player API** (`youtube-nocookie.com`). The client reads `getCurrentTime()` when L or I is pressed. Video is never downloaded or re-hosted. If the embed fails, the player falls back to CS50's official MP3 (`media.fallbackAudioUrl`) in a local `<audio>` element on the same timeline. A student's `youtube` lecture has no audio fallback: the player shows *Open on YouTube* instead. Preview thumbnails load from `i.ytimg.com` (CSP `img-src`).
 
 ### AssemblyAI (only for `live` and `audio` sources)
 
@@ -391,7 +391,7 @@ Embedded with the **IFrame Player API** (`youtube-nocookie.com`). The client rea
 | Decisions (Jev) | `experimental_evaluate({ model: 'typesafe-ai/jev', state, questions })` (`ai` ≥ 7.0.105), used by the leak check |
 | Caching | Anthropic prompt caching set explicitly with `providerOptions.anthropic.cacheControl` on the lecture-context block (only worth it above ~1–2k tokens) |
 | Models by role | `reasoner`/`persona`/`answerer`: `anthropic/claude-sonnet-5.5` · `reasoner-premium` (library seed only): `anthropic/claude-opus-5.5` · `verifier`/`judge`: `openai/gpt-6.1-sol` · `judge` fallback: `google/gemini-3.8-flash` · `vision` (Should, unused: slides not built): `google/gemini-3.8-flash` · `guard`: `typesafe-ai/jev` · `guard-escalation`: `openai/gpt-6-luna`. See [[Lectheo Tech Stack#Model routing table]] |
-| YouTube transcription *(decided 7 Oct 2026, to be built)* | ([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]]) `gemini-3.8-flash` reads the public YouTube URL through the **direct Google API** (`generateContent`, `fileData` + part-level `videoMetadata` start/end offsets), in 2-minute clips at `MEDIA_RESOLUTION_LOW`, returning JSON `{ cues: [{ start: "H:MM:SS", end, text }] }`, converted to ms and stitched (`docs/spikes/youtube-transcripts.md`). **Not through the AI Gateway**: it drops the clip offsets and bills the whole video. Costs are logged to `llm_calls` at list price |
+| YouTube transcription | ([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]]) `gemini-3.8-flash` reads the public YouTube URL through the **direct Google API** (`generateContent`, `fileData` + part-level `videoMetadata` start/end offsets), in 2-minute clips at `MEDIA_RESOLUTION_LOW`, returning JSON `{ cues: [{ start: "H:MM:SS", end, text }] }`, converted to ms and stitched (`docs/spikes/youtube-transcripts.md`). **Not through the AI Gateway**: it drops the clip offsets and bills the whole video. Costs are logged to `llm_calls` at list price ($0.75 / $3.75 per M tokens) with `gateway_key = 'google'` and capped by `GOOGLE_AI_BUDGET_USD`; 429/503 are retried with backoff. Keys: `YOUTUBE_API_KEY` (Data API), `GOOGLE_GENERATIVE_AI_API_KEY` (Gemini API) |
 | Errors | 402 `quota_for_entity_exceeded` → set `ai_degraded`, return `503 ai_paused` · 429 → backoff · 5xx → 1 retry, then the role's fallback model |
 
 ### Supabase (provisioned through the Vercel Marketplace)

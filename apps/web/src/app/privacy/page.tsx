@@ -68,15 +68,26 @@ export default function PrivacyPage() {
           lecture text and your practice answers, not your name or email.
         </li>
         <li>
+          <strong>Google (Gemini API, called directly)</strong> — receives the link of a YouTube
+          video you add, to transcribe it. Only the link is sent: the video is never downloaded. The
+          transcript of a public video is kept and reused for other students; it holds none of your
+          data.
+        </li>
+        <li>
+          <strong>YouTube Data API</strong> — checks a video you paste (public, embeddable, length,
+          language) before anything else happens. It receives the video&apos;s id only.
+        </li>
+        <li>
           <strong>AssemblyAI</strong> — transcribes audio, only when you upload or record audio.
         </li>
         <li>
           <strong>Cloudflare Turnstile</strong> — bot check on the sample-account button.
         </li>
         <li>
-          <strong>YouTube</strong> — plays the library lectures. Your browser loads YouTube&apos;s
-          player script and a privacy-enhanced embed (<code>youtube-nocookie.com</code>) when you
-          watch one.
+          <strong>YouTube</strong> — plays the library lectures and the YouTube lectures you add.
+          Your browser loads YouTube&apos;s player script and a privacy-enhanced embed (
+          <code>youtube-nocookie.com</code>) when you watch one, and the video&apos;s thumbnail (
+          <code>i.ytimg.com</code>) when you paste a link.
         </li>
         <li>
           <strong>CS50</strong> — if the YouTube embed fails, your browser fetches the
@@ -103,8 +114,8 @@ export default function PrivacyPage() {
           from the account menu (<strong>Delete account</strong>): it removes your courses,
           lectures, markers, practice, uploaded files and your sign-in. The AI-call cost record
           (token counts and cost, no content) is kept, with your bare user id, for budget
-          accounting. If you can&apos;t sign in,
-          email <a href={`mailto:${CONTACT}`}>{CONTACT}</a> and we will delete it for you.
+          accounting. If you can&apos;t sign in, email <a href={`mailto:${CONTACT}`}>{CONTACT}</a>{' '}
+          and we will delete it for you.
         </li>
       </ul>
 

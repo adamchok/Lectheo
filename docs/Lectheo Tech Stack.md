@@ -75,7 +75,7 @@ All slugs live in `packages/ai/src/models.ts` and were checked against the live 
 | `answerer` | The AI's answer in Stump the AI | `anthropic/claude-sonnet-5.5` | medium effort | `google/gemini-3.8-flash` |
 | `guard` | Leak check on author replies | `typesafe-ai/jev` | 2 boolean questions, timeout 800 ms | `guard-escalation` |
 | `guard-escalation` | Gray zone (0.3–0.7) or Jev unavailable | `openai/gpt-6-luna` | low effort, boolean + reason | canned deflection (fail closed) |
-| `transcriber` *(decided 7 Oct 2026, to be built)* | YouTube lecture transcripts ([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]]) | `gemini-3.8-flash` via the **direct Google API** (not the gateway) | low media resolution, 2-minute clips in parallel (cap 10), `H:MM:SS` cue times, structured output; ≈ $0.42 per hour of video | none: retry 429/503 with backoff; the step fails with Retry |
+| `transcriber` | YouTube lecture transcripts ([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]]) | `gemini-3.8-flash` via the **direct Google API** (not the gateway) | low media resolution, 2-minute clips in parallel (cap 10), `H:MM:SS` cue times, structured output; ≈ $0.42 per hour of video | none, by construction: the role has no gateway attempt plan (`attemptPlan` throws; `google-direct.test.ts`). Retry 429/503 with backoff; the step fails with Retry |
 | `vision` *(Should, unused: slides input not built)* | Slides PDF pages that have no text layer | `google/gemini-3.8-flash` | low thinking | `anthropic/claude-sonnet-5.5` |
 
 > **Why the verifier and judge aren't Claude:** generation, personas and the Stump answerer are Claude. A different family checking and grading avoids correlated blind spots and self-preference bias.
@@ -118,7 +118,7 @@ Benchmarks used (checked 4 Oct 2026):
 | Teach-back (~4 turns + 1 judge call) | Sonnet + Sol | ≈ $0.05 |
 | Transfer / Stump (beta) | Sol / Sonnet + Sol ×2 | ≈ $0.03 / $0.07 |
 | On-demand item (if the bank runs out) | Sonnet + Sol | ≈ $0.05 |
-| YouTube lecture transcript [[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]] *(to be built)* | Gemini 3.8 Flash, direct key | ≈ $0.42 per hour of video (2-hour max ≈ $0.85); cached per video |
+| YouTube lecture transcript [[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]] | Gemini 3.8 Flash, direct key | ≈ $0.42 per hour of video (2-hour max ≈ $0.85; $0.39/h measured on MIT 6.006); cached per video; capped by `GOOGLE_AI_BUDGET_USD` (default $10) |
 | **Judge path** (diagnostic + spot the flaw + teach-back) | | **≈ $0.10–0.15** |
 
 ### Budget ($50) and enforcement
@@ -304,17 +304,17 @@ Format: context → decision → consequences. All **Accepted, 4 Oct 2026** (v2 
   - − About 5 kB of JavaScript for Motion's first load; the feature bundle loads asynchronously.
 - **Rejected:** GSAP, react-spring, Lottie (weight and style); View Transitions (still experimental in Next.js).
 
-### ADR-017 · YouTube lectures through Gemini, never by downloading *(decided 7 Oct 2026, to be built)*
+### ADR-017 · YouTube lectures through Gemini, never by downloading
 - **Context:** Students study from long YouTube lectures. Every Lectheo feature needs a timestamped transcript, and YouTube's captions can't be used: scraping breaks YouTube's terms and is blocked from cloud servers, the Data API only lets owners download captions, and downloading audio breaks the terms too.
 - **Decision:**
   - `gemini-3.8-flash` reads the public YouTube URL (Google's own feature) through the **direct Google API** and returns timestamped cues in **2-minute clips**, run in parallel and stitched. The spike (7 Oct 2026, `docs/spikes/youtube-transcripts.md`) showed the AI Gateway passes the link but ignores the clip offsets, billing the whole video (653k tokens for a 2-hour lecture) and timing out, so the gateway is not used for this role.
-  - The direct client lives inside `packages/ai` behind `runTask`, writes every call to `llm_calls` (priced from Google's token counts) so the spend governor counts it, and can't fall back to the gateway. The Google project runs on the paid tier with a budget alert (~$10).
+  - The direct client lives inside `packages/ai` behind `runTask`, writes every call to `llm_calls` (priced from Google's token counts) so the spend governor counts it, and can't fall back to the gateway. The Google project runs on the paid tier with a budget alert (~$10). *As built:* the `transcriber` role is marked `direct: 'google'` in `packages/ai/src/models.ts`; `runTask` sends it to `google-direct.ts` (REST `generateContent`), rows carry `gateway_key = 'google'`, and `GOOGLE_AI_BUDGET_USD` caps them (75% → no new YouTube lectures, 100% → no transcription).
   - The YouTube Data API checks the video (public or unlisted, embeddable, not live, length, language) before any AI spend.
   - Transcripts are cached by video id; the video only ever plays through the embed.
   - Gated by a spike ([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]].1), **passed 7 Oct 2026**: 5.5% word errors, p95 drift 2.6 s, $0.42 per hour, 40 s for a 60-minute video. Longer clips drift ~10 s per minute, hence 2 minutes.
 - **Consequences:**
   - \+ No files to find; creators keep their views; no media handling on our side.
-  - − Depends on one Google feature and a second AI key outside the gateway. Quality was measured on one lecture; a second one is scored before shipping (F10.9). English only in v1.
+  - − Depends on one Google feature and a second AI key outside the gateway. Quality was measured on one lecture; the second (F10.9, MIT 6.006) scored 12.6% word errors and p95 drift 6.5 s, below the targets, mostly fillers the reference captions omit. English only in v1.
 - **Rejected:** caption scraping, the YouTube captions API, downloading audio for AssemblyAI.
 
 ---

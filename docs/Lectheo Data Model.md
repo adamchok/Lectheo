@@ -93,10 +93,10 @@ Index: `(owner_id)`.
 | `course_id` | uuid FK → courses ON DELETE CASCADE | |
 | `title` | text | |
 | `seq` | int | order within course |
-| `source` | enum | `library`, `import`, `live`, `audio`, `transcript`. *(decided 7 Oct 2026, to be built)*: `youtube` ([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]]) |
+| `source` | enum | `library`, `import`, `live`, `audio`, `transcript`, `youtube` ([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]], migration `0007`) |
 | `status` | enum | `draft` → `uploading` → `processing` → `map_ready` → `ready`, or `failed` |
 | `progress` | jsonb | `{step, done, total}` for the polling UI |
-| `media` | jsonb null | library: `{youtubeId, startMs, endMs}`. Import: `{localFileName, durationMs}` (metadata only; the file stays on the device) |
+| `media` | jsonb null | library: `{youtubeId, startMs, endMs}`. Import: `{localFileName, durationMs}` (metadata only; the file stays on the device). YouTube: `{youtubeId, durationMs}` (only the 11-character id; the link itself isn't stored) |
 | `has_timestamps` | bool | false for plain-text transcripts, which disables markers |
 | `audio_path` | text null | Storage path for uploaded or recorded audio. **Cleared, and the object deleted, after transcription** |
 | `duration_ms` | int null | measured: from the transcription result or the last transcript cue |
@@ -363,7 +363,7 @@ No prompt or answer text is stored here; the ledger is tokens, cost and outcome 
 
 Windows older than 24 h are pruned on each sample sign-in.
 
-**`youtube_transcripts`** *(decided 7 Oct 2026, to be built)* ([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]]): a cache of transcripts of public YouTube videos, shared across students (the transcript of a public video is not personal data). Server-only, RLS deny-all.
+**`youtube_transcripts`** ([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]], migration `0007`): a cache of transcripts of public YouTube videos, shared across students (the transcript of a public video is not personal data). Server-only, RLS deny-all, no `anon`/`authenticated` privileges. Written by `transcribeVideo` only for a whole video that passed the checks; read only for the same `model`, so `AI_FAKE` rows (`model = 'fake'`) never stand in for real transcripts.
 
 | Column | Type | Notes |
 |---|---|---|
