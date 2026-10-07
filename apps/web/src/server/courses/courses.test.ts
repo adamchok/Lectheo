@@ -126,6 +126,40 @@ describe('GET /courses/{id}/map', () => {
     expect(sourcesOf(ID.C3)).toEqual([])
   })
 
+  it('gives each lecture its playable length and chapter starts (F2.11)', async () => {
+    const chapter = (id: string, startIdx: number, endIdx: number) =>
+      `{"id":"${id}","title":"${id}","summary":"","startIdx":${startIdx},"endIdx":${endIdx},"conceptIds":[]}`
+    await f.exec(`
+      INSERT INTO transcript_segments (lecture_id, idx, start_ms, end_ms, text) VALUES
+        ('${ID.L1}', 0, 600000, 610000, 'a'), ('${ID.L1}', 1, 900000, 910000, 'b'),
+        ('${ID.L1}', 2, 1200000, 1210000, 'c'),
+        ('${ID.PL1}', 0, 0, 5000, 'a'), ('${ID.PL1}', 1, 5000, 95000, 'b'),
+        ('${ID.PL2}', 0, 0, 1000, 'text only');
+      -- Library window: 10:00 to 25:00 of a longer video, chapters at segments 0 and 2.
+      UPDATE lectures SET media = '{"startMs":600000,"endMs":1500000}',
+        chapters = '[${chapter('c1', 0, 1)},${chapter('c2', 2, 2)}]' WHERE id = '${ID.L1}';
+      UPDATE lectures SET has_timestamps = false WHERE id = '${ID.PL2}';
+    `)
+    const lib = await getCourseMap(ACTOR_A, ID.LIB, f.db)
+    expect(lib.lectures[0]).toMatchObject({
+      startMs: 600000,
+      durationMs: 900000,
+      chapterStartsMs: [600000, 1200000],
+    })
+    // No segments, no media: nothing to measure.
+    expect(lib.lectures[1]).toMatchObject({ startMs: 0, durationMs: null, chapterStartsMs: [] })
+
+    const own = await getCourseMap(ACTOR_A, ID.P, f.db)
+    // No recording length: the last segment's end.
+    expect(own.lectures[0]).toMatchObject({ startMs: 0, durationMs: 95000, chapterStartsMs: [] })
+    // Text-only import: no time axis.
+    expect(own.lectures[1]).toMatchObject({ durationMs: null, chapterStartsMs: [] })
+
+    await f.exec(`UPDATE lectures SET duration_ms = 120000 WHERE id = '${ID.PL1}'`)
+    const recorded = await getCourseMap(ACTOR_A, ID.P, f.db)
+    expect(recorded.lectures[0]?.durationMs).toBe(120000)
+  })
+
   it('leaves key points to the Study brief', async () => {
     const json = JSON.stringify(await getCourseMap(ACTOR_A, ID.LIB, f.db))
     expect(json).not.toContain('keyPoints')

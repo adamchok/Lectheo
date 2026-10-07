@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react'
 import { formatTimestamp, formatTimestampLong, pluralize } from '@/client/format'
 import { cn } from '@/lib/utils'
 
-interface TimelineMarker {
+export interface TimelineMarker {
   id: string
   lectureId: string
   kind: MarkerKind
@@ -16,9 +16,15 @@ interface TimelineMarker {
   unlinked: boolean
 }
 
-interface Cluster {
+export interface Cluster {
   leftPct: number
   markers: TimelineMarker[]
+}
+
+/** One lecture's time axis, in media time like markers' tMs. */
+export interface Axis {
+  startMs: number
+  endMs: number
 }
 
 /** Hit area of one dot (WCAG 2.5.8; Design System icon-button size) plus a small gap. */
@@ -35,19 +41,39 @@ function collectMarkers(map: CourseMapResponse): TimelineMarker[] {
   return [...byId.values()].sort((a, b) => a.tMs - b.tMs)
 }
 
-/** Lecture length isn't in the map payload; the axis runs to just past the last marker. */
-const axisEnd = (markers: readonly TimelineMarker[]) =>
-  Math.max(60_000, (markers.at(-1)?.tMs ?? 0) * 1.05)
+type MapLecture = CourseMapResponse['lectures'][number]
 
-/** Markers too close to get their own dot share one, at the first marker's position. */
-function clusterMarkers(
+/** The real lecture length (F2.11); without one, the axis runs to just past the last marker. */
+export function lectureAxis(lecture: MapLecture, markers: readonly TimelineMarker[]): Axis {
+  const { startMs, durationMs } = lecture
+  if (durationMs) return { startMs, endMs: startMs + durationMs }
+  return {
+    startMs,
+    endMs: startMs + Math.max(60_000, ((markers.at(-1)?.tMs ?? 0) - startMs) * 1.05),
+  }
+}
+
+const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
+
+/** Where `ms` sits on the axis, 0–100. */
+const axisPct = (ms: number, { startMs, endMs }: Axis) =>
+  clamp(((ms - startMs) / Math.max(1, endMs - startMs)) * 100, 0, 100)
+
+/**
+ * Dots kept inside the track (a 32px dot centred at least 16px from each end), then markers too
+ * close to get their own dot share one at the first marker's position. Unmeasured (width 0): no
+ * clamping here (CSS clamps the dot) and a fixed cluster gap.
+ */
+export function clusterMarkers(
   markers: readonly TimelineMarker[],
-  endMs: number,
-  minGapPct: number,
+  axis: Axis,
+  widthPx: number,
 ): Cluster[] {
+  const edgePct = widthPx > 0 ? Math.min(50, (DOT_PX / 2 / widthPx) * 100) : 0
+  const minGapPct = widthPx > 0 ? ((DOT_PX + DOT_GAP_PX) / widthPx) * 100 : FALLBACK_CLUSTER_PCT
   const clusters: Cluster[] = []
   for (const marker of markers) {
-    const leftPct = (marker.tMs / endMs) * 100
+    const leftPct = clamp(axisPct(marker.tMs, axis), edgePct, 100 - edgePct)
     const last = clusters.at(-1)
     if (last && leftPct - last.leftPct < minGapPct) {
       clusters[clusters.length - 1] = { ...last, markers: [...last.markers, marker] }
@@ -138,28 +164,55 @@ function ClusterDot({ markers }: { markers: readonly TimelineMarker[] }) {
   )
 }
 
-function MarkerTrack({ title, markers }: { title: string; markers: readonly TimelineMarker[] }) {
+/** A dot's centre, never closer than half a dot to either end of the track. */
+const dotLeft = (pct: number) => `clamp(${DOT_PX / 2}px, ${pct}%, calc(100% - ${DOT_PX / 2}px))`
+
+interface MarkerTrackProps {
+  lecture: MapLecture
+  markers: readonly TimelineMarker[]
+}
+
+function MarkerTrack({ lecture, markers }: MarkerTrackProps) {
   const [track, width] = useWidth<HTMLDivElement>()
-  const minGapPct = width > 0 ? ((DOT_PX + DOT_GAP_PX) / width) * 100 : FALLBACK_CLUSTER_PCT
-  const clusters = clusterMarkers(markers, axisEnd(markers), minGapPct)
+  const axis = lectureAxis(lecture, markers)
+  const clusters = clusterMarkers(markers, axis, width)
+  // The first chapter starts the lecture: no tick there (like the Watch bar).
+  const ticks = lecture.chapterStartsMs.filter((ms) => ms > axis.startMs && ms < axis.endMs)
   return (
-    <div ref={track} className="relative mx-4 h-8">
-      <span aria-hidden className="bg-border absolute inset-x-0 top-1/2 h-px" />
-      <ul aria-label={`Markers in ${title}`}>
-        {clusters.map((cluster) => (
-          <li
-            key={cluster.markers[0]!.id}
-            className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
-            style={{ left: `${cluster.leftPct}%` }}
-          >
-            {cluster.markers.length === 1 ? (
-              <MarkerDot marker={cluster.markers[0]!} />
-            ) : (
-              <ClusterDot markers={cluster.markers} />
-            )}
-          </li>
+    <div className="space-y-1">
+      <div ref={track} className="relative h-8">
+        <span aria-hidden className="bg-border absolute inset-x-0 top-1/2 h-px" />
+        {ticks.map((ms) => (
+          <span
+            key={ms}
+            aria-hidden
+            data-testid="chapter-tick"
+            className="bg-muted-foreground absolute top-1/2 h-3 w-0.5 -translate-x-1/2 -translate-y-1/2"
+            style={{ left: `${axisPct(ms, axis)}%` }}
+          />
         ))}
-      </ul>
+        <ul aria-label={`Markers in ${lecture.title}`}>
+          {clusters.map((cluster) => (
+            <li
+              key={cluster.markers[0]!.id}
+              className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
+              style={{ left: dotLeft(cluster.leftPct) }}
+            >
+              {cluster.markers.length === 1 ? (
+                <MarkerDot marker={cluster.markers[0]!} />
+              ) : (
+                <ClusterDot markers={cluster.markers} />
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+      {lecture.durationMs !== null && (
+        <p className="text-mono-sm text-muted-foreground flex justify-between tabular-nums">
+          <span>{formatTimestamp(axis.startMs)}</span>
+          <span>{formatTimestamp(axis.endMs)}</span>
+        </p>
+      )}
     </div>
   )
 }
@@ -196,7 +249,7 @@ export function LectureTimeline({ map }: { map: CourseMapResponse }) {
               <span className="font-medium">{lecture.title}</span>{' '}
               <span className="text-muted-foreground">· {pluralize(own.length, 'marker')}</span>
             </p>
-            <MarkerTrack title={lecture.title} markers={own} />
+            <MarkerTrack lecture={lecture} markers={own} />
           </li>
         ))}
       </ul>

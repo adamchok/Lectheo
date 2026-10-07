@@ -98,27 +98,6 @@ function ViewToggle({ view, onChange }: { view: View; onChange: (view: View) => 
   )
 }
 
-interface SideColumnProps {
-  map: CourseMapResponse
-  selectedId: string | null
-  onClose: () => void
-}
-
-/** The right column: the open concept's panel, else the lecture timeline (Design System §4). */
-function SideColumn({ map, selectedId, onClose }: SideColumnProps) {
-  const selected = map.nodes.find((n) => n.id === selectedId)
-  return (
-    <div className="space-y-6 lg:sticky lg:top-[calc(var(--topbar-height)+1rem)]">
-      {selected ? (
-        <NodePanel concept={selected} map={map} onClose={onClose} />
-      ) : (
-        <LectureTimeline map={map} />
-      )}
-      {map.course.kind === 'library' && <LicenseNotice />}
-    </div>
-  )
-}
-
 /** /courses/[id]: concept map + accessible list view (F2, F2.8). */
 export function CourseView({ courseId }: { courseId: string }) {
   const map = useCourseMap(courseId)
@@ -151,6 +130,7 @@ export function CourseView({ courseId }: { courseId: string }) {
   }
 
   const { course, nodes, lectures } = map.data
+  const selected = nodes.find((n) => n.id === selectedId)
   const counts = countMastery(nodes.map((node) => node.mastery.state))
   const activeView: View = FEATURES.conceptMapCanvas && nodes.length > 0 ? view : 'list'
 
@@ -176,9 +156,7 @@ export function CourseView({ courseId }: { courseId: string }) {
             {FEATURES.conceptMapCanvas && nodes.length > 0 && (
               <ViewToggle view={activeView} onChange={changeView} />
             )}
-            {course.kind === 'personal' && (
-              <CourseActions course={course} lectures={lectures} />
-            )}
+            {course.kind === 'personal' && <CourseActions course={course} lectures={lectures} />}
           </>
         }
       />
@@ -190,22 +168,25 @@ export function CourseView({ courseId }: { courseId: string }) {
 
       <MasteryBar counts={counts} className="mb-8 max-w-xl" />
 
-      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_var(--panel-width)]">
-        <div className="min-w-0 space-y-3">
-          {activeView === 'map' ? (
-            <>
-              {nodes.length < SMALL_MAP && <SmallMapNote />}
+      <div className="space-y-8">
+        {activeView === 'map' ? (
+          <div className="space-y-3">
+            {nodes.length < SMALL_MAP && <SmallMapNote />}
+            {/* F2.10: full-width map; the open concept is a sheet over its right side. */}
+            <div className="relative">
               <ConceptMap map={map.data} selectedId={selectedId} onOpen={setSelectedId} />
-            </>
-          ) : (
-            <ConceptList map={map.data} />
-          )}
-        </div>
-        <SideColumn
-          map={map.data}
-          selectedId={activeView === 'map' ? selectedId : null}
-          onClose={closePanel}
-        />
+              {selected && (
+                <div className="absolute inset-y-3 right-3 max-w-[calc(100%-1.5rem)] w-panel overflow-y-auto rounded-lg shadow-lg">
+                  <NodePanel concept={selected} map={map.data} onClose={closePanel} />
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <ConceptList map={map.data} />
+        )}
+        <LectureTimeline map={map.data} />
+        {course.kind === 'library' && <LicenseNotice />}
       </div>
     </>
   )

@@ -46,6 +46,14 @@ export const MapLecture = z.object({
   seq: z.number().int(),
   status: LectureStatus,
   hasTimestamps: z.boolean(),
+  /**
+   * Your markers timeline (F2.10–F2.11), all in media time like markers' `tMs`. `startMs` is where
+   * the lecture starts (a library window's start, else 0); `durationMs` its playable length, null
+   * without timestamps; `chapterStartsMs` each chapter's start, [] without chapters.
+   */
+  startMs: Ms,
+  durationMs: Ms.nullable(),
+  chapterStartsMs: z.array(Ms),
 })
 
 export const MapNode = z.object({
