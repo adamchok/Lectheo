@@ -184,7 +184,8 @@ function WatchSession({ lecture }: { lecture: LectureResponse }) {
             />
           ) : (
             <WatchPlayer
-              media={lecture.media ?? NO_MEDIA}
+              // ?t= becomes the embed's own start too: a seekTo before the first play can be lost.
+              media={{ ...(lecture.media ?? NO_MEDIA), startMs: startAt ?? lecture.media?.startMs }}
               onReady={onReady}
               onPlayingChange={onPlayingChange}
               onEnded={onEnded}

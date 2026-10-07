@@ -42,6 +42,34 @@ declare global {
   }
 }
 
+/** Further behind the requested start than this on the first PLAYING: the start was ignored. */
+const RESEEK_SLACK_MS = 3_000
+/** Still this far behind after the re-seek: a different cut than the transcript; give up. */
+const START_SLACK_MS = 30_000
+
+export interface FirstPlay {
+  startMs: number
+  endMs: number | null
+  currentMs: number
+  /** 0 while unknown. */
+  durationMs: number
+  /** We already re-seeked to startMs once. */
+  reseeked: boolean
+}
+
+/**
+ * What to do on the first PLAYING state. The embed can drop both `start` and a seekTo made
+ * before playback and play from 0:00, so seek again once. A video shorter than the lecture
+ * window (or one still far behind after the re-seek) is a different cut than the transcript.
+ */
+export function firstPlayCheck(p: FirstPlay): 'ok' | 'reseek' | 'blocked' {
+  if (p.durationMs > 0 && p.durationMs < (p.endMs ?? p.startMs)) return 'blocked'
+  const behindMs = p.startMs - p.currentMs
+  if (behindMs <= RESEEK_SLACK_MS) return 'ok'
+  if (!p.reseeked) return 'reseek'
+  return behindMs > START_SLACK_MS ? 'blocked' : 'ok'
+}
+
 /** If the API script hasn't loaded by then, the embed is treated as blocked (Arch risk 7). */
 const API_TIMEOUT_MS = 10_000
 
@@ -51,7 +79,10 @@ let apiPromise: Promise<YTNamespace> | null = null
 export function loadYouTubeApi(): Promise<YTNamespace> {
   if (window.YT?.Player) return Promise.resolve(window.YT)
   apiPromise ??= new Promise<YTNamespace>((resolve, reject) => {
-    const timer = window.setTimeout(() => reject(new Error('YouTube API timed out')), API_TIMEOUT_MS)
+    const timer = window.setTimeout(
+      () => reject(new Error('YouTube API timed out')),
+      API_TIMEOUT_MS,
+    )
     const previous = window.onYouTubeIframeAPIReady
     window.onYouTubeIframeAPIReady = () => {
       previous?.()
