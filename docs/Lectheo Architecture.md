@@ -164,7 +164,7 @@ The sample account is **lived-in**: L3 practiced (mostly green/amber), L4 with a
 | **B. Import** | local file → `<video src=objectURL>` | `video.currentTime` | transcript file (.vtt / .srt) + markers | `parseTranscript` |
 | **C. Live (Should, *not built*)** | `MediaRecorder` (Opus codec, 32 kbps, 10 s pieces) | elapsed media time = pieces × 10 s + offset into the current piece | audio (signed URL) + markers | `transcribe` |
 | **D. Upload** | audio file, or transcript / text | none (no markers) | audio or transcript | `transcribe` or `parseTranscript` |
-| **E. Study** *(decided 7 Oct 2026, to be built)* | the brief's inline clips | none: the mark names its concept; `t_ms` = the concept's first source moment | markers only (capture `study`) | none: the lecture is already processed |
+| **E. Study** | the brief's inline clips (watch mode's players) | none: the mark names its concept; `t_ms` = the concept's first source moment | markers only (capture `study`) | none: the lecture is already processed |
 | **F. YouTube** *(decided 7 Oct 2026, to be built)* | YouTube IFrame embed | `player.getCurrentTime()` | the link only | `transcribeVideo` |
 
 ```mermaid
@@ -210,8 +210,8 @@ flowchart TD
     poll --> fetch["fetchTranscript<br/>sentences → truncate to tier limit · delete audio + remote transcript"]
     pt --> seg["segment<br/>sentence groups ≤ 40 s · PK (lecture, idx)"]
     fetch --> seg
-    seg --> ex["extractConcepts<br/>reasoner · counts scaled to length · existing course concepts in prompt · chapters by segment index (F11, to be built)"]
-    ex --> vg["validateGraph<br/>citations exist · DAG · dedupe by canonical key"]
+    seg --> ex["extractConcepts<br/>reasoner · counts scaled to length · existing course concepts in prompt · chapters by segment index (F11)"]
+    ex --> vg["validateGraph<br/>citations exist · DAG · dedupe by canonical key · chapters checked and stored"]
     vg --> lay["layoutMap<br/>ELK once · store positions + layout_hash"]
     lay --> al["alignMarkers"]
     al --> mr(["status = map_ready"])
@@ -357,7 +357,7 @@ concept           = argmax overlap(markerSegments, concept.occurrence segments)
                     ties → concept with most occurrences in the window
                     none → "unlinked" (shown on the lecture timeline)
 ```
-Runs on write for processed lectures, and in the pipeline otherwise. Study marks ([[Lectheo Product Spec#F9. Study mode — Must|F9]], *(decided 7 Oct 2026, to be built)*) skip alignment: they name their concept. Chapter marks ([[Lectheo Product Spec#F11. Chapters — Must|F11]]) likewise link to the chapter's concepts directly. Window sizes are tuned on the CS50 lectures.
+Runs on write for processed lectures, and in the pipeline otherwise. Study marks ([[Lectheo Product Spec#F9. Study mode — Must|F9]]) skip alignment: they name their concept (`marker_concepts.overlap_score = 1`, `t_ms` = the concept's first source moment, set by the server). Chapter marks ([[Lectheo Product Spec#F11. Chapters — Must|F11]]) likewise link to every concept the chapter covers, at the chapter's start. Window sizes are tuned on the CS50 lectures.
 
 ### 6.2 Mastery
 Input: the user's attempts for a concept (excluding `invalid`). *Independent* = diagnostic with confidence `sure`, or a practice attempt with `assisted = false`.
@@ -413,11 +413,10 @@ nothing at all left → add_lecture ("Add Lecture N+1" in an own course / "Add y
 | `/dashboard` | Course cards, lecture list and status, "Next step" card, account menu (sample label + Reset; *Delete account* for Google accounts). Google first run: an empty first-run screen with *Add your first lecture* |
 | `/courses/[id]` | Concept map (React Flow, stored ELK layout) + list view toggle + lecture timeline with unlinked markers |
 | `/lectures/new` | Add lecture: Import recording · Upload audio · Paste or upload transcript, with the consent checkbox (Record live is not built) |
-| `/lectures/[id]/watch` | Watch mode (YouTube or local file) with L/I marking, transcript side panel. *(decided 7 Oct 2026, to be built)*: a **Chapters** tab with progress-bar ticks, *play this chapter only* and chapter-level marks ([[Lectheo Product Spec#F11. Chapters — Must|F11]]) |
-| `/lectures/[id]` | Processing progress (2 s polling) and transcript |
+| `/lectures/[id]/watch` | Watch mode (YouTube or local file) with L/I marking, side panel with **Transcript \| Chapters** tabs, a progress bar with chapter ticks, *play this chapter only* and chapter-level marks ([[Lectheo Product Spec#F11. Chapters — Must|F11]]). `?t=` starts at a moment |
+| `/lectures/[id]` | **Study** ([[Lectheo Product Spec#F9. Study mode — Must|F9]]) once the map exists: the reading brief with inline clips, concept marks and *Test me*. Otherwise, or with `?view=transcript` (or a `?t=` deep link), processing progress (2 s polling) and the transcript. A **Study \| Watch \| Transcript** switch in the top bar |
 | `/lectures/[id]/diagnostic` | Confidence-first questions, instant feedback, results |
 | `/activities/[id]` | Spot the flaw / Teach-back / Transfer / Stump (beta) |
-| `/lectures/[id]` Study *(decided 7 Oct 2026, to be built)* | The lecture page gains a **Study \| Watch \| Transcript** switch; Study ([[Lectheo Product Spec#F9. Study mode — Must|F9]]) is the reading brief with inline clips, concept marks and *Test me* |
 
 Signed-in pages share one layout (`app/(app)/layout.tsx`) with `error.tsx` and `not-found.tsx`, so errors render inside the shell. The visual language, the app shell, loading states and motion rules are specified in [[Lectheo Design System]].
 

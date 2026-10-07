@@ -37,7 +37,7 @@ describe('sample account demo data', () => {
     expect(pointers?.transferAvailable).toBe(true)
   })
 
-  it('Pointers is ready for all four activity types; L5 is ready to watch', async () => {
+  it('Pointers is ready for all four activity types; L5 is ready to study', async () => {
     for (const kind of ['spot_flaw', 'transfer'] as const) {
       const ready = await conceptsWithUnseenItem(db, SAMPLE.userId, [POINTERS], kind)
       expect(ready.has(POINTERS), kind).toBe(true)
@@ -49,7 +49,7 @@ describe('sample account demo data', () => {
       .where(eq(concepts.id, POINTERS))
     expect(pointers?.keyPoints.length).toBeGreaterThanOrEqual(3)
     expect(await getNextStep(SAMPLE, LIBRARY_COURSE_ID, db)).toMatchObject({
-      kind: 'watch',
+      kind: 'study',
       lectureId: lectureId('l5'),
     })
   })

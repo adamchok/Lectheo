@@ -236,17 +236,17 @@ Activities are ordered by the recommender: confident mistakes → red → marked
 
 ### F9. Study mode — Must
 
-*Decided 7 Oct 2026, to be built.* Students don't want to sit through a 2-hour lecture before they can be tested. Study mode lets them take in a lecture in minutes, mark what's unclear, then go straight to the diagnosis.
+*Decided and built 7 Oct 2026.* Students don't want to sit through a 2-hour lecture before they can be tested. Study mode lets them take in a lecture in minutes, mark what's unclear, then go straight to the diagnosis.
 
 | ID | Requirement | Priority |
 |---|---|---|
 | F9.1 | Every lecture with a map has a **Study** view: a reading page (the lecture page's **Study \| Watch \| Transcript** switch, Study selected by default once the map exists). It is available from `map_ready`. | Must |
-| F9.2 | Concepts appear in **learning order**: prerequisites first (the map's *depends on* links), ties by first appearance in the lecture. Each concept shows its name and mastery badge, "Builds on: …" links to its prerequisites, the one-line summary, its **key points** (each with a `▶ 12:41` lecture link) and **Watch this part** with the total clip time. | Must |
+| F9.2 | Concepts appear in **learning order**: prerequisites first (the map's *depends on* links), ties by first appearance in the lecture. Each concept shows its name and mastery badge, "Builds on: …" links to its prerequisites, the one-line summary, its **key points** (each with a `▶ 12:41` lecture link) and **Watch this part** with the total clip time. *As built:* `▶` plays that moment in the block's player; a key point cited in an earlier lecture links to that lecture's transcript. | Must |
 | F9.3 | **Watch this part** plays the concept's source moments (neighbouring moments merged into short ranges) in an **inline mini player** inside the block. Lectures without media show the transcript excerpt instead. | Must |
-| F9.4 | **I'm lost here** and **Important** on each concept create normal markers linked **directly to that concept** (no time-window alignment), with capture `study`, at the concept's first source moment. They feed the diagnosis like watch-mode markers. Hidden for lectures without timestamps. | Must |
-| F9.5 | The header shows "N concepts · about M min to read · H min of video". A **Test me** button (the diagnostic) is always visible and ends the page: "Ready? Find out what you misunderstood." | Must |
+| F9.4 | **I'm lost here** and **Important** on each concept create normal markers linked **directly to that concept** (no time-window alignment), with capture `study`, at the concept's first source moment. They feed the diagnosis like watch-mode markers. Hidden for lectures without timestamps. *As built:* each is a toggle; pressing it again undoes the mark. | Must |
+| F9.5 | The header shows "N concepts · about M min to read · H min of video". A **Test me** button (the diagnostic) is always visible and ends the page: "Ready? Find out what you misunderstood." *As built:* at `map_ready` Test me shows "Opens once the questions are ready." | Must |
 | F9.6 | No reading progress is tracked: no ticks, percentages or "read" states. Marks and the diagnostic are the only signals. | Must |
-| F9.7 | The next-step card offers **Study** first for a lecture the student hasn't started ("Study Lecture 5 · about 5 min"), with **Watch** second and a quiet **Skip to the diagnostic**. | Must |
+| F9.7 | The next-step card offers **Study** first for a lecture the student hasn't started ("Study Lecture 5 · about 5 min"), with **Watch** second and a quiet **Skip to the diagnostic**. *As built:* the button reads "Study Lecture 5" and the card's caption gives the brief's reading time ("About 5 minutes"). | Must |
 | F9.8 | **Key points are shown to students.** This changes ADR-009: key points stop being secret. Teach-back still grades against them (now "explain it in your own words"); answer keys, flaws, rubrics, hints and leak keywords stay hidden. Mastered still needs two different activity types. | Must |
 | F9.9 | No new AI text: the brief uses the existing summary and key points, so it costs nothing per lecture. | Must |
 
@@ -268,15 +268,15 @@ Activities are ordered by the recommender: confident mistakes → red → marked
 
 ### F11. Chapters — Must
 
-*Decided 7 Oct 2026, to be built in the same session as F9.* Students want to jump to the part they need and listen to just that, like a well-chaptered YouTube video.
+*Decided and built 7 Oct 2026, with F9.* Students want to jump to the part they need and listen to just that, like a well-chaptered YouTube video.
 
 | ID | Requirement | Priority |
 |---|---|---|
 | F11.1 | Every lecture with timestamps gets **chapters**: about 8–15 per hour, each with a short title, a one-line description, its start and end, and the concepts it covers. Non-concept parts get chapters too ("Announcements", "Q&A", "Recap") so they can be skipped. Lectures without timestamps get none. | Must |
-| F11.2 | Chapters come from the **existing `extractConcepts` call** (no extra AI call). The model names the **transcript line** each chapter starts at (`[s42]`), never a time; the server reads the real time from that segment, so timestamps are exact. Validated: in order, no overlaps, covering the lecture from the first to the last segment, concept references existing. | Must |
-| F11.3 | **Watch page:** a **Chapters** tab beside Transcript lists time, title and description; the current chapter is highlighted as the media plays; clicking jumps there. Chapter ticks sit on the progress bar. **Play this chapter only** stops playback at the chapter's end. | Must |
+| F11.2 | Chapters come from the **existing `extractConcepts` call** (no extra AI call). The model names the **transcript line** each chapter starts at (`[s42]`), never a time; the server reads the real time from that segment, so timestamps are exact. Validated: in order, no overlaps, covering the lecture from the first to the last segment, concept references existing. *As built:* a chapter list that fails the checks is dropped (and logged), so the lecture has no chapters but its map is kept; "about 8–15 per hour" allows one chapter either side. | Must |
+| F11.3 | **Watch page:** a **Chapters** tab beside Transcript lists time, title and description; the current chapter is highlighted as the media plays; clicking jumps there. Chapter ticks sit on the progress bar. **Play this chapter only** stops playback at the chapter's end. *As built:* the ticks sit on Lectheo's own progress bar under the player (the YouTube embed's bar can't be drawn on), next to "Chapter 3 of 8 · title". | Must |
 | F11.4 | Each chapter row with concepts has quiet **I'm lost** / **Important** buttons. The marker (capture `study`, at the chapter's start) links **directly to every concept the chapter covers**. Chapters without concepts show no buttons. L/I during playback keep working as before. | Must |
-| F11.5 | **Study page** (F9): each concept shows where it sits ("In chapter 4 · 23:10", a link). **Lecture header:** "12 chapters · 58 min". | Must |
+| F11.5 | **Study page** (F9): each concept shows where it sits ("In chapter 4 · 23:10", a link). **Lecture header:** "12 chapters · 58 min". *As built:* the Study header ends with "· 8 chapters"; "8 chapters · 45 min" sits in the Transcript view's header. | Must |
 | F11.6 | The **CS50 library** gets chapters through a one-off script run on the dev key; it only adds data, so the item bank and stable ids don't change. | Must |
 
 ---
@@ -298,8 +298,8 @@ flowchart LR
 ```
 
 1. **Sign-in page:** the judge clicks **Explore with a sample account**.
-2. **Dashboard:** CS50x course, Lecture 3 mostly green, Lecture 4 showing a red confident mistake on *pointers*, and a Next-step card: "Lecture 5 is ready to watch."
-3. **Watch mode:** the judge plays a few minutes of Lecture 5 and taps **L** when the hash-table explanation loses them.
+2. **Dashboard:** CS50x course, Lecture 3 mostly green, Lecture 4 showing a red confident mistake on *pointers*, and a Next-step card: "Lecture 5 is ready. Study it in a few minutes and mark what's unclear.", with **Watch** beside it.
+3. **Watch mode** (or **Study**, F9): the judge plays a few minutes of Lecture 5 and taps **L** when the hash-table explanation loses them.
 4. **Map:** the Lecture 5 concepts appear with their flag on *hash tables*, linked back to *arrays* and *linked lists*.
 5. **Diagnostic:** 4–5 questions with confidence first. They answer "Sure: lookup is always O(1)", get it wrong, get the follow-up wrong too → **Confident mistake: hash table lookup cost**, with a link to the lecture moment.
 6. **Spot the flaw** on that concept: they question the author, find the flaw, and get a guiding question → retry → full explanation. Node goes red → amber.
@@ -315,7 +315,7 @@ Sign in with Google → **Record live** in the lecture hall and tap L / I → st
 
 ---
 
-### 4.4 Student with a long lecture (Study mode, *(decided 7 Oct 2026, to be built)*)
+### 4.4 Student with a long lecture (Study mode)
 
 Sign in → add the lecture (recording + .vtt, audio, transcript, or a YouTube link once F10 ships) → **Study** the brief in ~15 minutes, tapping *I'm lost here* on two concepts → watch only those two clips, or jump to the two chapters that sounded hard (F11) → **Test me** → the diagnostic starts with the marked concepts and finds a confident mistake → Spot the flaw → Mastered over the following days. The full video is never watched end to end.
 
@@ -353,9 +353,9 @@ Full analysis, profiles, feature matrix and sources: **[[Lectheo Competition]]**
 
 ## 7. Scope boundaries
 
-**In scope (Must):** sign-in page (Google + sample account); dashboard; CS50 library with watch mode; import recording + transcript; audio and transcript upload; markers; concept map + list view; adaptive diagnostic; spot the flaw; teach-back; Socratic feedback; mastery map; consent, deletion and limits.
+**In scope (Must):** sign-in page (Google + sample account); dashboard; CS50 library with watch mode; import recording + transcript; audio and transcript upload; markers; concept map + list view; adaptive diagnostic; spot the flaw; teach-back; Socratic feedback; mastery map; consent, deletion and limits; Study mode ([[#F9. Study mode — Must|F9]], built 7 Oct 2026); chapters ([[#F11. Chapters — Must|F11]], built 7 Oct 2026).
 
-**Decided 7 Oct 2026, to be built:** Study mode ([[#F9. Study mode — Must|F9]], Must); chapters ([[#F11. Chapters — Must|F11]], Must, with F9); YouTube lectures ([[#F10. YouTube lectures — Should (after a spike)|F10]], Should, only if the spike passes).
+**Decided 7 Oct 2026, to be built:** YouTube lectures ([[#F10. YouTube lectures — Should (after a spike)|F10]], Should, only if the spike passes).
 
 **Should (in order):** record live (slim) → Stump the AI (beta) → transfer problems → slides as extra input → transcript correction → own-course dedupe → persona picker.
 
@@ -440,12 +440,12 @@ Recorded at submission (6 Oct 2026). Each deviation is deliberate; evidence is i
 
 Built on 6 Oct 2026: F0.4 (the dashboard follows the student's own course), F0.6 (self-serve *Delete account*), F0.7 (rename and delete own courses; the CS50 library is visible to sample and owner accounts only), F0.8 (first-run screen), F0.9 (processing steps on the dashboard), F0.10–F0.12 (why, how long, payoff, *Also worth doing*, no dead end) and F8.2 (delete course and delete account).
 
+Built on 7 Oct 2026: F9 (Study mode: the lecture brief, concept marks, Test me, Study first on the next-step card, key points shown) and F11 (chapters from `extractConcepts`, the Chapters tab, *Play this chapter only*, chapter marks, library chapters). Their as-built notes are in the F9 and F11 tables.
+
 ### Decided 7 Oct 2026, to be built
 
 | Req | Item |
 |---|---|
-| F9 | Study mode (lecture brief) |
-| F11 | Chapters (same session as F9) |
 | F10 | YouTube lectures, only if the F10.1 spike passes |
 
 ### Should items: built or cut

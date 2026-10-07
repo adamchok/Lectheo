@@ -25,9 +25,11 @@ Hackathon build (ForgeHacks 2026). **The judge path must work every time** (Arch
 - `apps/web/src/client` — browser code (`apiFetch`, query hooks, capture). `src/components` — UI.
 
 ## Rules that protect correctness
-- **Information hiding (ADR-009):** never select 🔒 data (`item_secrets.*`, `concepts.key_points`,
-  `activities.rubric_snapshot`) into a response. Responses always pass an explicit contracts schema
-  (unknown keys stripped). `server/contracts.test.ts` guards this.
+- **Information hiding (ADR-009, amended 7 Oct 2026):** never select 🔒 data (`item_secrets.*`:
+  answer keys, flaws, rubrics, hints, leak keywords; `activities.rubric_snapshot`) into a response.
+  `concepts.key_points` are no longer secret but appear only in the Study brief
+  (`GET /lectures/{id}/brief`). Responses always pass an explicit contracts schema (unknown keys
+  stripped). `server/contracts.test.ts` guards this.
 - **Ownership:** load resources via `server/ownership.ts`. Another user's id → 404, never 403.
 - **Safe retries (ADR-007):** client-generated UUIDv7 ids + `ON CONFLICT DO NOTHING`; state changes
   are guarded updates (`… WHERE status = 'active' RETURNING`). No idempotency tables.

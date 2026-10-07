@@ -22,6 +22,8 @@ export interface WatchPlayerEvents {
 
 export interface WatchPlayerProps extends WatchPlayerEvents {
   media: z.infer<typeof LectureMedia>
+  /** The embed's accessible name (default "Lecture video"). */
+  title?: string
 }
 
 const NOCOOKIE_HOST = 'https://www.youtube-nocookie.com'
@@ -34,7 +36,7 @@ const frameClass = 'bg-muted relative aspect-video w-full overflow-hidden rounde
  * embed is blocked (API script or player error), falls back to the official MP3 on the same
  * timeline (Architecture risk 7).
  */
-export function WatchPlayer({ media, ...events }: WatchPlayerProps) {
+export function WatchPlayer({ media, title = 'Lecture video', ...events }: WatchPlayerProps) {
   const [blocked, setBlocked] = useState(false)
   const latest = useRef<WatchPlayerEvents>(events)
   useEffect(() => {
@@ -47,6 +49,7 @@ export function WatchPlayer({ media, ...events }: WatchPlayerProps) {
     return (
       <YouTubePlayer
         videoId={media.youtubeId}
+        title={title}
         startMs={startMs}
         endMs={endMs}
         events={latest}
@@ -78,11 +81,12 @@ interface PlayerProps {
 
 function YouTubePlayer({
   videoId,
+  title,
   startMs,
   endMs,
   events,
   onBlocked,
-}: PlayerProps & { videoId: string; onBlocked: () => void }) {
+}: PlayerProps & { videoId: string; title: string; onBlocked: () => void }) {
   const container = useRef<HTMLDivElement>(null)
   const blocked = useRef(onBlocked)
   useEffect(() => {
@@ -126,6 +130,7 @@ function YouTubePlayer({
           },
           events: {
             onReady: () => {
+              created.getIframe().title = title
               if (offTimeline(created)) {
                 blocked.current()
                 return
@@ -172,7 +177,7 @@ function YouTubePlayer({
       target.remove()
       unready()
     }
-  }, [videoId, startMs, endMs, events])
+  }, [videoId, title, startMs, endMs, events])
 
   return <div ref={container} className={`${frameClass} [&_iframe]:absolute [&_iframe]:inset-0`} />
 }

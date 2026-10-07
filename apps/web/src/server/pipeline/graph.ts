@@ -8,26 +8,35 @@ import {
   eq,
   inArray,
   isNull,
+  lectures,
   markerConcepts,
   markers,
   sql,
   uuidv7,
 } from '@lectheo/db'
-import { scaleForMinutes } from '@lectheo/domain'
+import { Chapters } from '@lectheo/contracts'
+import { chapterCountRange, scaleForMinutes, type ChapterRange } from '@lectheo/domain'
 import { computeLayout, layoutHash } from '@lectheo/domain/layout'
 import { aiContext } from '../ai-hooks'
 import type { DbLike } from '../db'
-import { alignOnWrite } from '../lectures/markers'
+import { alignOnWrite, relinkStudyMarks } from '../lectures/markers'
 import {
   cycleErrors,
   graphErrors,
   nodeId,
+  planChapters,
   planGraph,
   type CourseConcept,
   type CourseEdge,
   type GraphPlan,
 } from './graph-check'
-import { lectureMinutes, loadLecture, loadSegments, type PipelineLecture } from './segments'
+import {
+  lectureMinutes,
+  loadLecture,
+  loadSegments,
+  spokenMinutes,
+  type PipelineLecture,
+} from './segments'
 import { PipelineError, runStep, stepOutput } from './state'
 
 /* Concept-map steps (Architecture §4.3): extract → validate + store → layout → align markers. */
@@ -106,6 +115,7 @@ export async function extractConceptsStep(db: DbLike, lectureId: string): Promis
         segments: segments.map(({ idx, text }) => ({ idx, text })),
         existingConcepts: course.concepts.map(({ canonicalKey, name }) => ({ canonicalKey, name })),
         targetCount: scaleForMinutes(lectureMinutes(lecture, segments)).nodes,
+        chapterCount: lecture.hasTimestamps ? chapterCountRange(spokenMinutes(segments)) : null,
       },
       aiContext({ userId: lecture.ownerId, lectureId, intake: true, skipQuota: true, db }),
     )
@@ -116,12 +126,13 @@ export async function extractConceptsStep(db: DbLike, lectureId: string): Promis
 /**
  * Stores the plan in one transaction: new concepts (ON CONFLICT on the course's canonical key
  * reuses a concurrent insert), this lecture's occurrences (upserted, so a re-run adds rather than
- * replaces), and this lecture's edges (recomputed).
+ * replaces), this lecture's edges (recomputed) and its chapters (replaced).
  */
 async function storeGraph(
   db: DbLike,
   lecture: PipelineLecture,
   plan: GraphPlan,
+  chapters: ChapterRange[] | null,
 ): Promise<{ concepts: number; reused: number }> {
   return db.transaction(async (tx) => {
     const fresh = plan.concepts.filter((c) => c.existingId === null)
@@ -197,15 +208,35 @@ async function storeGraph(
         )
         .onConflictDoNothing()
     }
+    await tx
+      .update(lectures)
+      .set({
+        chapters: chapters
+          ? Chapters.parse(
+              chapters.map(({ id, title, summary, startIdx, endIdx, concepts }) => ({
+                id,
+                title,
+                summary,
+                startIdx,
+                endIdx,
+                conceptIds: [...new Set(concepts.map(conceptId))],
+              })),
+            )
+          : null,
+      })
+      .where(eq(lectures.id, lecture.id))
     return { concepts: plan.concepts.length, reused: plan.concepts.length - fresh.length }
   })
 }
 
-/** Citations exist, depends_on stays a DAG, dedupe by canonical key; then stores the graph. */
+/**
+ * Citations exist, depends_on stays a DAG, dedupe by canonical key, chapters check out (F11.2);
+ * then stores the graph.
+ */
 export async function validateGraphStep(
   db: DbLike,
   lectureId: string,
-): Promise<{ concepts: number; reused: number; edges: number }> {
+): Promise<{ concepts: number; reused: number; edges: number; chapters: number }> {
   return runStep(db, lectureId, 'validateGraph', async () => {
     const { extraction } = await stepOutput<ExtractOutput>(db, lectureId, 'extractConcepts')
     if (!extraction) {
@@ -223,7 +254,20 @@ export async function validateGraphStep(
         'The concept map failed our consistency checks. Retrying usually fixes this.',
       )
     }
-    return { ...(await storeGraph(db, lecture, plan)), edges: plan.edges.length }
+    const { chapters, errors: chapterErrors } = planChapters(
+      extraction,
+      plan,
+      segments.map((s) => s.idx),
+      spokenMinutes(segments),
+      lecture.hasTimestamps,
+    )
+    if (chapterErrors.includes('no_chapters')) {
+      console.warn(JSON.stringify({ event: 'no_chapters', lectureId }))
+    } else if (chapterErrors.length > 0) {
+      console.warn(JSON.stringify({ event: 'invalid_chapters', lectureId, errors: chapterErrors }))
+    }
+    const stored = await storeGraph(db, lecture, plan, chapters)
+    return { ...stored, edges: plan.edges.length, chapters: chapters?.length ?? 0 }
   })
 }
 
@@ -265,13 +309,29 @@ export async function alignMarkersStep(
     // No timestamps → markers are disabled for this lecture (F1.7).
     if (!lecture.hasTimestamps) return { markers: 0 }
     const live = await db
-      .select({ id: markers.id, kind: markers.kind, tMs: markers.tMs })
+      .select({
+        id: markers.id,
+        kind: markers.kind,
+        tMs: markers.tMs,
+        capture: markers.capture,
+        target: markers.target,
+      })
       .from(markers)
       .where(and(eq(markers.lectureId, lectureId), isNull(markers.deletedAt)))
     if (live.length > 0) {
       const ids = live.map((m) => m.id)
       await db.delete(markerConcepts).where(inArray(markerConcepts.markerId, ids))
-      await alignOnWrite(db, lectureId, live)
+      // F9.4 / F11.4: study marks name what they are on, so they are re-linked, not re-aligned.
+      await alignOnWrite(
+        db,
+        lectureId,
+        live.filter((m) => m.capture !== 'study'),
+      )
+      await relinkStudyMarks(
+        db,
+        lecture,
+        live.filter((m) => m.capture === 'study'),
+      )
     }
     return { markers: live.length }
   })

@@ -89,6 +89,15 @@ export interface EdgeFx {
   segs: number[]
 }
 
+/** A library chapter (F11): it starts at segment `start` and ends where the next one starts. */
+export interface ChapterFx {
+  title: string
+  summary: string
+  start: number
+  /** Concept keys the chapter teaches; empty for parts without one. */
+  concepts: string[]
+}
+
 /** A concept that also appears in a later lecture (cross-lecture grounding). */
 export interface ExtraOccurrenceFx {
   concept: string

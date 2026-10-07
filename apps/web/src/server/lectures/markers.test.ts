@@ -46,9 +46,30 @@ describe('POST /lectures/{id}/markers', () => {
     await postMarkers(ACTOR_A, ID.L1, [lost, important, anecdote], f.db)
     const { data } = await listMarkers(ACTOR_A, ID.L1, f.db)
     expect(data).toEqual([
-      { id: lost.id, kind: 'lost', tMs: 30_000, capture: 'watch', conceptIds: [ID.C1] },
-      { id: important.id, kind: 'important', tMs: 70_000, capture: 'watch', conceptIds: [ID.C2] },
-      { id: anecdote.id, kind: 'lost', tMs: 600_000, capture: 'watch', conceptIds: [] },
+      {
+        id: lost.id,
+        kind: 'lost',
+        tMs: 30_000,
+        capture: 'watch',
+        target: null,
+        conceptIds: [ID.C1],
+      },
+      {
+        id: important.id,
+        kind: 'important',
+        tMs: 70_000,
+        capture: 'watch',
+        target: null,
+        conceptIds: [ID.C2],
+      },
+      {
+        id: anecdote.id,
+        kind: 'lost',
+        tMs: 600_000,
+        capture: 'watch',
+        target: null,
+        conceptIds: [],
+      },
     ])
   })
 
@@ -60,15 +81,15 @@ describe('POST /lectures/{id}/markers', () => {
 
   it('409s on a lecture without timestamps', async () => {
     await f.exec(`UPDATE lectures SET has_timestamps = false WHERE id = '${ID.PL2}'`)
-    await expect(
-      postMarkers(ACTOR_A, ID.PL2, [marker('lost', 1_000)], f.db),
-    ).rejects.toMatchObject({ code: 'invalid_state' })
+    await expect(postMarkers(ACTOR_A, ID.PL2, [marker('lost', 1_000)], f.db)).rejects.toMatchObject(
+      { code: 'invalid_state' },
+    )
   })
 
   it('404s another user’s personal lecture', async () => {
-    await expect(
-      postMarkers(ACTOR_B, ID.PL1, [marker('lost', 1_000)], f.db),
-    ).rejects.toMatchObject({ code: 'not_found' })
+    await expect(postMarkers(ACTOR_B, ID.PL1, [marker('lost', 1_000)], f.db)).rejects.toMatchObject(
+      { code: 'not_found' },
+    )
   })
 })
 

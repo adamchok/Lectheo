@@ -140,11 +140,16 @@ const FAQ: ReadonlyArray<{ question: string; answer: ReactNode }> = [
     answer: (
       <>
         No. <strong className={strong}>Try the sample account</strong> gives you your own copy of a
-        student partway through CS50x, with Lecture 5 ready to watch. It&apos;s deleted after 24
+        student partway through CS50x, with Lecture 5 ready to study. It&apos;s deleted after 24
         hours. To add your own lectures, continue with Google. Your account starts empty: just your
         courses, nothing preloaded.
       </>
     ),
+  },
+  {
+    question: 'Do I have to watch the whole lecture?',
+    answer:
+      'No. Study the brief in a few minutes, watch only the parts you got stuck on, then get tested.',
   },
   {
     question: 'What happens to my lecture recordings?',

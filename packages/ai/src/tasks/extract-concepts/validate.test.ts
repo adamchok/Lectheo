@@ -22,6 +22,7 @@ const concepts = (n: number): ExtractConceptsOutput => ({
     ],
   })),
   edges: [],
+  chapters: [],
 })
 const countErrors = (out: ExtractConceptsOutput, target: number) =>
   validateExtraction(out, input(target)).filter((e) => e.startsWith('concepts: expected'))

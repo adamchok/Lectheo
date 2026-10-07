@@ -136,6 +136,8 @@ export interface LectureRef {
   /** "Lecture 5" for library lectures, the student's own title otherwise. */
   readonly title: string
   readonly durationMs?: number | null
+  /** Study brief reading time (F9.5), when known. */
+  readonly readMinutes?: number | null
 }
 
 /** One of the student's own marks, as evidence. */
@@ -145,6 +147,8 @@ export interface EvidenceMarker {
   /** Same convention as `LectureRef.title`. */
   readonly lectureTitle: string
   readonly tMs: number
+  /** Study marks: what was marked (a concept), worded "on …" instead of "at 12:41". */
+  readonly on?: string
 }
 
 export interface ConceptDetail {
@@ -188,7 +192,7 @@ export const PAYOFFS = {
   confidentMistake: 'A correct answer here clears the confident mistake.',
   red: 'A correct answer moves it to Getting there.',
   oneMoreWin: 'One more independent win in a different activity → Mastered.',
-  watch: 'Your marks decide what the diagnostic asks.',
+  study: 'Your marks decide what the diagnostic asks.',
   diagnostic: "Finds the mistakes you're sure about.",
   stump: "The hardest test there is: write a question the AI can't answer.",
 } as const
@@ -216,16 +220,20 @@ export function dashboardNextStep(input: NextStepInput): NextStepResponse {
   if (processing) {
     return lectureStep('processing', processing, `${processing.title} is being processed.`, null)
   }
+  // F9.7: Study first (watching stays one click away on the card).
   const lecture = input.unwatchedLibraryLectures[0]
   if (lecture) {
     return {
       ...lectureStep(
-        'watch',
+        'study',
         lecture,
-        `${lecture.title} is ready. Watch it and tap when you're lost.`,
-        PAYOFFS.watch,
+        `${lecture.title} is ready. Study it in a few minutes and mark what's unclear.`,
+        PAYOFFS.study,
       ),
-      estimateMinutes: durationMinutes(lecture.durationMs),
+      estimateMinutes:
+        lecture.readMinutes != null && lecture.readMinutes > 0
+          ? lecture.readMinutes
+          : durationMinutes(lecture.durationMs),
     }
   }
   const pending = input.pendingDiagnostics[0]
@@ -292,16 +300,14 @@ function conceptStep(
     evidence: conceptEvidence(top, detail),
     estimateMinutes: ESTIMATE_MINUTES.practice,
     payoff: conceptPayoff(top, detail),
-    alsoWorthDoing: rest.slice(0, MAX_ALSO_WORTH_DOING).map(
-      (c): AlsoWorthDoing => ({
-        conceptId: c.conceptId,
-        conceptName: c.conceptName,
-        state: c.state,
-        confidentMistake: c.confidentMistake,
-        activityType: activityFor(input, c.conceptId),
-        reason: conceptReason(c),
-      }),
-    ),
+    alsoWorthDoing: rest.slice(0, MAX_ALSO_WORTH_DOING).map((c): AlsoWorthDoing => ({
+      conceptId: c.conceptId,
+      conceptName: c.conceptName,
+      state: c.state,
+      confidentMistake: c.confidentMistake,
+      activityType: activityFor(input, c.conceptId),
+      reason: conceptReason(c),
+    })),
   }
 }
 
@@ -346,7 +352,11 @@ const latestAt = (attempts: readonly MasteryAttempt[]): number =>
  */
 function masteredLongestAgo(input: NextStepInput) {
   return input.masteredConcepts
-    .map((c, order) => ({ c, at: latestAt(input.concepts.get(c.conceptId)?.attempts ?? []), order }))
+    .map((c, order) => ({
+      c,
+      at: latestAt(input.concepts.get(c.conceptId)?.attempts ?? []),
+      order,
+    }))
     .sort((a, b) => a.at - b.at || a.order - b.order)[0]?.c
 }
 
@@ -369,11 +379,16 @@ function sureWrongText(count: number): string {
 const isSureWrong = (a: MasteryAttempt): boolean =>
   a.activityType === 'diagnostic' && a.confidence === 'sure' && a.outcome === 'incorrect'
 
-/** "You marked I'm lost at 12:41 in Lecture 5", with its lecture moment. */
+/**
+ * "You marked I'm lost at 12:41 in Lecture 5" (a study mark: "… on Hash tables in Lecture 5"),
+ * with its lecture moment.
+ */
 function markEvidence(m: EvidenceMarker): NextStepEvidence {
   return {
     kind: m.kind === 'lost' ? 'marked_lost' : 'marked_important',
-    text: `You marked ${MARKER_WORDS[m.kind]} at ${formatTimestamp(m.tMs)} in ${m.lectureTitle}`,
+    text: m.on
+      ? `You marked ${MARKER_WORDS[m.kind]} on ${m.on} in ${m.lectureTitle}`
+      : `You marked ${MARKER_WORDS[m.kind]} at ${formatTimestamp(m.tMs)} in ${m.lectureTitle}`,
     source: { lectureId: m.lectureId, tMs: m.tMs },
   }
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import type { LectureResponse, MarkerKind } from '@lectheo/contracts'
+import { useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { preconnect } from 'react-dom'
 import { toast } from 'sonner'
@@ -13,18 +14,36 @@ import { useMe } from '@/client/queries'
 import { errorMessage } from '@/components/error-state'
 import { KeyHint } from '@/components/key-hint'
 import { PlayerProvider, type PlayerContextValue } from '@/components/player-context'
+import { ChapterBar } from './chapter-bar'
 import { LectureFrame } from './lecture-frame'
+import { LectureModes } from './lecture-modes'
 import { DoneCta, MARKER_LABELS, MarkerBar } from './watch-markers'
 import { TranscriptPanel } from './watch-transcript'
 
 const NO_MEDIA: NonNullable<LectureResponse['media']> = { youtubeId: null, durationMs: null }
 
-/** /lectures/[id]/watch — watch mode (F1 mode A): player, L/I markers, transcript panel. */
+/** `?t=` (e.g. Study's "In chapter 4 · 23:10"): a start inside the lecture's window, or null. */
+function useStartAt(lecture: LectureResponse): number | null {
+  const t = Number(useSearchParams().get('t'))
+  const media = lecture.media
+  if (!Number.isFinite(t) || t <= 0) return null
+  if (media?.startMs != null && t < media.startMs) return null
+  if (media?.endMs != null && t > media.endMs) return null
+  return t
+}
+
+/**
+ * /lectures/[id]/watch — watch mode (F1 mode A): player, L/I markers, transcript and chapters
+ * panel (F11.3).
+ */
 export function WatchView({ lectureId }: { lectureId: string }) {
   return (
     <LectureFrame
       lectureId={lectureId}
       section="Watch"
+      actions={(lecture) => (
+        <LectureModes lecture={lecture} current="watch" className="max-sm:hidden" />
+      )}
       description={
         <>
           {/* Visible because L / I also work before anything on the page is focused. */}
@@ -49,6 +68,8 @@ export function WatchView({ lectureId }: { lectureId: string }) {
 }
 
 function WatchSession({ lecture }: { lecture: LectureResponse }) {
+  const startAt = useStartAt(lecture)
+  const startPending = useRef(startAt)
   const me = useMe()
   const queue = useMarkerQueue(lecture.id, me.data?.id)
   const region = useRef<HTMLDivElement>(null)
@@ -69,6 +90,10 @@ function WatchSession({ lecture }: { lecture: LectureResponse }) {
   const onReady = useCallback((handle: WatchPlayerHandle | null) => {
     player.current = handle
     setReady(handle !== null)
+    if (handle && startPending.current !== null) {
+      handle.seek(startPending.current)
+      startPending.current = null
+    }
   }, [])
   const onPlayingChange = useCallback(
     (isPlaying: boolean) => {
@@ -82,6 +107,7 @@ function WatchSession({ lecture }: { lecture: LectureResponse }) {
     flush()
   }, [flush])
   const currentMs = useCallback(() => player.current?.currentMs() ?? null, [])
+  const pause = useCallback(() => player.current?.pause(), [])
 
   // The queue is keyed by user, so marking waits for /me.
   const canMark = ready && lecture.hasTimestamps && Boolean(me.data)
@@ -146,6 +172,7 @@ function WatchSession({ lecture }: { lecture: LectureResponse }) {
         ref={region}
         className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_var(--panel-width)] lg:gap-6"
       >
+        <LectureModes lecture={lecture} current="watch" className="sm:hidden" />
         <div className="min-w-0 max-lg:contents lg:space-y-4">
           {lecture.source === 'import' ? (
             <LocalPlayer
@@ -163,6 +190,7 @@ function WatchSession({ lecture }: { lecture: LectureResponse }) {
               onEnded={onEnded}
             />
           )}
+          <ChapterBar lecture={lecture} playing={playing} currentMs={currentMs} pause={pause} />
           <MarkerBar
             canMark={canMark}
             describedBy={loading ? loadingHintId : undefined}
@@ -185,6 +213,8 @@ function WatchSession({ lecture }: { lecture: LectureResponse }) {
         </div>
         <TranscriptPanel
           lectureId={lecture.id}
+          courseId={lecture.courseId}
+          chapters={lecture.chapters}
           startMs={lecture.media?.startMs ?? 0}
           playing={playing}
           currentMs={currentMs}

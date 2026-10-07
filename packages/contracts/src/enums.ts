@@ -17,7 +17,8 @@ export const ASSET_KINDS = ['slides_pdf', 'notes_text'] as const
 export const ASSET_STATUSES = ['pending', 'extracted', 'failed'] as const
 export const STEP_STATUSES = ['pending', 'running', 'done', 'failed'] as const
 export const MARKER_KINDS = ['lost', 'important'] as const
-export const MARKER_CAPTURES = ['watch', 'live'] as const
+/** `study`: a mark on a concept or chapter in Study mode or the Chapters tab (F9.4, F11.4). */
+export const MARKER_CAPTURES = ['watch', 'live', 'study'] as const
 export const RELATIONS = [
   'depends_on',
   'is_a',

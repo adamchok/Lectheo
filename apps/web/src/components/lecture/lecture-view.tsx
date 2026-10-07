@@ -6,7 +6,7 @@ import type { Route } from 'next'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useEffect } from 'react'
-import { formatTimestamp, formatTimestampLong } from '@/client/format'
+import { formatTimestamp, formatTimestampLong, pluralize } from '@/client/format'
 import {
   useCourseMap,
   useCourses,
@@ -26,7 +26,9 @@ import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { Spinner } from '@/components/ui/spinner'
+import { hasMap, LectureModes } from './lecture-modes'
 import { isAudio, STEP_LABELS, StepList, stepsFor } from './pipeline-steps'
+import { StudyView } from './study-view'
 
 type ReprocessFrom = 'parseTranscript' | 'submitTranscription' | 'extractConcepts' | 'draftItems'
 
@@ -300,11 +302,31 @@ function LectureActions({
   )
 }
 
-/** /lectures/[id]: status, step-by-step processing (2 s polling), errors + retry, transcript. */
+const MS_PER_MINUTE = 60_000
+
+/** "8 chapters · 45 min" (F11.5), else the recording's length. */
+function LengthMeta({ lecture }: { lecture: LectureResponse }) {
+  const media = lecture.media
+  const windowMs =
+    media?.startMs != null && media.endMs != null ? media.endMs - media.startMs : media?.durationMs
+  if (lecture.chapters.length > 0) {
+    const minutes = windowMs ? ` · ${Math.round(windowMs / MS_PER_MINUTE)} min` : ''
+    return <span>{`${pluralize(lecture.chapters.length, 'chapter')}${minutes}`}</span>
+  }
+  if (media?.durationMs == null) return null
+  return <span className="font-mono text-xs tabular-nums">{formatTimestamp(media.durationMs)}</span>
+}
+
+/**
+ * /lectures/[id]: Study once the map exists (F9.1), else (or with ?view=transcript, or a ?t= deep
+ * link) status, step-by-step processing (2 s polling), errors + retry and the transcript.
+ */
 export function LectureView({ lectureId }: { lectureId: string }) {
   const lecture = useLecture(lectureId)
   const courses = useCourses()
   const conceptCount = useLectureConceptCount(lecture.data)
+  const params = useSearchParams()
+  const transcriptAsked = params.get('view') === 'transcript' || params.has('t')
 
   if (lecture.isPending) {
     return (
@@ -336,6 +358,9 @@ export function LectureView({ lectureId }: { lectureId: string }) {
   const processing = data.status === 'processing' || data.status === 'map_ready'
   const userLecture = data.source !== 'library'
   const courseTitle = courses.data?.find((c) => c.id === data.courseId)?.title ?? 'Course'
+  if (hasMap(data) && !transcriptAsked) {
+    return <StudyView lecture={data} courseTitle={courseTitle} />
+  }
 
   return (
     <>
@@ -346,19 +371,21 @@ export function LectureView({ lectureId }: { lectureId: string }) {
         ]}
         title={data.title}
         courseId={data.courseId}
-        actions={userLecture ? <DeleteLectureButton lecture={data} /> : undefined}
+        actions={
+          <>
+            <LectureModes lecture={data} current="transcript" className="max-sm:hidden" />
+            {userLecture && <DeleteLectureButton lecture={data} />}
+          </>
+        }
       />
+      <LectureModes lecture={data} current="transcript" className="mb-6 sm:hidden" />
       <PageHeader
         eyebrow={`Lecture ${data.seq}`}
         title={data.title}
         description={
           <span className="inline-flex flex-wrap items-center gap-2">
             <LectureStatusChip status={data.status} />
-            {data.media?.durationMs != null && (
-              <span className="font-mono text-xs tabular-nums">
-                {formatTimestamp(data.media.durationMs)}
-              </span>
-            )}
+            <LengthMeta lecture={data} />
             <MarkerCounts lost={data.markerCounts.lost} important={data.markerCounts.important} />
           </span>
         }

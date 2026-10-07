@@ -1,9 +1,22 @@
 import {
+  type LectureChapter,
   type LectureResponse,
   PipelineStep,
   type TranscriptResponse,
 } from '@lectheo/contracts'
-import { and, asc, count, eq, gt, isNull, lt, markers, transcriptSegments } from '@lectheo/db'
+import {
+  and,
+  asc,
+  count,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  lt,
+  markers,
+  transcriptSegments,
+} from '@lectheo/db'
+import { chapterTimes } from '@lectheo/domain'
 import type { z } from 'zod'
 import type { Actor } from '../auth'
 import { appDb, type DbLike } from '../db'
@@ -16,6 +29,7 @@ type TranscriptDto = z.input<typeof TranscriptResponse>
 export function toLectureDto(
   lecture: Lecture,
   markerCounts: LectureDto['markerCounts'],
+  chapters: LectureChapter[] = [],
 ): LectureDto {
   const step = PipelineStep.safeParse(lecture.progress?.step)
   const media = lecture.media
@@ -47,7 +61,34 @@ export function toLectureDto(
     markerCounts,
     needsReprocess: lecture.needsReprocess,
     error: lecture.error ?? null,
+    chapters,
   }
+}
+
+/**
+ * lectures.chapters with times read from their first and last segments (F11.2): one query.
+ * Empty without timestamps; a chapter whose segments are gone is skipped.
+ */
+export async function lectureChapters(
+  db: DbLike,
+  lecture: Pick<Lecture, 'id' | 'chapters' | 'hasTimestamps'>,
+): Promise<LectureChapter[]> {
+  const chapters = lecture.chapters
+  if (!lecture.hasTimestamps || !chapters || chapters.length === 0) return []
+  const idxs = [...new Set(chapters.flatMap((c) => [c.startIdx, c.endIdx]))]
+  const rows = await db
+    .select({
+      idx: transcriptSegments.idx,
+      startMs: transcriptSegments.startMs,
+      endMs: transcriptSegments.endMs,
+    })
+    .from(transcriptSegments)
+    .where(and(eq(transcriptSegments.lectureId, lecture.id), inArray(transcriptSegments.idx, idxs)))
+  const byIdx = new Map(rows.map((r) => [r.idx, r]))
+  return chapters.flatMap(({ id, title, summary, conceptIds, ...range }) => {
+    const times = chapterTimes(range, byIdx)
+    return times ? [{ id, title, summary, conceptIds, ...times }] : []
+  })
 }
 
 /** This user's live markers on a lecture, by kind. */
@@ -67,14 +108,18 @@ async function markerCounts(
   return { lost: of('lost'), important: of('important') }
 }
 
-/** GET /lectures/{id}: 2 queries (ownership join, marker counts). */
+/** GET /lectures/{id}: 3 queries (ownership join, then marker counts and chapter times). */
 export async function getLecture(
   actor: Actor,
   lectureId: string,
   db: DbLike = appDb(),
 ): Promise<LectureDto> {
   const { lecture } = await loadLectureForRead(actor, lectureId, db)
-  return toLectureDto(lecture, await markerCounts(db, lecture.id, actor.userId))
+  const [counts, chapters] = await Promise.all([
+    markerCounts(db, lecture.id, actor.userId),
+    lectureChapters(db, lecture),
+  ])
+  return toLectureDto(lecture, counts, chapters)
 }
 
 export interface TranscriptRange {

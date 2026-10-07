@@ -121,6 +121,8 @@ export async function replaceSegments(
       .set({
         hasTimestamps: meta.hasTimestamps,
         durationMs: meta.durationMs,
+        // Chapters cite the old segment indexes too; extraction writes new ones.
+        chapters: null,
         ...(meta.sttConfidence === undefined ? {} : { sttConfidence: meta.sttConfidence }),
       })
       .where(eq(lectures.id, lectureId))
@@ -131,6 +133,10 @@ export async function replaceSegments(
     if (row) await dropOrphanConcepts(tx as unknown as DbLike, row.courseId)
   })
 }
+
+/** Span of the timed transcript in minutes (chapter counts, F11.1). */
+export const spokenMinutes = (segments: readonly LectureSegment[]): number =>
+  ((segments.at(-1)?.endMs ?? 0) - (segments[0]?.startMs ?? 0)) / 60_000
 
 /** Lecture length for scaling (F2.2): measured duration, else last cue, else words ÷ 150. */
 export function lectureMinutes(

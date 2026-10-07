@@ -26,20 +26,20 @@ describe('GET /courses/{id}/next', () => {
     await expect(getNextStep(ACTOR_B, 'nope', f.db)).rejects.toMatchObject({ code: 'not_found' })
   })
 
-  it('goes watch → diagnostic → activity', async () => {
+  it('goes study → diagnostic → activity', async () => {
     expect(await getNextStep(ACTOR_A, ID.LIB, f.db)).toEqual({
-      kind: 'watch',
+      kind: 'study',
       lectureId: ID.L1,
-      reason: "Lecture 1 is ready. Watch it and tap when you're lost.",
+      reason: "Lecture 1 is ready. Study it in a few minutes and mark what's unclear.",
       evidence: [],
-      estimateMinutes: null,
+      estimateMinutes: 1, // the brief's few short summaries and key points
       payoff: 'Your marks decide what the diagnostic asks.',
       alsoWorthDoing: [],
     })
 
     await addMarker(f, { lectureId: ID.L1, userId: ID.A })
     expect(await getNextStep(ACTOR_A, ID.LIB, f.db)).toMatchObject({
-      kind: 'watch',
+      kind: 'study',
       lectureId: ID.L2,
     })
 
@@ -96,9 +96,10 @@ describe('GET /courses/{id}/next', () => {
     expect(step.reason).toContain('You were sure about Loops')
   })
 
-  it('estimates a watch by the part that plays, not the whole video', async () => {
-    // L5-like: a 2:03:50 video that plays 1:16:30–2:01:30.
+  it('without a brief to read, estimates by the part of the video that plays', async () => {
+    // L5-like: a 2:03:50 video that plays 1:16:30–2:01:30. No concepts → no reading time.
     await f.exec(`
+      DELETE FROM concept_occurrences;
       UPDATE lectures SET duration_ms = 7430000,
         media = '{"youtubeId":"x","startMs":4590000,"endMs":7290000}'::jsonb
       WHERE id = '${ID.L1}';

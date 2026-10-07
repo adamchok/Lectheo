@@ -3,6 +3,7 @@ import {
   and,
   asc,
   conceptEdges,
+  conceptOccurrences,
   concepts,
   desc,
   eq,
@@ -19,6 +20,7 @@ import {
   type LectureRef,
   type MasteryAttempt,
   type NextStepInput,
+  briefReadMinutes,
   dashboardNextStep,
   nextActivityType,
   prerequisitesOfRed,
@@ -114,6 +116,16 @@ function lectureSteps(rows: LectureFlags[]) {
   }
 }
 
+/** The Study brief's reading time for the lecture the card suggests (F9.7). One query. */
+async function withReadMinutes(db: DbLike, lecture: LectureRef): Promise<LectureRef> {
+  const rows = await db
+    .select({ name: concepts.name, summary: concepts.summary, keyPoints: concepts.keyPoints })
+    .from(conceptOccurrences)
+    .innerJoin(concepts, eq(concepts.id, conceptOccurrences.conceptId))
+    .where(eq(conceptOccurrences.lectureId, lecture.lectureId))
+  return { ...lecture, readMinutes: briefReadMinutes(rows) }
+}
+
 /** "Add Lecture N" in the student's own course; the library isn't theirs to extend. */
 const nextLectureSeq = (course: Course, rows: LectureFlags[]): number | null =>
   course.kind === 'personal' ? Math.max(0, ...rows.map((l) => l.seq ?? 0)) + 1 : null
@@ -123,7 +135,9 @@ const loadMarks = (db: DbLike, courseId: string, userId: string, lectureId?: str
   db
     .select({
       conceptId: markerConcepts.conceptId,
+      conceptName: concepts.name,
       kind: markers.kind,
+      capture: markers.capture,
       lectureId: markers.lectureId,
       tMs: markers.tMs,
       title: lectures.title,
@@ -133,6 +147,7 @@ const loadMarks = (db: DbLike, courseId: string, userId: string, lectureId?: str
     .from(markers)
     .innerJoin(lectures, eq(lectures.id, markers.lectureId))
     .leftJoin(markerConcepts, eq(markerConcepts.markerId, markers.id))
+    .leftJoin(concepts, eq(concepts.id, markerConcepts.conceptId))
     .where(
       and(
         eq(lectures.courseId, courseId),
@@ -150,6 +165,8 @@ const toEvidenceMarker = (m: MarkRow): EvidenceMarker => ({
   lectureId: m.lectureId,
   lectureTitle: lectureTitle(m),
   tMs: m.tMs,
+  // A study mark was pressed on a concept or chapter, not at a moment (F9.4).
+  ...(m.capture === 'study' && m.conceptName ? { on: m.conceptName } : {}),
 })
 
 /** Concepts in map order with the latest practice time (epoch ms) for the user. */
@@ -223,7 +240,12 @@ export async function getNextStep(
     concepts: new Map(),
     activityTypes: new Map(),
   }
-  if (steps.processing.length > 0 || steps.unwatched.length > 0) return dashboardNextStep(base)
+  if (steps.processing.length > 0) return dashboardNextStep(base)
+  const [unwatched, ...laterUnwatched] = steps.unwatched
+  if (unwatched) {
+    const study = await withReadMinutes(db, unwatched)
+    return dashboardNextStep({ ...base, unwatchedLibraryLectures: [study, ...laterUnwatched] })
+  }
   const pending = steps.pending[0]
   if (pending) {
     const marks = await loadMarks(db, course.id, actor.userId, pending.lectureId)

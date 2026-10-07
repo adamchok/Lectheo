@@ -11,6 +11,7 @@ import type {
 import { useQueryClient } from '@tanstack/react-query'
 import {
   ArrowRight,
+  BookOpenText,
   CircleMinus,
   CircleX,
   ClipboardCheck,
@@ -46,6 +47,7 @@ const OVERLINE_ID = 'next-step-overline'
 
 const ICONS: Readonly<Record<NextStepResponse['kind'], LucideIcon>> = {
   processing: LoaderCircle,
+  study: BookOpenText,
   watch: Play,
   diagnostic: ClipboardCheck,
   activity: Sparkles,
@@ -72,9 +74,43 @@ const START_LABELS: Readonly<Record<ActivityType, string>> = {
   stump: 'Start Stump the AI',
 }
 
+/**
+ * F9.7: Study first ("Study Lecture 5"), Watch second, and a quiet way straight to the
+ * diagnostic for a student who already knows the lecture.
+ */
+function StudyActions({ lectureId }: { lectureId: string }) {
+  const lecture = useLecture(lectureId)
+  const name = lecture.data ? `Lecture ${lecture.data.seq}` : 'the lecture'
+  return (
+    <div className="flex flex-col items-start gap-2 sm:items-end">
+      <div className="flex flex-wrap gap-2">
+        <Button asChild size="lg">
+          <Link href={`/lectures/${lectureId}` as Route}>
+            Study {name}
+            <ArrowRight aria-hidden />
+          </Link>
+        </Button>
+        <Button asChild size="lg" variant="outline">
+          <Link href={`/lectures/${lectureId}/watch` as Route}>
+            <Play aria-hidden />
+            Watch
+          </Link>
+        </Button>
+      </div>
+      <Link
+        href={`/lectures/${lectureId}/diagnostic` as Route}
+        className="text-body-sm text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+      >
+        Skip to the diagnostic
+      </Link>
+    </div>
+  )
+}
+
 function NextStepAction({ step }: { step: NextStepResponse }) {
   const { startPractice, isPending } = useStartPractice()
 
+  if (step.kind === 'study' && step.lectureId) return <StudyActions lectureId={step.lectureId} />
   if (step.kind === 'watch' && step.lectureId) {
     return (
       <Button asChild size="lg">

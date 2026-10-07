@@ -26,8 +26,14 @@ test('add a lecture from a pasted transcript, see its map, delete it', async ({ 
 
   await expect(page).toHaveURL(/\/lectures\/[0-9a-f-]{36}$/, { timeout: 30_000 })
   const lectureUrl = page.url()
-  await expect(page.getByText('Ready', { exact: true })).toBeVisible({ timeout: 90_000 })
+  // F9.1: once the map exists the lecture opens in Study; Test me links once it is ready.
+  await expect(page.getByRole('link', { name: 'Test me' }).first()).toBeVisible({
+    timeout: 90_000,
+  })
+  await expect(page.getByRole('article').first()).toBeVisible()
 
+  await page.getByRole('link', { name: 'Transcript', exact: true }).first().click()
+  await expect(page.getByText('Ready', { exact: true })).toBeVisible()
   await page.getByRole('link', { name: 'Concept map' }).first().click()
   await expect(page.getByRole('heading', { name: 'E2E Data Structures' })).toBeVisible()
   await expect(page.getByText(/^[1-9]\d* concepts? across 1 lecture/)).toBeVisible()

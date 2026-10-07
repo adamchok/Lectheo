@@ -43,7 +43,7 @@ export const ACTOR_B: Actor = { userId: ID.B, kind: 'owner', isSample: false }
 export const ACTOR_G: Actor = { userId: ID.G, kind: 'google', isSample: false }
 export const ACTOR_S: Actor = { userId: ID.S, kind: 'sample', isSample: true }
 
-/** The 🔒 key_points value seeded on every concept; it must never reach a response. */
+/** Key point text seeded on every concept: only the Study brief may show it (ADR-009 amended). */
 export const SECRET_KEY_POINT = 'SECRET-KEY-POINT'
 
 export interface Fixture {
@@ -55,7 +55,7 @@ export interface Fixture {
 export async function createFixture(): Promise<Fixture> {
   const testDb = await createTestDb()
   const exec = (sql: string) => testDb.$client.exec(sql)
-  const kp = `'["${SECRET_KEY_POINT}"]'::jsonb`
+  const kp = `'[{"id":"k1","text":"${SECRET_KEY_POINT}","segmentIdxs":[0]}]'::jsonb`
   await exec(`
     INSERT INTO profiles (id, kind) VALUES
       ('${ID.A}', 'owner'), ('${ID.B}', 'owner'), ('${ID.S}', 'sample'), ('${ID.G}', 'google');

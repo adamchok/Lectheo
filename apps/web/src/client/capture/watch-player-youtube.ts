@@ -15,6 +15,7 @@ export interface YTPlayer {
   playVideo: () => void
   pauseVideo: () => void
   destroy: () => void
+  getIframe: () => HTMLIFrameElement
 }
 
 interface YTPlayerOptions {

@@ -120,7 +120,11 @@ async function resetFrom(db: DbLike, lectureId: string, from: ReprocessFrom): Pr
  */
 async function resetFresh(db: DbLike, lecture: Lecture): Promise<void> {
   await db.delete(pipelineSteps).where(eq(pipelineSteps.lectureId, lecture.id))
-  await db.update(lectures).set({ sttJobId: null }).where(eq(lectures.id, lecture.id))
+  // Chapters cite segment indexes of the old run; validateGraph writes new ones.
+  await db
+    .update(lectures)
+    .set({ sttJobId: null, chapters: null })
+    .where(eq(lectures.id, lecture.id))
   await retireItems(db, lecture.id)
   await db.delete(conceptOccurrences).where(eq(conceptOccurrences.lectureId, lecture.id))
   await db.delete(conceptEdges).where(eq(conceptEdges.lectureId, lecture.id))

@@ -82,7 +82,7 @@ Part of the architecture set: [[Lectheo Architecture]] · **API Spec** · [[Lect
   /lectures/{id}/transcript/segments/{idx}  PATCH   (Should, not built)
   /lectures/{id}/slides-upload-url  POST           (Should, not built)
   /lectures/{id}/process            POST
-  /lectures/{id}/brief              GET            Study mode brief            (to be built, F9)
+  /lectures/{id}/brief              GET            Study mode brief            (F9)
   /youtube/preview?url=             GET            YouTube link check          (to be built, F10)
   /lectures/{id}/markers            GET POST
   /lectures/{id}/markers/{markerId} DELETE        (undo)
@@ -167,19 +167,19 @@ Joins concepts, edges, layout, this user's markers and **mastery computed on rea
 `moments` are this user's markers on the concept ("▶ 12:41" links). `sources` are where the lecture teaches it ([[Lectheo Product Spec#F2. Concept map — Must|F2.4]]): up to 3, most salient first. `position` is `null` before the layout exists.
 
 ### `GET /courses/{courseId}/next`
-`200 { kind: "processing"|"watch"|"diagnostic"|"activity"|"add_lecture", lectureId?, conceptId?, conceptName?, activityType?, reason, evidence, estimateMinutes, payoff, alsoWorthDoing }` (F0.9–F0.12, `packages/contracts/src/api/courses.ts`; rules in `packages/domain/src/recommender.ts`).
+`200 { kind: "processing"|"study"|"watch"|"diagnostic"|"activity"|"add_lecture", lectureId?, conceptId?, conceptName?, activityType?, reason, evidence, estimateMinutes, payoff, alsoWorthDoing }` (F0.9–F0.12, `packages/contracts/src/api/courses.ts`; rules in `packages/domain/src/recommender.ts`).
 
 | Field | Meaning |
 |---|---|
 | `kind` | `processing`: a lecture of the student's is in the pipeline (`processing` or `map_ready`; the dashboard shows its steps), or, when nothing else is left, one whose processing failed (to retry) or that is still being added (`draft`/`uploading`: "Finish adding Week 1"). `add_lecture`: nothing left to do in the course (replaced `none`). |
 | `reason` | The card's headline, written for the student (see the examples below). |
 | `evidence` | 0–2 items `{ kind: "marked_lost"|"marked_important"|"confident_mistake"|"wrong"|"partial", text, source?: { lectureId, tMs } }`, strongest first. Built from the student's own markers and attempts only. |
-| `estimateMinutes` | Watch: the part that plays (`media.endMs − media.startMs` for library lectures, else the recording's duration). Diagnostic: 3. Spot the flaw, teach-back, transfer, Stump: 5. `null` for `processing` and `add_lecture`. |
+| `estimateMinutes` | Study (F9.7): the brief's reading time (words ÷ 200, rounded up), or the watch length when the lecture has no concepts. Watch: the part that plays (`media.endMs − media.startMs` for library lectures, else the recording's duration). Diagnostic: 3. Spot the flaw, teach-back, transfer, Stump: 5. `null` for `processing` and `add_lecture`. |
 | `payoff` | One line on what finishing the step changes, or `null`. Rules in [[Lectheo Architecture#6.3 Practice recommender|Architecture §6.3]]. |
 | `alsoWorthDoing` | 0–2 items `{ conceptId, conceptName, state, confidentMistake, activityType, reason }`: the next ranked concepts after the top one. Empty unless `kind = "activity"`. |
 
 Examples:
-- `{ kind: "watch", reason: "Lecture 5 is ready. Watch it and tap when you're lost.", evidence: [], estimateMinutes: 45, payoff: "Your marks decide what the diagnostic asks." }`
+- `{ kind: "study", reason: "Lecture 5 is ready. Study it in a few minutes and mark what's unclear.", evidence: [], estimateMinutes: 5, payoff: "Your marks decide what the diagnostic asks." }` (an unstarted library lecture, F9.7; `watch` is kept in the enum but no longer returned)
 - `{ kind: "activity", activityType: "spot_flaw", conceptName: "Hash tables", reason: "You were sure about Hash tables, but got it wrong. Let's fix that.", evidence: [{ kind: "confident_mistake", text: "Sure but wrong, twice, in the diagnostic" }, { kind: "marked_lost", text: "You marked I'm lost at 12:41 in Lecture 5", source: { lectureId: "…", tMs: 761000 } }], estimateMinutes: 5, payoff: "A correct answer here clears the confident mistake." }`
 
 ---
@@ -200,7 +200,7 @@ Examples:
   "media": { "youtubeId": null, "localFileName": "week6.mp4", "durationMs": 3120000 }, "hasTimestamps": true,
   "markerCounts": { "lost": 4, "important": 3 }, "needsReprocess": false, "error": null }
 ```
-Library media also carries `startMs`/`endMs` (the core window) and `fallbackAudioUrl` (CS50's official MP3 on the same timeline, used when the YouTube embed is blocked). *(decided 7 Oct 2026, to be built)*: the response adds `chapters: [{ id, title, summary, startMs, endMs, conceptIds }]` for lectures with timestamps ([[Lectheo Product Spec#F11. Chapters — Must|F11]]). Polled every 2 s while `status ∈ {processing, map_ready}`. The map is usable from `map_ready` onwards; `ready` means questions are available too.
+Library media also carries `startMs`/`endMs` (the core window) and `fallbackAudioUrl` (CS50's official MP3 on the same timeline, used when the YouTube embed is blocked). The response carries `chapters: [{ id, title, summary, startMs, endMs, conceptIds }]` ([[Lectheo Product Spec#F11. Chapters — Must|F11]]), in order, times read from the chapters' first and last segments; `[]` for lectures without timestamps or chapters. Polled every 2 s while `status ∈ {processing, map_ready}`. The map is usable from `map_ready` onwards; `ready` means questions are available too.
 
 ### `PATCH /lectures/{id}`: `{ title }` → `200`
 ### `DELETE /lectures/{id}`: `204`. Cascades and removes Storage objects. Library lectures → `404`.
@@ -235,13 +235,13 @@ Batch upsert from watch mode or the recorder (every 10 s and on pause/stop):
 → `200 { accepted: 3, duplicates: 1 }`. Max 200 per request.
 For **library and already-processed** lectures, markers are linked to concepts **immediately** (deterministic alignment), so the map updates without re-processing. Lectures without timestamps → `409 invalid_state`.
 
+Study marks: `{ id, kind, capture: "study", conceptId }` or, for a chapter ([[Lectheo Product Spec#F11. Chapters — Must|F11]]), `{ id, kind, capture: "study", chapterId }`, which links the marker to every concept the chapter covers and sets `tMs` to the chapter's start. The server sets `tMs` to the concept's first source moment in this lecture and links the marker to `conceptId` directly. `409 invalid_state` for lectures without timestamps; `404` for a concept not in this lecture, an unknown chapter or a chapter without concepts. Same idempotency as other markers (`ON CONFLICT DO NOTHING`; links only for newly inserted marks). `GET …/markers` returns every marker with `target` (`{ conceptId }` or `{ chapterId }` for study marks, else `null`). A pipeline re-run re-links study marks by their target, never by time: a concept mark keeps its concept while the lecture still teaches it; a chapter mark follows the chapter that now starts at its time.
+
 ### `DELETE /lectures/{id}/markers/{markerId}`
 Undo (soft delete) → `204`.
 
-Study marks *(decided 7 Oct 2026, to be built)*: `{ id, kind, capture: "study", conceptId }` or, for a chapter ([[Lectheo Product Spec#F11. Chapters — Must|F11]]), `{ id, kind, capture: "study", chapterId }`, which links the marker to every concept the chapter covers and sets `tMs` to the chapter's start. The server sets `tMs` to the concept's first source moment in this lecture and links the marker to `conceptId` directly. `409 invalid_state` for lectures without timestamps.
-
-### `GET /lectures/{id}/brief` *(decided 7 Oct 2026, to be built)*
-The Study brief ([[Lectheo Product Spec#F9. Study mode — Must|F9]]). `200 { lectureId, readMinutes, videoMinutes, concepts: [{ id, name, mastery: { state, confidentMistake }, prerequisites: [{ id, name }], summary, keyPoints: [{ id, text, sources: [SourceRef] }], clips: [{ startMs, endMs }], clipMs, chapter: { id, title, startMs }, marks: { lost, important } }] }`. Concepts in learning order (prerequisites first, then first appearance). Available from `map_ready`. `readMinutes` = words ÷ 200, rounded up. No AI calls.
+### `GET /lectures/{id}/brief`
+The Study brief ([[Lectheo Product Spec#F9. Study mode — Must|F9]]). `200 { lectureId, readMinutes, videoMinutes, concepts: [{ id, name, mastery: { state, confidentMistake }, prerequisites: [{ id, name }], summary, keyPoints: [{ id, text, sources: [SourceRef] }], clips: [{ startMs, endMs }], clipMs, chapter: { id, title, startMs }, marks: { lost, important } }] }`. Concepts in learning order (prerequisites first, then first appearance). Available from `map_ready` (`409 invalid_state` before). `readMinutes` = words ÷ 200, rounded up (names, summaries and key points). No AI calls. As built: `prerequisites` lists every depends_on target in the course (it may be taught in another lecture); `keyPoints[].sources` point at the lecture the key point cites (the concept's first lecture); `clips` are the concept's source segments here, neighbours merged, so `clips[0].startMs` is its first moment; `chapter` is `null` without chapters; `videoMinutes` is `null` without playable media; `marks` counts this user's live markers here linked to the concept. Key points are the only formerly 🔒 field in any response (ADR-009 amended).
 
 ### `GET /youtube/preview?url=` *(decided 7 Oct 2026, to be built)*
 ([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]]) `200 { videoId, title, channel, durationMs, thumbnailUrl, ok, reason? }`. `reason`: `not_found` · `private` · `embed_disabled` · `live` · `too_short` · `too_long` (tier limit) · `not_english`. Uses the YouTube Data API (`videos.list`, server key); no AI spend.
@@ -408,8 +408,8 @@ Embedded with the **IFrame Player API** (`youtube-nocookie.com`). The client rea
 ## 10. Example: the judge path
 
 1. Sign-in page → Turnstile → `POST /session/sample` → dashboard.
-2. `GET /courses` → `GET /courses/{cs50}/next` → "Lecture 5 is ready to watch".
-3. Watch mode: `POST /lectures/{L5}/markers` (batched while watching).
+2. `GET /courses` → `GET /courses/{cs50}/next` → "Lecture 5 is ready. Study it…" (Study or Watch).
+3. Watch mode: `POST /lectures/{L5}/markers` (batched while watching); or Study: `GET /lectures/{L5}/brief`, then a study mark per concept.
 4. `GET /courses/{cs50}/map` → the L5 concepts show the judge's flag.
 5. `POST /lectures/{L5}/diagnostic` → for each item: `…/confidence` → `…/answer` (plus a follow-up on a sure-and-wrong answer).
 6. `GET /courses/{cs50}/next` → spot the flaw on *hash tables*.

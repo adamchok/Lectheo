@@ -1,6 +1,7 @@
 import {
   AnswerKeyByKind,
   AttemptGrading,
+  Chapters,
   CourseAttributionJson,
   DistractorMeta,
   HintsSecret,
@@ -231,6 +232,15 @@ describe('CS50x library + seed student fixture', () => {
     }
     for (const c of await rows<{ key_points: unknown }>(db, 'SELECT key_points FROM concepts')) {
       KeyPoints.parse(c.key_points)
+    }
+    // F11.6: every library lecture has chapters, linked to library concepts only.
+    const conceptIds = new Set(
+      (await rows<{ id: string }>(db, 'SELECT id FROM concepts')).map((c) => c.id),
+    )
+    for (const l of await rows<{ chapters: unknown }>(db, 'SELECT chapters FROM lectures')) {
+      const chapters = Chapters.parse(l.chapters)
+      expect(chapters.length).toBeGreaterThanOrEqual(5)
+      for (const c of chapters) expect(c.conceptIds.every((id) => conceptIds.has(id))).toBe(true)
     }
     for (const item of items) {
       PublicPayloadByKind[item.kind].parse(item.public_payload)

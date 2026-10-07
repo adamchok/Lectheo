@@ -32,5 +32,32 @@ export function fakeExtractConcepts(input: ExtractConceptsInput): ExtractConcept
     relation: 'depends_on' as const,
     segmentIdxs: idxs,
   }))
-  return { concepts, edges }
+  return {
+    concepts,
+    edges,
+    chapters: fakeChapters(
+      input,
+      concepts.map((c) => c.canonicalKey),
+    ),
+  }
+}
+
+/**
+ * Evenly spaced chapters in the middle of the asked range; concepts round-robin over all but the
+ * last chapter, a "Recap" without concepts (so chapters without marks are covered too).
+ */
+function fakeChapters(input: ExtractConceptsInput, keys: readonly string[]) {
+  const count = input.chapterCount
+  if (!count || input.segments.length === 0) return []
+  const n = Math.min(input.segments.length, Math.round((count.min + count.max) / 2))
+  const teaching = Math.max(1, n - 1)
+  return Array.from({ length: n }, (_, i) => {
+    const recap = n > 1 && i === n - 1
+    return {
+      title: recap ? 'Recap' : `Part ${i + 1}`,
+      summary: recap ? 'A quick recap of the lecture.' : `Part ${i + 1} of the lecture.`,
+      startIdx: input.segments[Math.floor((i * input.segments.length) / n)]?.idx ?? 0,
+      conceptKeys: recap ? [] : keys.filter((_, k) => k % teaching === i),
+    }
+  })
 }

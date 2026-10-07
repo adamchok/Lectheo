@@ -105,7 +105,7 @@ Index: `(owner_id)`.
 | `workflow_run_id` | text null | |
 | `needs_reprocess` | bool default false | set after a transcript edit |
 | `error` | jsonb null | `{step, code, message}` |
-| `chapters` | jsonb null | *(decided 7 Oct 2026, to be built)* ([[Lectheo Product Spec#F11. Chapters — Must|F11]]): `[{ id, title, summary, startIdx, endIdx, conceptIds[] }]`, segment indexes, not times (times are read from `transcript_segments`). Written by `extractConcepts`, validated in `validateGraph`; replaced on re-process. `null` for lectures without timestamps |
+| `chapters` | jsonb null | ([[Lectheo Product Spec#F11. Chapters — Must|F11]]): `[{ id, title, summary, startIdx, endIdx, conceptIds[] }]` (contracts `Chapters`), ids `ch1…` in order, segment indexes, not times (times are read from `transcript_segments`; `endIdx` is inclusive). Written by `validateGraph` from the `extractConcepts` output once checked (an invalid list is dropped); replaced on re-process and cleared when the transcript is replaced. `null` for lectures without timestamps. Library lectures get theirs from the seed fixture (`fixtures/chapters.ts`) |
 | `created_at`, `updated_at` | timestamptz | |
 
 Index: `(course_id, seq)`. The **"one processing lecture per course"** rule is a partial unique index: `UNIQUE (course_id) WHERE status = 'processing'`.
@@ -153,7 +153,8 @@ Edits never re-segment, so citations stay stable.
 | `user_id` | uuid FK → profiles ON DELETE CASCADE | |
 | `kind` | enum `lost`, `important` | |
 | `t_ms` | int | media time |
-| `capture` | enum `watch`, `live` | *(decided 7 Oct 2026, to be built)*: `study` ([[Lectheo Product Spec#F9. Study mode — Must|F9]]), a mark made on a concept in the brief; linked to that concept directly (`marker_concepts.overlap_score = 1`), `t_ms` = the concept's first source moment. Chapter marks ([[Lectheo Product Spec#F11. Chapters — Must|F11]]) use the same capture: `t_ms` = the chapter's start, linked to every concept the chapter covers |
+| `capture` | enum `watch`, `live`, `study` | `study` ([[Lectheo Product Spec#F9. Study mode — Must|F9]]), a mark made on a concept in the brief; linked to that concept directly (`marker_concepts.overlap_score = 1`), `t_ms` = the concept's first source moment. Chapter marks ([[Lectheo Product Spec#F11. Chapters — Must|F11]]) use the same capture: `t_ms` = the chapter's start, linked to every concept the chapter covers |
+| `target` | jsonb null | Study marks only: `{ conceptId }` or `{ chapterId }` (contracts `StudyTarget`), what was marked. A pipeline re-run re-links study marks by it instead of by time (the chapter id follows the chapter that now starts at `t_ms`). `null` for watch and live markers |
 | `deleted_at` | timestamptz null | undo within 5 s (soft delete) |
 | `created_at` | timestamptz | |
 
@@ -180,7 +181,7 @@ Index: `(concept_id)`.
 | `name` | text | |
 | `canonical_key` | text | normalized name. `UNIQUE (course_id, canonical_key)` |
 | `summary` | text | one grounded sentence |
-| `key_points` 🔒 | jsonb | 2–5 points with segment citations. The source for teach-back rubrics; never serialized to clients. *(decided 7 Oct 2026, to be built)*: **no longer secret**: shown in the Study brief ([[Lectheo Product Spec#F9. Study mode — Must|F9]], ADR-009 amended); still frozen into `rubric_snapshot` for teach-back |
+| `key_points` | jsonb | 2–5 points with segment citations. The source for teach-back rubrics. **Not secret** since 7 Oct 2026: shown in the Study brief (`GET /lectures/{id}/brief` only; [[Lectheo Product Spec#F9. Study mode — Must|F9]], ADR-009 amended); still frozen into `rubric_snapshot` for teach-back |
 | `first_lecture_id` | uuid FK ON DELETE SET NULL | |
 
 Index: `(course_id)`.
