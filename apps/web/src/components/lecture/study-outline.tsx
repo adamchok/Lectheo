@@ -23,27 +23,28 @@ export interface OutlineEntry {
 /** The band of the viewport that decides which section is "in view". */
 const IN_VIEW_MARGIN = '-20% 0px -70% 0px'
 
-/** Scrolling by hand (wheel, touch, keys, scrollbar drag): what ends a jump's pin. */
-const MANUAL_SCROLL_EVENTS = ['wheel', 'touchmove', 'keydown', 'pointerdown'] as const
-
 export interface SectionInView {
   active: string | null
-  /** Marks a jumped-to section as current until the student scrolls by hand. */
+  /** Marks a jumped-to section as current while it stays on screen. */
   pin: (id: string) => void
 }
 
 /**
  * The first section crossing the band near the top of the viewport; the last one seen stays.
- * The last chapters can't scroll up to the band, so a jump pins its target instead.
+ * The last chapters can't scroll up to the band, so a jump pins its target until that section
+ * leaves the viewport (by position, so screen-reader browsing and Tab don't drop it).
  */
 export function useSectionInView(ids: readonly string[]): SectionInView {
   const [active, setActive] = useState<string | null>(null)
   const [pinned, setPinned] = useState<string | null>(null)
   useEffect(() => {
-    if (!pinned) return
-    const unpin = () => setPinned(null)
-    MANUAL_SCROLL_EVENTS.forEach((e) => window.addEventListener(e, unpin, { passive: true }))
-    return () => MANUAL_SCROLL_EVENTS.forEach((e) => window.removeEventListener(e, unpin))
+    const el = pinned ? document.getElementById(pinned) : null
+    if (!el) return
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry && !entry.isIntersecting) setPinned(null)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
   }, [pinned])
   const key = ids.join(' ')
   useEffect(() => {
@@ -82,7 +83,8 @@ export function StudyOutline({ entries, inView, footer }: StudyOutlineProps) {
       aria-label="Outline"
       className="border-border sticky top-[calc(var(--topbar-height)+1.5rem)] max-h-[calc(100dvh-var(--topbar-height)-3rem)] space-y-6 overflow-y-auto border-r pr-4"
     >
-      <ol className="space-y-1">
+      {/* role="list": Safari drops list semantics when list-style is none. */}
+      <ol role="list" className="space-y-1">
         {entries.map((e) => {
           const current = e.id === inView.active
           return (
@@ -96,7 +98,11 @@ export function StudyOutline({ entries, inView, footer }: StudyOutlineProps) {
               <a
                 href={`#${e.id}`}
                 aria-current={current ? 'location' : undefined}
-                onClick={() => inView.pin(e.id)}
+                onClick={(event) => {
+                  // A modified click opens a new tab or window: this page doesn't move.
+                  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+                  inView.pin(e.id)
+                }}
                 className={cn(
                   'hover:bg-accent block rounded-md px-3 py-2 transition-colors',
                   e.empty && 'text-muted-foreground',
@@ -124,7 +130,11 @@ export interface JumpToProps {
 export function JumpTo({ entries, inView }: JumpToProps) {
   const id = useId()
   return (
-    <div className="bg-background z-sticky top-topbar border-border sticky mb-6 flex items-center gap-2 border-b py-2">
+    // data-jump-to: globals.css keeps focused content clear of this bar (WCAG 2.4.11).
+    <div
+      data-jump-to
+      className="bg-background z-sticky top-topbar border-border sticky mb-6 flex items-center gap-2 border-b py-2"
+    >
       <label htmlFor={id} className="text-body-sm text-muted-foreground shrink-0">
         Jump to
       </label>
@@ -132,10 +142,10 @@ export function JumpTo({ entries, inView }: JumpToProps) {
         id={id}
         value={inView.active ?? ''}
         onChange={(event) => {
+          // Scroll only: arrow keys fire `change` on a closed select, so moving focus here would
+          // throw a keyboard user out of the menu after one step (WCAG 3.2.2).
           inView.pin(event.target.value)
-          const target = document.getElementById(event.target.value)
-          target?.scrollIntoView({ block: 'start' })
-          target?.querySelector<HTMLElement>('h2')?.focus({ preventScroll: true })
+          document.getElementById(event.target.value)?.scrollIntoView({ block: 'start' })
         }}
         className="border-input bg-background text-body-sm h-9 min-w-0 flex-1 rounded-md border px-2"
       >

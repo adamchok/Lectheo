@@ -59,7 +59,7 @@ export interface RoleConfig {
 export const MAX_OUTPUT_TOKENS = {
   extraction: 16_000,
   itemBatch: 12_000,
-  /** About 12 concepts of depth (~450 words each) plus reasoning (F9.13). */
+  /** One explainConcepts batch: 6 concepts of depth (~450 words each) plus reasoning (F9.13). */
   explanation: 16_000,
   verifier: 4_000,
   judge: 4_000,

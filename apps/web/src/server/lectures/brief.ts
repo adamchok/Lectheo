@@ -153,12 +153,17 @@ async function loadCitedElsewhere(
 
 const segmentKey = (lectureId: string, idx: number): string => `${lectureId}:${idx}`
 
-/** Segment citations → "▶ 12:41" links (at most 3), skipping segments that no longer exist. */
+/**
+ * Segment citations → "▶ 12:41" links (at most 3), skipping segments that no longer exist. None
+ * when the lecture they cite was deleted (first_lecture_id is set null): its indexes would
+ * otherwise resolve against this lecture's segments.
+ */
 function sourcesOf(
   idxs: readonly number[],
-  lectureId: string,
+  lectureId: string | null,
   segments: ReadonlyMap<string, SegmentRow>,
 ): SourceRef[] {
+  if (!lectureId) return []
   return idxs
     .flatMap((idx): SourceRef[] => {
       const s = segments.get(segmentKey(lectureId, idx))
@@ -171,7 +176,7 @@ function sourcesOf(
 
 const keyPointsWithSources = (
   keyPoints: KeyPoints,
-  lectureId: string,
+  lectureId: string | null,
   segments: ReadonlyMap<string, SegmentRow>,
 ): BriefConcept['keyPoints'] =>
   keyPoints.map(({ id, text, segmentIdxs }) => ({
@@ -183,7 +188,7 @@ const keyPointsWithSources = (
 /** F9.13: stored depth with lecture links and the map's builds-on / leads-to concepts. */
 function briefDepth(
   depth: ConceptDepth | null,
-  lectureId: string,
+  lectureId: string | null,
   segments: ReadonlyMap<string, SegmentRow>,
   connects: BriefDepth['connects'],
 ): BriefDepth | null {
@@ -260,7 +265,7 @@ export async function getBrief(
     const m = mastery.get(id)
     const counts = marks.get(id)
     const builtOn = ends(prerequisites, id)
-    const citedIn = c.firstLectureId ?? lecture.id
+    const citedIn = c.firstLectureId
     return [
       {
         id,

@@ -186,6 +186,14 @@ describe('GET /lectures/{id}/brief', () => {
     ])
   })
 
+  it('links nothing once the introducing lecture is gone (first_lecture_id set null)', async () => {
+    await f.exec(`UPDATE concepts SET first_lecture_id = NULL,
+      depth = '${JSON.stringify(DEPTH)}'::jsonb WHERE id = '${ID.C2}'`)
+    const loops = (await getBrief(ACTOR_A, ID.L2, f.db)).concepts.find((c) => c.id === ID.C2)
+    expect(loops?.keyPoints[0]?.sources).toEqual([])
+    expect(loops?.depth?.howItWorks.flatMap((p) => p.sources)).toEqual([])
+  })
+
   it('shows key points but no other secret (ADR-009 amended)', async () => {
     const json = JSON.stringify(await getBrief(ACTOR_A, ID.L1, f.db))
     expect(json).toContain(SECRET_KEY_POINT)

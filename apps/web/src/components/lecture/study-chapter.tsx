@@ -4,9 +4,10 @@ import type { BriefConcept, LectureChapter, LectureResponse } from '@lectheo/con
 import { ChevronDown, Play } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
-import { useId, type ReactNode } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import { formatTimestamp } from '@/client/format'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { ClipPlayer } from './clip-player'
 import { canWatch } from './lecture-modes'
 import { MarkButtons } from './mark-buttons'
@@ -19,7 +20,7 @@ import { MarkButtons } from './mark-buttons'
 
 const MS_PER_MINUTE = 60_000
 const SECTION_CLASS =
-  'border-border scroll-mt-[calc(var(--topbar-height)+1rem)] border-t first:border-t-0 max-lg:scroll-mt-[calc(var(--topbar-height)+4rem)]'
+  'border-border scroll-mt-[calc(var(--topbar-height)+1rem)] border-t first:border-t-0'
 
 export const chapterSectionId = (chapterId: string): string => `chapter-${chapterId}`
 
@@ -81,6 +82,8 @@ export function StudyChapter({
   children,
 }: StudyChapterProps) {
   const headingId = useId()
+  const summaryId = useId()
+  const [showSummary, setShowSummary] = useState(false)
   const playable = canWatch(lecture) && lecture.media !== null
   const range = `${formatTimestamp(chapter.startMs)}–${formatTimestamp(chapter.endMs)}`
   const minutes = Math.max(1, Math.round((chapter.endMs - chapter.startMs) / MS_PER_MINUTE))
@@ -92,22 +95,29 @@ export function StudyChapter({
         aria-labelledby={headingId}
         className={`${SECTION_CLASS} py-4 first:pt-0`}
       >
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <details className="group min-w-0 flex-1">
-            <summary className="text-body-sm flex cursor-pointer list-none items-center gap-1.5 py-1.5 [&::-webkit-details-marker]:hidden">
-              <ChevronDown
-                aria-hidden
-                className="text-muted-foreground duration-fast size-4 shrink-0 -rotate-90 transition-transform group-open:rotate-0"
-              />
-              <span className="text-muted-foreground shrink-0">
-                Chapter {number} · {range} ·
-              </span>
-              <h2 id={headingId} tabIndex={-1} className="min-w-0 font-medium outline-none">
-                {chapter.title}
-              </h2>
-            </summary>
-            <p className="text-body-sm text-muted-foreground mt-1 pl-5.5">{chapter.summary}</p>
-          </details>
+        {/* The h2 stays outside the toggle: VoiceOver flattens a <summary>'s contents. */}
+        <div className="text-body-sm flex flex-wrap items-center gap-x-1.5 gap-y-1">
+          <span className="text-muted-foreground">
+            Chapter {number} · {range} ·
+          </span>
+          <h2 id={headingId} tabIndex={-1} className="min-w-0 font-medium outline-none">
+            {chapter.title}
+          </h2>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-expanded={showSummary}
+            aria-controls={summaryId}
+            aria-label={`Summary: ${chapter.title}`}
+            onClick={() => setShowSummary((s) => !s)}
+            className="text-muted-foreground size-7"
+          >
+            <ChevronDown
+              aria-hidden
+              className={cn('duration-fast transition-transform', showSummary && 'rotate-180')}
+            />
+          </Button>
+          <span aria-hidden className="flex-1" />
           {playable && (
             <Button
               variant="ghost"
@@ -120,6 +130,9 @@ export function StudyChapter({
             </Button>
           )}
         </div>
+        <p id={summaryId} hidden={!showSummary} className="text-body-sm text-muted-foreground mt-1">
+          {chapter.summary}
+        </p>
         {playing && (
           <div className="mt-3">
             <ChapterPlayer lecture={lecture} chapter={chapter} />
@@ -153,6 +166,7 @@ export function StudyChapter({
             >
               <Play aria-hidden />
               Play this chapter
+              <span className="sr-only">: {chapter.title}</span>
               <span className="text-muted-foreground font-normal">· {minutes} min</span>
             </Button>
           )}

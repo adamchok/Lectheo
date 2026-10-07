@@ -1,8 +1,12 @@
-import { ConceptDepth } from '@lectheo/contracts'
+import { ConceptDepth, DEPTH_CITES_MAX } from '@lectheo/contracts'
 import type { ExplainConceptsOutput, ExplainedConcept } from './schema'
 
-/** F9.14: no outside links. Any URL-looking text drops the concept's depth. */
-const URL_PATTERN = /\bhttps?:\/\/|\bwww\.[a-z0-9-]+\.[a-z]{2,}/i
+/**
+ * F9.14: no outside links. Any URL-looking text drops the concept's depth: a scheme, `www.`, or a
+ * bare domain on a common web TLD (cs50.harvard.edu/x). File names like stdio.h don't match.
+ */
+const URL_PATTERN =
+  /\bhttps?:\/\/|\bwww\.[a-z0-9-]+\.[a-z]{2,}|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|org|net|edu|gov|io|dev|ai|uk|ly)\b/i
 const MAX_PARAGRAPHS = 4
 const MAX_MISTAKES = 3
 
@@ -19,7 +23,7 @@ function toDepth(c: ExplainedConcept, known: ReadonlySet<number>): ConceptDepth 
   const parsed = ConceptDepth.safeParse({
     howItWorks: c.howItWorks.slice(0, MAX_PARAGRAPHS).map((p) => ({
       text: p.text.trim(),
-      cites: [...new Set(p.cites.filter((i) => known.has(i)))],
+      cites: [...new Set(p.cites.filter((i) => known.has(i)))].slice(0, DEPTH_CITES_MAX),
     })),
     example: c.example && {
       text: c.example.text.trim(),

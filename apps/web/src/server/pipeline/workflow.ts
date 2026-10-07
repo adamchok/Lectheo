@@ -93,9 +93,11 @@ export async function processLecture(lectureId: string): Promise<'ready' | 'fail
       current = 'verifyItems'
       await verifyItems(lectureId)
     }
-    // F9.15: depth is written beside the items, so ready comes no later. Its failure (already
-    // logged by runStep) only hides Explain in depth; it never fails the lecture.
-    await Promise.all([prepareItems(), explainConcepts(lectureId).catch(() => undefined)])
+    // F9.15: depth is written beside the items, so ready comes no later. Both settle before the
+    // run ends (no step left billing on a failed lecture). A depth failure (already logged by
+    // runStep) only hides Explain in depth; an items failure fails the lecture as before.
+    const [items] = await Promise.allSettled([prepareItems(), explainConcepts(lectureId)])
+    if (items.status === 'rejected') throw items.reason
     await finishLecture(lectureId)
     return 'ready'
   } catch {

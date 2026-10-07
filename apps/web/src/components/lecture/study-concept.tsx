@@ -4,7 +4,7 @@ import type { BriefConcept, LectureResponse } from '@lectheo/contracts'
 import { FileText, Play } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
-import { useId } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import { formatTimestamp } from '@/client/format'
 import { useTranscript } from '@/client/queries'
 import { MasteryBadge } from '@/components/mastery-badge'
@@ -95,12 +95,17 @@ export function StudyConcept({
   /** A cited moment plays in this block when it is in this lecture; else it links out. */
   const seekable = (lectureId: string) =>
     playable && lectureId === lecture.id ? (ms: number) => onOpen(ms) : undefined
+  // A ▶ in an open depth panel opens the player above it, possibly off-screen: bring it in.
+  const playerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (open !== null) playerRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [open])
 
   return (
     <article
       id={`concept-${c.id}`}
       aria-labelledby={headingId}
-      className="scroll-mt-[calc(var(--topbar-height)+1rem)] space-y-4 py-8 first:pt-0 max-lg:scroll-mt-[calc(var(--topbar-height)+4rem)]"
+      className="scroll-mt-[calc(var(--topbar-height)+1rem)] space-y-4 py-8 first:pt-0"
     >
       <header className="space-y-1.5">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
@@ -125,7 +130,7 @@ export function StudyConcept({
             return (
               <li key={k.id}>
                 <div className="flex items-baseline justify-between gap-4">
-                  <span className="text-pretty">{k.text}</span>
+                  <span className="min-w-0 break-words text-pretty">{k.text}</span>
                   {source && lecture.hasTimestamps && (
                     <SourceRef
                       compact
@@ -169,18 +174,23 @@ export function StudyConcept({
         )}
       </div>
 
-      {open !== null &&
-        (playable ? (
-          <ClipPlayer
-            key={String(open)}
-            lecture={lecture}
-            title={`Lecture clip: ${c.name}`}
-            clips={open === 'clips' ? c.clips : null}
-            startMs={open === 'clips' ? undefined : open}
-          />
-        ) : (
-          <ClipText lectureId={lecture.id} clips={c.clips} />
-        ))}
+      <div ref={playerRef} className="scroll-my-[calc(var(--topbar-height)+1rem)] empty:hidden">
+        {open !== null &&
+          (playable ? (
+            <ClipPlayer
+              key={String(open)}
+              lecture={lecture}
+              title={`Lecture clip: ${c.name}`}
+              clips={open === 'clips' ? c.clips : null}
+              startMs={open === 'clips' ? undefined : open}
+            />
+          ) : (
+            <ClipText lectureId={lecture.id} clips={c.clips} />
+          ))}
+      </div>
+      <p role="status" className="sr-only">
+        {typeof open === 'number' && playable ? `Player opened at ${formatTimestamp(open)}` : ''}
+      </p>
 
       {c.depth && (
         <StudyDepth
@@ -188,6 +198,8 @@ export function StudyConcept({
           courseId={lecture.courseId}
           onPage={onPage}
           seekable={seekable}
+          name={c.name}
+          headingLevel={headingLevel === 3 ? 4 : 3}
         />
       )}
     </article>

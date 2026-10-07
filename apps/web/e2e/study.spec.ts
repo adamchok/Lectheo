@@ -120,6 +120,14 @@ test('study by chapter: outline jump, explain in depth, a â–¶ link plays (F9.10â
   await expect(tries.locator('audio')).toBeAttached()
   const toSeconds = (clock: string) => clock.split(':').reduce((acc, p) => acc * 60 + Number(p), 0)
   await expect.poll(() => lastSeek(page)).toBeGreaterThanOrEqual(toSeconds(at))
+
+  // One player per page: playing the chapter closes the concept's, and the other way round.
+  await section.getByRole('button', { name: /play this chapter/i }).click()
+  await expect(page.locator('audio')).toHaveCount(1)
+  await expect(tries.locator('audio')).toHaveCount(0)
+  await tries.getByRole('button', { name: /^watch from/i }).click()
+  await expect(page.locator('audio')).toHaveCount(1)
+  await expect(tries.locator('audio')).toHaveCount(1)
 })
 
 test('study on a phone: the outline is a Jump to menu', async ({ page }) => {

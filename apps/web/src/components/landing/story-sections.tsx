@@ -72,7 +72,7 @@ const STEPS = [
     title: "Read the brief or watch. Mark what's unclear.",
     body: (
       <>
-        Read a few-minute brief of the lecture, chapter by chapter, and open any idea in depth. Or
+        Read a few-minute brief of the lecture, chapter by chapter, and open an idea in depth. Or
         watch it and press <KeyHint>L</KeyHint> when you&apos;re lost and <KeyHint>I</KeyHint> when
         something matters. No pausing, no notes. Your marks sit on the lecture&apos;s timeline.
       </>

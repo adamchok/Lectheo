@@ -27,18 +27,36 @@ export interface StudyDepthProps {
   onPage: ReadonlySet<string>
   /** Plays a cited moment in the block's player; undefined links to the transcript instead. */
   seekable: (lectureId: string) => ((ms: number) => void) | undefined
+  /** The concept's name, so each disclosure has its own accessible name. */
+  name: string
+  /** One below the concept's heading (h3 in the flat list, h4 under a chapter). */
+  headingLevel: 3 | 4
 }
 
-function Part({ title, children }: { title: string; children: ReactNode }) {
+interface PartProps {
+  title: string
+  level: 3 | 4
+  children: ReactNode
+}
+
+function Part({ title, level, children }: PartProps) {
+  const Heading = level === 3 ? 'h3' : 'h4'
   return (
     <section className="space-y-2">
-      <h4 className="text-heading">{title}</h4>
+      <Heading className="text-heading">{title}</Heading>
       {children}
     </section>
   )
 }
 
-export function StudyDepth({ depth, courseId, onPage, seekable }: StudyDepthProps) {
+export function StudyDepth({
+  depth,
+  courseId,
+  onPage,
+  seekable,
+  name,
+  headingLevel,
+}: StudyDepthProps) {
   const [open, setOpen] = useState(false)
   const panelId = useId()
   return (
@@ -56,12 +74,13 @@ export function StudyDepth({ depth, courseId, onPage, seekable }: StudyDepthProp
           className={cn('duration-fast transition-transform', open && 'rotate-180')}
         />
         Explain in depth
+        <span className="sr-only">: {name}</span>
         <span className="text-muted-foreground font-normal">
           · {Math.max(1, depth.readMinutes)} min read
         </span>
       </Button>
       <div id={panelId} hidden={!open} className="bg-sunken space-y-5 rounded-lg p-4 sm:p-5">
-        <Part title="How it works">
+        <Part level={headingLevel} title="How it works">
           {depth.howItWorks.map((p, i) => (
             <p key={i} className="text-body text-pretty">
               {p.text}{' '}
@@ -74,10 +93,16 @@ export function StudyDepth({ depth, courseId, onPage, seekable }: StudyDepthProp
           ))}
         </Part>
         {depth.example && (
-          <Part title="Worked example">
+          <Part level={headingLevel} title="Worked example">
             <p className="text-body text-pretty">{depth.example.text}</p>
             {depth.example.code && (
-              <pre className="bg-card border-border text-mono-sm overflow-x-auto rounded-md border p-3">
+              // Focusable so a scrolling code block is reachable by keyboard (Safari, WCAG 2.1.1).
+              <pre
+                tabIndex={0}
+                role="region"
+                aria-label={'Code example: ' + name}
+                className="bg-card border-border text-mono-sm overflow-x-auto rounded-md border p-3"
+              >
                 <code>{depth.example.code}</code>
               </pre>
             )}
@@ -86,7 +111,7 @@ export function StudyDepth({ depth, courseId, onPage, seekable }: StudyDepthProp
             )}
           </Part>
         )}
-        <Part title="Common mistakes">
+        <Part level={headingLevel} title="Common mistakes">
           <ul className="marker:text-muted-foreground text-body list-disc space-y-2 pl-5">
             {depth.mistakes.map((m, i) => (
               <li key={i} className="text-pretty">
@@ -97,7 +122,7 @@ export function StudyDepth({ depth, courseId, onPage, seekable }: StudyDepthProp
           </ul>
         </Part>
         {depth.connects.length > 0 && (
-          <Part title="Connects to">
+          <Part level={headingLevel} title="Connects to">
             <ul className="text-body space-y-1">
               {depth.connects.map((c) => (
                 <li key={`${c.relation}-${c.id}`}>

@@ -46,6 +46,38 @@ describe('toDepths (F9.14)', () => {
     expect(toDepths({ concepts: [inText, inCode] }, KEYS, KNOWN).size).toBe(0)
   })
 
+  it('drops bare domains but keeps file names and member access', () => {
+    const bare = {
+      ...good(),
+      example: { text: 'See cs50.harvard.edu/x', code: null, beyondLecture: true },
+    }
+    const files = {
+      ...good('malloc'),
+      example: { text: 'Include stdio.h', code: 'node.next = list->head;', beyondLecture: false },
+    }
+    expect([...toDepths({ concepts: [bare, files] }, KEYS, KNOWN).keys()]).toEqual(['malloc'])
+  })
+
+  it('caps citations and drops over-long text', () => {
+    const many = {
+      ...good(),
+      howItWorks: [{ text: 'a', cites: [1, 2, 3, 1, 2] }, ...good().howItWorks.slice(1)],
+    }
+    const tenKnown = new Set(Array.from({ length: 10 }, (_, i) => i))
+    const wide = {
+      ...many,
+      howItWorks: [{ text: 'a', cites: [...tenKnown] }, ...good().howItWorks.slice(1)],
+    }
+    expect(
+      toDepths({ concepts: [wide] }, KEYS, tenKnown).get('pointer')?.howItWorks[0]?.cites,
+    ).toHaveLength(8)
+    const long = {
+      ...good('malloc'),
+      mistakes: [{ mistake: 'x'.repeat(1201), why: 'y' }, ...good().mistakes],
+    }
+    expect(toDepths({ concepts: [long] }, KEYS, KNOWN).size).toBe(0)
+  })
+
   it('enforces the counts and ignores unknown keys and repeats', () => {
     const one = { ...good(), howItWorks: good().howItWorks.slice(0, 1) }
     const all = [one, good('nope'), good('malloc'), good('malloc')]

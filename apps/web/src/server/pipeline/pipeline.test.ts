@@ -12,12 +12,25 @@ import { processLecture } from './workflow'
 
 vi.mock('server-only', () => ({}))
 
-// Lets a test make the explainConcepts call fail (F9.15) while every other task stays fake.
-const explainFails = vi.hoisted(() => ({ on: false }))
+// Lets a test make explainConcepts calls fail (F9.15) while every other task stays fake.
+const explainFails = vi.hoisted(() => ({
+  on: false,
+  calls: 0,
+  /** Fails only this explain call (1-based); that batch's size goes in `failedSize`. */
+  failCall: 0,
+  failedSize: 0,
+}))
 vi.mock('@lectheo/ai', async (orig) => {
   const ai = await orig<typeof import('@lectheo/ai')>()
   const runTask: typeof ai.runTask = async (task, input, ctx) => {
-    if (explainFails.on && task.name === 'explain-concepts') throw new Error('model down')
+    if (task.name === 'explain-concepts') {
+      explainFails.calls += 1
+      if (explainFails.on) throw new Error('model down')
+      if (explainFails.calls === explainFails.failCall) {
+        explainFails.failedSize = (input as { concepts: unknown[] }).concepts.length
+        throw new Error('model down')
+      }
+    }
     return ai.runTask(task, input, ctx)
   }
   return { ...ai, runTask }
@@ -49,7 +62,7 @@ let f: PipelineFixture
 beforeEach(async () => {
   f = await createPipelineFixture()
   current = f.db
-  explainFails.on = false
+  Object.assign(explainFails, { on: false, calls: 0, failCall: 0, failedSize: 0 })
   vi.clearAllMocks()
 })
 
@@ -206,6 +219,34 @@ describe('explainConcepts (F9.13–F9.15)', () => {
     expect(await lecture()).toMatchObject({ status: 'ready', error: null })
     expect(await itemCounts()).toEqual({ verified: 12 })
     expect((await depths()).every((r) => r.depth === null)).toBe(true)
+  })
+
+  it('explains a long lecture in batches; a failed batch only drops its own concepts', async () => {
+    await runFull()
+    const kp = JSON.stringify([
+      { id: 'k1', text: 'one', segmentIdxs: [1] },
+      { id: 'k2', text: 'two', segmentIdxs: [2] },
+    ])
+    const extra = Array.from({ length: 17 }, (_, i) => ({ id: uuidv7(), key: `extra-${i}` }))
+    const conceptRows = extra.map(
+      (c) => `('${c.id}', '${ID.P}', '${c.key}', '${c.key}', 's', '${kp}', '${f.lectureId}')`,
+    )
+    const occurrenceRows = extra.map((c) => `('${c.id}', '${f.lectureId}', '{1}', 0.5)`)
+    await f.exec(`
+      INSERT INTO concepts (id, course_id, name, canonical_key, summary, key_points, first_lecture_id)
+        VALUES ${conceptRows.join(',')};
+      INSERT INTO concept_occurrences (concept_id, lecture_id, segment_idxs, salience)
+        VALUES ${occurrenceRows.join(',')};
+      DELETE FROM pipeline_steps WHERE lecture_id = '${f.lectureId}' AND step = 'explainConcepts';
+    `)
+    Object.assign(explainFails, { calls: 0, failCall: 2 })
+    const out = await explainConceptsStep(f.db, f.lectureId)
+    // 20 concepts in batches of 6 → 4 calls; the second one fails.
+    expect(explainFails.calls).toBe(4)
+    expect(explainFails.failedSize).toBeGreaterThan(0)
+    expect(out).toEqual({ concepts: 20, explained: 20 - explainFails.failedSize })
+    const written = (await depths()).filter((r) => r.first && r.depth !== null)
+    expect(written).toHaveLength(20 - explainFails.failedSize)
   })
 
   it('re-processing replaces the depth', async () => {

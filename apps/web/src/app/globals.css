@@ -358,6 +358,13 @@
       scroll-padding-top: calc(var(--topbar-height) + 4.5rem);
     }
   }
+  /* The Study brief's sticky "Jump to" bar (about 53px, below lg) does the same, at any pointer:
+     narrow or zoomed desktop windows get it too. */
+  @media (max-width: 1023px) {
+    html:has([data-jump-to]) {
+      scroll-padding-top: calc(var(--topbar-height) + 4.5rem);
+    }
+  }
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-feature-settings: 'kern', 'liga';

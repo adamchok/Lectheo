@@ -83,15 +83,22 @@ function BriefSkeleton() {
   )
 }
 
-/** /lectures/{id}#concept-{id} (the map's "Read about it"): scroll there once the brief is in. */
-function useConceptAnchor(ready: boolean): void {
+/**
+ * /lectures/{id}#concept-{id} (the map's "Read about it") or #chapter-{id} (the outline): scroll
+ * there once the brief is in. A chapter is pinned as the outline's current section.
+ */
+function useAnchor(ready: boolean, pin: (id: string) => void): void {
   useEffect(() => {
     if (!ready) return
     const id = window.location.hash.slice(1)
-    if (!id.startsWith('concept-')) return
+    if (!id.startsWith('concept-') && !id.startsWith('chapter-')) return
     const block = document.getElementById(id)
-    block?.scrollIntoView({ block: 'start' })
-    block?.querySelector<HTMLElement>('h2, h3')?.focus({ preventScroll: true })
+    if (!block) return
+    if (id.startsWith('chapter-')) pin(id)
+    block.scrollIntoView({ block: 'start' })
+    block.querySelector<HTMLElement>('h2, h3')?.focus({ preventScroll: true })
+    // Runs once per load; pin is a state setter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready])
 }
 
@@ -141,7 +148,6 @@ export interface StudyViewProps {
 
 export function StudyView({ lecture, courseTitle }: StudyViewProps) {
   const brief = useBrief(lecture.id)
-  useConceptAnchor(Boolean(brief.data))
   const [open, setOpen] = useState<OpenPlayer | null>(null)
   const userLecture = lecture.source !== 'library'
   const concepts = brief.data?.concepts ?? []
@@ -149,6 +155,7 @@ export function StudyView({ lecture, courseTitle }: StudyViewProps) {
   const byChapter = lecture.chapters.length > 0 && concepts.length > 0
   const { groups, unplaced, outline } = groupByChapter(lecture, byChapter ? concepts : [])
   const inView = useSectionInView(byChapter ? outline.map((e) => e.id) : [])
+  useAnchor(Boolean(brief.data), inView.pin)
 
   const conceptBlock = (c: BriefConcept, headingLevel: 2 | 3) => (
     <StudyConcept
@@ -168,7 +175,7 @@ export function StudyView({ lecture, courseTitle }: StudyViewProps) {
     <div
       className={cn(
         'mx-auto',
-        byChapter ? 'max-w-[calc(var(--reading-max)+16rem)]' : 'max-w-reading',
+        byChapter ? 'max-w-[calc(var(--reading-max)+16.25rem)]' : 'max-w-reading',
       )}
     >
       <PageChrome
@@ -188,9 +195,9 @@ export function StudyView({ lecture, courseTitle }: StudyViewProps) {
       <LectureModes lecture={lecture} current="study" className="mb-6 sm:hidden" />
       <div className={cn(byChapter && 'lg:grid lg:grid-cols-[13.75rem_minmax(0,1fr)] lg:gap-10')}>
         {byChapter && (
-          <aside className="max-lg:hidden">
+          <div className="max-lg:hidden">
             <StudyOutline entries={outline} inView={inView} footer={<TestMe lecture={lecture} />} />
-          </aside>
+          </div>
         )}
         <div className="min-w-0">
           <PageHeader

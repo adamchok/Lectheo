@@ -12,7 +12,10 @@ export const SegmentIdxs = z.array(z.number().int().nonnegative()).min(1)
 
 export const McqPublicPayload = z.object({
   stem: z.string(),
-  options: z.array(z.object({ id: z.string(), text: z.string() })).min(3).max(5),
+  options: z
+    .array(z.object({ id: z.string(), text: z.string() }))
+    .min(3)
+    .max(5),
 })
 export const SpotFlawPublicPayload = z.object({
   sentences: z.array(z.string()).min(3).max(5),
@@ -84,22 +87,29 @@ export type KeyPoints = z.infer<typeof KeyPoints>
 
 // ---------- concepts.depth (F9.13–F9.14, not secret, Study brief only) ----------
 
+/** Model-written text is capped (F9.13: short paragraphs, small examples). */
+export const DEPTH_TEXT_MAX = 1200
+export const DEPTH_CODE_MAX = 3000
+export const DEPTH_CITES_MAX = 8
+
+const DepthText = z.string().min(1).max(DEPTH_TEXT_MAX)
+
 /** "Explain in depth": cites segment indexes of the concept's first lecture, never times. */
 export const ConceptDepth = z.object({
   howItWorks: z
-    .array(z.object({ text: z.string().min(1), cites: SegmentIdxs }))
+    .array(z.object({ text: DepthText, cites: SegmentIdxs.max(DEPTH_CITES_MAX) }))
     .min(2)
     .max(4),
   example: z
     .object({
-      text: z.string().min(1),
-      code: z.string().min(1).optional(),
+      text: DepthText,
+      code: z.string().min(1).max(DEPTH_CODE_MAX).optional(),
       /** True when the example goes beyond what the lecture showed. */
       beyondLecture: z.boolean(),
     })
     .nullable(),
   mistakes: z
-    .array(z.object({ mistake: z.string().min(1), why: z.string().min(1) }))
+    .array(z.object({ mistake: DepthText, why: DepthText }))
     .min(2)
     .max(3),
 })
