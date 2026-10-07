@@ -148,9 +148,9 @@ There are four ways to add a lecture. All of them feed the same pipeline after t
 | F3.6 | Results are ordered: confident mistakes → wrong → unsure-but-right → right. | Must |
 | F3.7 | Only questions that passed **independent verification** are shown ([[#8. Product quality rules\|§8.1]]). If fewer than 3 verified questions exist, the diagnostic runs shorter and says so. | Must |
 | F3.8 | Results set the initial mastery state ([[#F6. Mastery map — Must\|F6]]) and the practice order ([[#F4. Understanding-level practice\|F4]]). | Must |
-| F3.9 | *(decided 7 Oct 2026, to be built)* **Baseline spread across the lecture:** after marked concepts (F3.1 order unchanged), unmarked baseline concepts are taken **one per chapter in turn** (chapter order, learning order inside a chapter), so a run without marks no longer asks only about the first minutes. Lectures without chapters spread evenly through lecture order. | Must |
-| F3.10 | *(decided 7 Oct 2026, to be built)* **Coverage and "test the rest":** the results show "Tested 6 of 14 concepts" and, per chapter, "Chapter 3 · 2 of 3 tested". If any concept of the lecture is still *Not tested*, the results end with **Test the other 8 →**, which starts a new round of one question per untested concept (in chapter order, at most 8 per round, repeatable) under the same rules: confidence first, immediate feedback, follow-ups (max 2 per round), verified items only. The first round stays short and targeted. | Must |
-| F3.11 | *(decided 7 Oct 2026, to be built)* **Every concept can be tested:** the pipeline already drafts two diagnostic questions per concept for user lectures (the CS50 library has them too). A concept left with no verified question after the redraft round counts as "No checked question yet" in the coverage line, never as tested, and is skipped by *Test the rest*. | Must |
+| F3.9 | **Baseline spread across the lecture:** after marked concepts (F3.1 order unchanged), unmarked baseline concepts are taken **one per chapter in turn** (chapter order, learning order inside a chapter), so a run without marks no longer asks only about the first minutes. Lectures without chapters spread evenly through lecture order. *As built:* when a short run has more chapters (or, without chapters, more baseline concepts) than free slots, the chapters it visits are spread evenly too, so it never asks only about the first chapters (`planDiagnostic`, `packages/domain`). A concept's chapter is the one holding its first segment in the lecture. | Must |
+| F3.10 | **Coverage and "test the rest":** the results show "Tested 6 of 14 concepts" and, per chapter, "Chapter 3 · 2 of 3 tested". If any concept of the lecture is still *Not tested*, the results end with **Test the other 8 →**, which starts a new round of one question per untested concept (in chapter order, at most 8 per round, repeatable) under the same rules: confidence first, immediate feedback, follow-ups (max 2 per round), verified items only. The first round stays short and targeted. *As built:* a concept that recurs from an earlier lecture is asked with a question from the lecture that introduced it (that is where its questions live; follow-ups use the same rule). With more than 8 untested concepts the button reads **Test 8 more →**. The per-chapter caption numbers the chapters, with the title on hover. The dashboard's next step is unchanged: after the first round the lecture is no longer a pending diagnostic, and *Test the rest* is offered on the results. | Must |
+| F3.11 | **Every concept can be tested:** the pipeline already drafts two diagnostic questions per concept for user lectures (the CS50 library has them too). A concept left with no verified question after the redraft round counts as "No checked question yet" in the coverage line, never as tested, and is skipped by *Test the rest*. | Must |
 
 ### F4. Understanding-level practice
 
@@ -366,7 +366,9 @@ Full analysis, profiles, feature matrix and sources: **[[Lectheo Competition]]**
 
 **In scope (Must):** sign-in page (Google + sample account); dashboard; CS50 library with watch mode; import recording + transcript; audio and transcript upload; markers; concept map + list view; adaptive diagnostic; spot the flaw; teach-back; Socratic feedback; mastery map; consent, deletion and limits; Study mode ([[#F9. Study mode — Must|F9]], built 7 Oct 2026, redesigned the same day: F9.9–F9.15); chapters ([[#F11. Chapters — Must|F11]], built 7 Oct 2026).
 
-**Decided 7 Oct 2026, to be built:** course page layout ([[#F2. Concept map — Must|F2.10–F2.11]]: full-width map, markers timeline below it); diagnostic coverage ([[#F3. Adaptive, confidence-rated diagnostic — Must|F3.9–F3.11]]: baseline spread across chapters, *Test the rest*).
+**Decided 7 Oct 2026, to be built:** course page layout ([[#F2. Concept map — Must|F2.10–F2.11]]: full-width map, markers timeline below it).
+
+**Built 8 Oct 2026:** diagnostic coverage ([[#F3. Adaptive, confidence-rated diagnostic — Must|F3.9–F3.11]]: baseline spread across chapters, coverage on the results, *Test the rest*).
 
 **Built 7 Oct 2026:** YouTube lectures ([[#F10. YouTube lectures — Should (after a spike)|F10]], Should), behind the `FEATURE_YOUTUBE_LECTURES` switch; F10.9 passed after the review.
 
@@ -460,6 +462,8 @@ Built on 6 Oct 2026: F0.4 (the dashboard follows the student's own course), F0.6
 Built on 7 Oct 2026: F9 (Study mode: the lecture brief, concept marks, Test me, Study first on the next-step card, key points shown) and F11 (chapters from `extractConcepts`, the Chapters tab, *Play this chapter only*, chapter marks, library chapters). Their as-built notes are in the F9 and F11 tables. The Study redesign (F9.9–F9.15: by chapter, outline, quieter blocks, *Explain in depth* written by the `explainConcepts` pipeline step in batches and, for the library, by `scripts/library-depth.ts`) was built the same day; its as-built notes are in the F9 table.
 
 Also built on 7 Oct 2026: F10 (YouTube lectures: the *From YouTube* tab, Data API checks, the direct-Google `transcriber`, the `transcribeVideo` step with its per-video cache, the embed in Watch and Study with *Open on YouTube*). F10.9 passed on MIT 6.006 after the review (see F10.9). It is switched on with `FEATURE_YOUTUBE_LECTURES=1`.
+
+Built on 8 Oct 2026: F3.9–F3.11 (diagnostic coverage: baseline spread across chapters, the coverage line on the results, *Test the rest* rounds, *No checked question yet*). Their as-built notes are in the F3 table.
 
 ### Should items: built or cut
 

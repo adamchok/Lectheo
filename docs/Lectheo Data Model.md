@@ -254,7 +254,7 @@ Index: `(concept_id, kind, status)`, `(lecture_id)`.
 | `user_id` | uuid FK ON DELETE CASCADE | |
 | `lecture_id` | uuid FK ON DELETE CASCADE | |
 | `planned_item_ids` | uuid[] | the core questions, in order |
-| `round` | enum `core`, `rest` default `core` | *(decided 7 Oct 2026, to be built)* ([[Lectheo Product Spec#F3. Adaptive, confidence-rated diagnostic — Must|F3.9–F3.11]]): `rest` = a *Test the rest* round on untested concepts |
+| `round` | enum `core`, `rest` default `core` | ([[Lectheo Product Spec#F3. Adaptive, confidence-rated diagnostic — Must|F3.9–F3.11]]): `rest` = a *Test the rest* round on untested concepts. `clone_sample` doesn't list it, so copies take the default: the seed's sessions are all `core` |
 | `follow_ups_used` | int default 0 | max 2 |
 | `status` | enum `active`, `completed` | partial unique: one `active` per `(user_id, lecture_id)` |
 | `created_at`, `completed_at` | timestamptz | |
