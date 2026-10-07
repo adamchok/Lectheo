@@ -21,7 +21,14 @@ import { appDb, type DbLike } from '../db'
 import { ApiError, invalidState } from '../errors'
 import { type Lecture, loadLectureForWrite } from '../ownership'
 import { serverEnv } from '../env'
-import { assertGoogleIntakeOpen, assertIntakeOpen, consume, refundUsage } from '../quota'
+import { youtubeLecturesEnabled } from '../features'
+import {
+  assertGoogleIntakeOpen,
+  assertIntakeOpen,
+  consume,
+  refundUsage,
+  YOUTUBE_PAUSED_MESSAGE,
+} from '../quota'
 import { dropOrphanConcepts } from './segments'
 import { readStep, sourceKind, stepsFrom } from './state'
 
@@ -88,14 +95,17 @@ async function assertYoutubeClaim(
   from: ReprocessFrom | undefined,
 ): Promise<void> {
   if (lecture.source !== 'youtube') return
+  // With or without ?from: the run starts at transcribeVideo again while it isn't done.
   const failedTranscription =
     lecture.status === 'failed' && lecture.error?.step === 'transcribeVideo'
-  if (!from && failedTranscription && FINAL_VIDEO_FAILURES.includes(lecture.error?.code ?? '')) {
+  if (failedTranscription && FINAL_VIDEO_FAILURES.includes(lecture.error?.code ?? '')) {
     throw invalidState(
       'This video can’t be transcribed. Try another video, or upload a transcript.',
     )
   }
   if ((await readStep(db, lecture.id, 'transcribeVideo'))?.status !== 'done') {
+    // The F10 switch stops all Google spend, existing lectures' transcriptions included.
+    if (!youtubeLecturesEnabled()) throw new ApiError('intake_paused', YOUTUBE_PAUSED_MESSAGE)
     await assertGoogleIntakeOpen(db, serverEnv().GOOGLE_AI_BUDGET_USD)
   }
 }

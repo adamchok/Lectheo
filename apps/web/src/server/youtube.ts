@@ -173,7 +173,10 @@ export function cachedClient(inner: YoutubeClient, ttlMs = VIDEO_CACHE_MS): Yout
       const hit = seen.get(id)
       if (hit && Date.now() - hit.at < ttlMs) return hit.video
       const video = await inner.video(id)
-      seen.set(id, { at: Date.now(), video })
+      const now = Date.now()
+      // Expired answers are dropped on write, so the memo stays bounded by ~10 min of lookups.
+      for (const [key, entry] of seen) if (now - entry.at >= ttlMs) seen.delete(key)
+      seen.set(id, { at: now, video })
       return video
     },
   }

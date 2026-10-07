@@ -17,7 +17,7 @@ const LATE_GRACE_MS = 2_000
 const RELATIVE_STAMP_SLACK_MS = 60_000
 /**
  * "No large gaps" (F10.5): a silence longer than this between cues fails the transcript, unless
- * chunks still empty after the retry pass (real silence: an exam, a demo) cover it.
+ * chunks that were retried and stayed empty (real silence: an exam, a demo) cover it.
  */
 export const MAX_TRANSCRIPT_GAP_MS = 10 * 60_000
 
@@ -139,13 +139,19 @@ export function untrustedShare(cues: readonly Cue[], chunk: VideoChunk): number 
 }
 
 /**
- * Chunks worth one retry (F10.5): empty while a neighbour has speech, or with most cues
- * untrusted. Returns their indexes.
+ * Chunks worth one retry (F10.5): empty next to speech or anywhere between speech (every chunk of
+ * an empty run inside the lecture, so a skipped stretch can't pass as silence), or with most cues
+ * untrusted. Leading and trailing silence (intro music, an empty room) isn't retried. Returns
+ * their indexes.
  */
 export function chunksToRetry(parts: readonly ChunkCues[]): number[] {
-  const hasSpeech = (i: number): boolean => (parts[i]?.cues.length ?? 0) > 0
+  const speaking = parts.map((p) => p.cues.length > 0)
+  const firstSpeech = speaking.indexOf(true)
+  const lastSpeech = speaking.lastIndexOf(true)
   return parts.flatMap(({ chunk, cues }, i) => {
-    const emptyAmongSpeech = cues.length === 0 && (hasSpeech(i - 1) || hasSpeech(i + 1))
+    const betweenSpeech = i > firstSpeech && i < lastSpeech
+    const nextToSpeech = speaking[i - 1] === true || speaking[i + 1] === true
+    const emptyAmongSpeech = cues.length === 0 && (betweenSpeech || nextToSpeech)
     return emptyAmongSpeech || untrustedShare(cues, chunk) > 0.5 ? [i] : []
   })
 }
@@ -160,8 +166,8 @@ function covered(from: number, to: number, chunks: readonly VideoChunk[]): numbe
 
 /**
  * F10.5's checks on the stitched transcript: in order, inside the video (start and end), no
- * large gaps. `silent` = chunks still empty after the retry pass; the gaps they cover are real
- * silence (an exam, a demo).
+ * large gaps. `silent` = chunks retried and still empty; the gaps they cover are real silence
+ * (an exam, a demo).
  * Returns the problems found ([] when valid).
  */
 export function checkVideoCues(

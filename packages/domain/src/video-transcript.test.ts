@@ -151,6 +151,24 @@ describe('chunksToRetry', () => {
     ).toEqual([])
   })
 
+  it('flags every chunk of an empty run between speech, not leading or trailing silence', () => {
+    const parts = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18].map((m) => ({
+      chunk: chunk(m),
+      cues: m === 4 || m === 14 ? [cue(m * 60 + 5, m * 60 + 9, 'x')] : [],
+    }))
+    // 0–2 and 2–4 lead in (only 2 is next to speech); 6–12 lie between speech; 16 is next to it.
+    expect(chunksToRetry(parts)).toEqual([1, 3, 4, 5, 6, 8])
+  })
+
+  it('a gap counts as silence only where chunks were retried and stayed empty', () => {
+    const cues = [cue(5, 9, 'a'), cue(900, 905, 'b')]
+    const all = [chunk(2), chunk(4), chunk(6), chunk(8), chunk(10), chunk(12)]
+    expect(checkVideoCues(cues, 1_000_000, all)).toEqual([])
+    expect(checkVideoCues(cues, 1_000_000, all.slice(0, 2))).toEqual([
+      'no speech for 11 min at cue 1',
+    ])
+  })
+
   it('flags a chunk whose cues are mostly untrusted', () => {
     const slipped = [cue(3601, 3602, 'a'), cue(130, 131, 'b'), cue(135, 136, 'c')]
     expect(untrustedShare(slipped, chunk(2))).toBeCloseTo(2 / 3)

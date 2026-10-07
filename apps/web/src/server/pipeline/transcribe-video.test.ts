@@ -4,6 +4,7 @@ import type { Cue, VideoChunk } from '@lectheo/domain'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ACTOR_A, createFixture, ID, type Fixture } from '../courses/test-fixtures'
 import type { DbLike } from '../db'
+import { resetEnvCache } from '../env'
 import { claimLecture } from './claim'
 import { rows } from './test-fixture'
 import { NO_SPEECH_MESSAGE, transcribeVideoStep, type ChunkTranscriber } from './transcribe-video'
@@ -235,6 +236,32 @@ describe('transcribeVideo: durable waves (F10.5)', () => {
     await runToDone(await addYoutubeLecture(VIDEO, 30 * MIN), transcriber)
     expect((await cacheRows())[0]?.refusal).toBeNull()
   })
+
+  it('review N1: every chunk of an empty run between speech is retried before it counts', async () => {
+    // Speech, then 6 empty chunks (2–14 min), then speech: a 12-minute hole.
+    const transcriber = vi.fn<ChunkTranscriber>(async (chunk) =>
+      chunk.startMs === 0 || chunk.startMs >= 14 * MIN ? speech(chunk) : [],
+    )
+    await runToDone(await addYoutubeLecture(VIDEO, 16 * MIN), transcriber)
+    const calls = (startMin: number) =>
+      transcriber.mock.calls.filter(([c]) => c.startMs === startMin * MIN).length
+    expect([2, 4, 6, 8, 10, 12].map(calls)).toEqual([2, 2, 2, 2, 2, 2])
+    // Retried and still empty: real silence, so the transcript is cached.
+    expect((await cacheRows())[0]?.refusal).toBeNull()
+  })
+
+  it('review N1: a hole the retries fill is transcribed, not passed as silence', async () => {
+    const tried = new Set<number>()
+    const transcriber: ChunkTranscriber = async (chunk) => {
+      const first = !tried.has(chunk.startMs)
+      tried.add(chunk.startMs)
+      // Chunks 2–14 min come back empty the first time only (a flaky Gemini answer).
+      return first && chunk.startMs > 0 && chunk.startMs < 14 * MIN ? [] : speech(chunk)
+    }
+    await runToDone(await addYoutubeLecture(VIDEO, 16 * MIN), transcriber)
+    const cues = (await cacheRows())[0]?.cues ?? []
+    expect(cues.some((c) => c.startMs >= 6 * MIN && c.startMs < 8 * MIN)).toBe(true)
+  })
 })
 
 describe('transcribeVideo: no speech, not English (F10.5)', () => {
@@ -326,6 +353,29 @@ describe('processLecture and Retry for a YouTube lecture', () => {
     await expect(claimLecture(ACTOR_A, lectureId, undefined, f.db)).rejects.toMatchObject({
       code: 'invalid_state',
     })
+  })
+
+  it('review N2: ?from= is refused too after a final transcription failure', async () => {
+    const lectureId = await addYoutubeLecture(FAKE_SILENT_VIDEO_ID)
+    await claimLecture(ACTOR_A, lectureId, undefined, f.db)
+    expect(await processLecture(lectureId)).toBe('failed')
+    await expect(claimLecture(ACTOR_A, lectureId, 'extractConcepts', f.db)).rejects.toMatchObject({
+      code: 'invalid_state',
+    })
+  })
+
+  it('review N6: with the F10 switch off, nothing transcribes, even an existing lecture', async () => {
+    const lectureId = await addYoutubeLecture()
+    vi.stubEnv('FEATURE_YOUTUBE_LECTURES', '0')
+    resetEnvCache()
+    try {
+      await expect(claimLecture(ACTOR_A, lectureId, undefined, f.db)).rejects.toMatchObject({
+        code: 'intake_paused',
+      })
+    } finally {
+      vi.unstubAllEnvs()
+      resetEnvCache()
+    }
   })
 
   it('a Retry that would transcribe again obeys the Google cap', async () => {

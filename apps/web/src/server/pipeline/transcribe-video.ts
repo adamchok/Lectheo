@@ -90,6 +90,12 @@ const videoRejected = (err: unknown): boolean =>
   err.statusCode < 500 &&
   err.statusCode !== 429
 
+/*
+ * ponytail: two lectures of the same new video share its chunk rows, so a failing run's
+ * deleteChunks can wipe the other run's progress, which then pays for those chunks again. Costs
+ * money only, bounded by the Google cap; upgrade path: a per-video advisory lock around a wave.
+ */
+
 /** Errors that end the lecture at once (and stop the rest of the wave). */
 const isFatal = (err: unknown): boolean =>
   err instanceof PipelineError || err instanceof ApiError || err instanceof AiPausedError
@@ -209,9 +215,11 @@ async function advance(
 
   const cues = stitchChunks(parts)
   if (cues.length === 0) return refuse(db, lecture, key, durationMs, 'no_speech')
-  // Chunks still empty after the retry pass are real silence (an exam, a demo): those next to
-  // speech were retried and stayed empty, the rest sit between empty chunks.
-  const silent = parts.filter((p) => p.cues.length === 0).map((p) => p.chunk)
+  // Real silence (an exam, a demo) = chunks retried and still empty. Every empty chunk between
+  // speech is retried, so a skipped stretch can't pass the gap check as silence.
+  const silent = parts
+    .filter((p) => p.cues.length === 0 && attemptsOf(p.chunk) >= 2)
+    .map((p) => p.chunk)
   const problems = checkVideoCues(cues, durationMs, silent)
   if (problems.length > 0) {
     console.warn(
