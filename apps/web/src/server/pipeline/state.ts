@@ -148,7 +148,9 @@ async function setProgress(db: DbLike, lectureId: string, step: PipelineStep): P
     .limit(1)
   if (!lecture) return
   const path = pipelinePath(sourceKind(lecture.source))
-  const done = Math.max(0, path.indexOf(step))
+  // explainConcepts runs beside the item steps and never shows as progress.
+  if (!path.includes(step)) return
+  const done = path.indexOf(step)
   await db
     .update(lectures)
     .set({ progress: { step, done, total: path.length } })

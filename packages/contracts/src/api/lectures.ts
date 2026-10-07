@@ -9,7 +9,7 @@ import {
   PipelineStep,
   ReprocessFromStep,
 } from '../enums'
-import { Chapter, StudyTarget } from '../payloads'
+import { Chapter, ConceptDepth, StudyTarget } from '../payloads'
 
 /**
  * `library` can't be created at runtime. `youtube` (F10) takes `youtubeUrl`, and its title
@@ -168,6 +168,19 @@ export const MarkerDto = z.object({
 })
 export const ListMarkersResponse = z.object({ data: z.array(MarkerDto) })
 
+/** A concept's "Explain in depth" as shown (F9.13): citations resolved to lecture links. */
+export const BriefDepth = z.object({
+  howItWorks: z.array(z.object({ text: z.string(), sources: z.array(SourceRef) })),
+  example: ConceptDepth.shape.example,
+  mistakes: ConceptDepth.shape.mistakes,
+  /** From the map's depends_on edges (no AI): what it builds on and what builds on it. */
+  connects: z.array(
+    z.object({ id: Id, name: z.string(), relation: z.enum(['builds_on', 'leads_to']) }),
+  ),
+  readMinutes: z.number().int().nonnegative(),
+})
+export type BriefDepth = z.infer<typeof BriefDepth>
+
 /** One concept of the Study brief (F9.2): learning order, key points, clips, marks. */
 export const BriefConcept = z.object({
   id: Id,
@@ -182,13 +195,19 @@ export const BriefConcept = z.object({
   chapter: z.object({ id: Chapter.shape.id, title: z.string(), startMs: Ms }).nullable(),
   /** This user's live markers in this lecture linked to the concept. */
   marks: z.object({ lost: z.number().int(), important: z.number().int() }),
+  /** "Explain in depth" (F9.13); null when not written or the step failed (UI hides it). */
+  depth: BriefDepth.nullable(),
+  /** F9.10: later chapters (ids) that revisit the concept; it sits in `chapter`. */
+  alsoIn: z.array(Chapter.shape.id),
 })
 export type BriefConcept = z.infer<typeof BriefConcept>
 
-/** GET /lectures/{id}/brief (F9). */
+/** GET /lectures/{id}/brief (F9). Concepts by chapter, then learning order (F9.10). */
 export const BriefResponse = z.object({
   lectureId: Id,
   readMinutes: z.number().int().nonnegative(),
+  /** All depth text, words ÷ 200 rounded up (F9.13 "40 min with depth" adds it). */
+  depthMinutes: z.number().int().nonnegative(),
   /** Length of the video to watch; null without media. */
   videoMinutes: z.number().int().nonnegative().nullable(),
   concepts: z.array(BriefConcept),

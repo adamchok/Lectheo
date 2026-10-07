@@ -95,3 +95,72 @@ export const briefReadMinutes = (
   }[],
 ): number =>
   readMinutes(concepts.flatMap((c) => [c.name, c.summary, ...c.keyPoints.map((k) => k.text)]))
+
+export interface StudyChapter {
+  readonly id: string
+  readonly startMs: number
+  readonly endMs: number
+  /** Concepts the chapter says it teaches (may be wrong about where they first appear). */
+  readonly conceptIds: readonly string[]
+}
+
+export interface ChapterPlacement {
+  readonly id: string
+  /** The chapter of the concept's first moment; null only when the lecture has no chapters. */
+  readonly chapterId: string | null
+  /** Later chapters that revisit it ("Also revisits: Hash functions →"). */
+  readonly alsoIn: readonly string[]
+}
+
+const distanceMs = (c: StudyChapter, t: number): number =>
+  t < c.startMs ? c.startMs - t : t > c.endMs ? t - c.endMs : 0
+
+/** Index of the chapter at `t`, else the nearest one; at a shared boundary the later one wins. */
+function chapterIndexAt(chapters: readonly StudyChapter[], t: number): number {
+  let best = 0
+  chapters.forEach((c, i) => {
+    if (distanceMs(c, t) <= distanceMs(chapters[best] as StudyChapter, t)) best = i
+  })
+  return best
+}
+
+/**
+ * F9.10: the brief by chapter. `concepts` come in learning order with the start of each source
+ * moment. A concept sits in the chapter of its first moment (outside every chapter: the nearest
+ * one; no moments: the first chapter that lists it, else the first chapter). Later chapters that
+ * list it or hold one of its moments go in `alsoIn`. Returned by chapter, learning order within
+ * one. No chapters: learning order unchanged (F9.2's flat list).
+ */
+export function byChapter(
+  concepts: readonly { readonly id: string; readonly momentsMs: readonly number[] }[],
+  chapters: readonly StudyChapter[],
+): ChapterPlacement[] {
+  if (chapters.length === 0) return concepts.map((c) => ({ id: c.id, chapterId: null, alsoIn: [] }))
+  const placed = concepts.map((c) => {
+    const listed = chapters.findIndex((ch) => ch.conceptIds.includes(c.id))
+    const home =
+      c.momentsMs.length > 0
+        ? chapterIndexAt(chapters, Math.min(...c.momentsMs))
+        : Math.max(0, listed)
+    const revisits = new Set(c.momentsMs.map((t) => chapterIndexAt(chapters, t)))
+    const alsoIn = chapters
+      .filter((ch, i) => i > home && (revisits.has(i) || ch.conceptIds.includes(c.id)))
+      .map((ch) => ch.id)
+    return { id: c.id, chapterId: chapters[home]?.id ?? null, alsoIn, home }
+  })
+  // Array.prototype.sort is stable, so learning order holds within a chapter.
+  return placed
+    .sort((a, b) => a.home - b.home)
+    .map(({ id, chapterId, alsoIn }) => ({ id, chapterId, alsoIn }))
+}
+
+/** F9.13: the text of an "Explain in depth" (code included), for its reading time. */
+export const depthTexts = (depth: {
+  readonly howItWorks: readonly { readonly text: string }[]
+  readonly example: { readonly text: string; readonly code?: string } | null
+  readonly mistakes: readonly { readonly mistake: string; readonly why: string }[]
+}): string[] => [
+  ...depth.howItWorks.map((p) => p.text),
+  ...(depth.example ? [depth.example.text, depth.example.code ?? ''] : []),
+  ...depth.mistakes.flatMap((m) => [m.mistake, m.why]),
+]

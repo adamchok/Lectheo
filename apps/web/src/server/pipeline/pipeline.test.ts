@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ACTOR_A, ACTOR_B, ID } from '../courses/test-fixtures'
 import type { DbLike } from '../db'
 import { claimLecture } from './claim'
+import { explainConceptsStep } from './explain'
 import { extractConceptsStep, validateGraphStep } from './graph'
 import { draftItemsStep, verifyItemsStep } from './items'
 import { runStep } from './state'
@@ -10,6 +11,17 @@ import { addLecture, createPipelineFixture, rows, type PipelineFixture } from '.
 import { processLecture } from './workflow'
 
 vi.mock('server-only', () => ({}))
+
+// Lets a test make the explainConcepts call fail (F9.15) while every other task stays fake.
+const explainFails = vi.hoisted(() => ({ on: false }))
+vi.mock('@lectheo/ai', async (orig) => {
+  const ai = await orig<typeof import('@lectheo/ai')>()
+  const runTask: typeof ai.runTask = async (task, input, ctx) => {
+    if (explainFails.on && task.name === 'explain-concepts') throw new Error('model down')
+    return ai.runTask(task, input, ctx)
+  }
+  return { ...ai, runTask }
+})
 
 // Steps resolve the database through appDb(); point it at this test's PGlite instance.
 let current: DbLike
@@ -37,6 +49,7 @@ let f: PipelineFixture
 beforeEach(async () => {
   f = await createPipelineFixture()
   current = f.db
+  explainFails.on = false
   vi.clearAllMocks()
 })
 
@@ -154,6 +167,57 @@ describe('processLecture with AI_FAKE', () => {
       status: 'failed',
       error: { step: 'parseTranscript', code: 'no_transcript' },
     })
+  })
+})
+
+interface DepthRow {
+  first: boolean
+  depth: { howItWorks: { cites: number[] }[] } | null
+}
+
+/** concepts.depth of the course's concepts, flagged by whether this lecture introduced them. */
+const depths = async (): Promise<DepthRow[]> =>
+  rows<DepthRow>(
+    f,
+    `SELECT c.first_lecture_id = '${f.lectureId}' AS first, c.depth FROM concepts c
+      WHERE c.course_id = '${ID.P}' ORDER BY c.canonical_key`,
+  )
+
+describe('explainConcepts (F9.13–F9.15)', () => {
+  it('runs beside the item steps and writes depth for the concepts this lecture introduces', async () => {
+    await runFull()
+    expect(await stepNames()).toContain('explainConcepts')
+    const all = await depths()
+    expect(all.filter((r) => r.first)).toHaveLength(3)
+    const segments = new Set(Array.from({ length: 12 }, (_, i) => i))
+    for (const row of all.filter((r) => r.first)) {
+      expect(row.depth?.howItWorks.length).toBeGreaterThanOrEqual(2)
+      row.depth?.howItWorks.forEach((p) => expect(p.cites.every((i) => segments.has(i))).toBe(true))
+    }
+    // PC1/PC2 belong to earlier lectures: never written from this one.
+    expect(all.filter((r) => !r.first).map((r) => r.depth)).toEqual([null, null])
+    // The step stays off the progress path.
+    expect(await lecture()).toMatchObject({ progress: { step: null, done: 7, total: 7 } })
+  })
+
+  it('a failed call still turns the lecture ready, without depth', async () => {
+    explainFails.on = true
+    await runFull()
+    expect(await lecture()).toMatchObject({ status: 'ready', error: null })
+    expect(await itemCounts()).toEqual({ verified: 12 })
+    expect((await depths()).every((r) => r.depth === null)).toBe(true)
+  })
+
+  it('re-processing replaces the depth', async () => {
+    await runFull()
+    await f.exec(`
+      UPDATE concepts SET depth = '{"stale": true}'::jsonb WHERE first_lecture_id = '${f.lectureId}';
+      DELETE FROM pipeline_steps WHERE lecture_id = '${f.lectureId}' AND step = 'explainConcepts';
+    `)
+    await explainConceptsStep(f.db, f.lectureId)
+    const mine = (await depths()).filter((r) => r.first)
+    expect(mine.length).toBeGreaterThan(0)
+    mine.forEach((r) => expect(r.depth).not.toHaveProperty('stale'))
   })
 })
 

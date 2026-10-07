@@ -18,6 +18,7 @@ export const STEP_LABELS: Readonly<Record<PipelineStep, string>> = {
   alignMarkers: 'Linking your markers',
   draftItems: 'Writing practice questions',
   verifyItems: 'Verifying questions independently',
+  explainConcepts: 'Explaining the concepts in depth',
 }
 
 /** Mirrors server/pipeline/state.ts#pipelinePath (the order the steps run in). */

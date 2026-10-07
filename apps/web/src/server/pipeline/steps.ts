@@ -4,6 +4,7 @@ import { getWorkflowMetadata } from 'workflow'
 import { appDb } from '../db'
 import { sttClient } from '../stt/assemblyai'
 import { alignMarkersStep, extractConceptsStep, layoutMapStep, validateGraphStep } from './graph'
+import { explainConceptsStep } from './explain'
 import { draftItemsStep, verifyItemsStep } from './items'
 import { loadLecture } from './segments'
 import {
@@ -126,6 +127,13 @@ export async function verifyItems(lectureId: string): Promise<void> {
   'use step'
   if (await superseded(lectureId)) return
   await verifyItemsStep(appDb(), lectureId)
+}
+
+/** F9.15: in parallel with the item steps; the workflow ignores its failure. */
+export async function explainConcepts(lectureId: string): Promise<void> {
+  'use step'
+  if (await superseded(lectureId)) return
+  await explainConceptsStep(appDb(), lectureId)
 }
 
 export async function finishLecture(lectureId: string): Promise<void> {

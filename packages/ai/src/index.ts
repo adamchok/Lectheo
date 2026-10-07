@@ -48,6 +48,7 @@ export { pingTask } from './tasks/ping/task'
 export { extractConceptsTask } from './tasks/extract-concepts/task'
 export { draftItemsTask, toItemRecords, type ItemRecord } from './tasks/draft-items/task'
 export { verifyItemsTask, toVerification } from './tasks/verify-items/task'
+export { explainConceptsTask, toDepths } from './tasks/explain-concepts/task'
 export { authorReplyTask } from './tasks/author-reply/task'
 export { friendReplyTask } from './tasks/friend-reply/task'
 export { judgeCorrectionTask } from './tasks/judge-correction/task'
@@ -64,6 +65,10 @@ export { gradedCriteria, type ChatTurn } from './tasks/common'
 export type { ExtractConceptsInput, ExtractConceptsOutput } from './tasks/extract-concepts/schema'
 export type { DraftItemsInput, DraftItemsOutput } from './tasks/draft-items/schema'
 export type { VerifyItemsInput, VerifyItemsOutput, VerifyItem } from './tasks/verify-items/schema'
+export type {
+  ExplainConceptsInput,
+  ExplainConceptsOutput,
+} from './tasks/explain-concepts/schema'
 export type { AuthorReplyInput } from './tasks/author-reply/schema'
 export type { FriendReplyInput } from './tasks/friend-reply/schema'
 export type { JudgeCorrectionInput } from './tasks/judge-correction/schema'

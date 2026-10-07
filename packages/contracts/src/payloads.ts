@@ -82,6 +82,29 @@ export const KeyPoints = z
   .max(5)
 export type KeyPoints = z.infer<typeof KeyPoints>
 
+// ---------- concepts.depth (F9.13–F9.14, not secret, Study brief only) ----------
+
+/** "Explain in depth": cites segment indexes of the concept's first lecture, never times. */
+export const ConceptDepth = z.object({
+  howItWorks: z
+    .array(z.object({ text: z.string().min(1), cites: SegmentIdxs }))
+    .min(2)
+    .max(4),
+  example: z
+    .object({
+      text: z.string().min(1),
+      code: z.string().min(1).optional(),
+      /** True when the example goes beyond what the lecture showed. */
+      beyondLecture: z.boolean(),
+    })
+    .nullable(),
+  mistakes: z
+    .array(z.object({ mistake: z.string().min(1), why: z.string().min(1) }))
+    .min(2)
+    .max(3),
+})
+export type ConceptDepth = z.infer<typeof ConceptDepth>
+
 // ---------- 🔒 activities.rubric_snapshot ----------
 
 export const RubricSnapshot = z.discriminatedUnion('kind', [

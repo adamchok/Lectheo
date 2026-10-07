@@ -217,7 +217,7 @@ flowchart TD
     al --> mr(["status = map_ready"])
     mr --> dr["draftItems<br/>batches of 4 · per-item writes"]
     dr --> vf["verifyItems<br/>verifier blind-solves · per-item writes · ≤ 1 redraft round"]
-    mr --> xc["explainConcepts (F9.13, to be built)<br/>reasoner · one call per lecture · cites segment indexes · validated · failure only hides depth"]
+    mr --> xc["explainConcepts (F9.13)<br/>reasoner · one call per lecture · cites segment indexes · validated · failure only hides depth"]
     xc --> done
     vf --> done(["status = ready"])
     pt -. "FatalError or retries exhausted" .-> fail(["status = failed · error shown · retry button"])

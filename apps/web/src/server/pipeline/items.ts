@@ -94,7 +94,7 @@ async function mapLimit<T, R>(list: readonly T[], limit: number, fn: (x: T) => P
 }
 
 /** AI context billed to the lecture's owner (llm_calls.user_id), pipeline quota rules. */
-async function pipelineAi(db: DbLike, lectureId: string) {
+export async function pipelineAi(db: DbLike, lectureId: string) {
   const { ownerId } = await loadLecture(db, lectureId)
   return aiContext({ userId: ownerId, lectureId, intake: true, skipQuota: true, db })
 }

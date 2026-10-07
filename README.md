@@ -4,7 +4,8 @@
 
 **Lectheo (LEK-thee-oh)** is an AI study partner for university CS students. It uses your lecture to find what _you personally_ don't understand, then makes you reason with it instead of just recalling it.
 
-1. **Capture** — study the lecture brief in minutes or watch it, jump between AI chapters, and tap **L** ("I'm lost") or **I** ("Important") on what's unclear.
+1. **Capture** — study the lecture brief chapter by chapter in minutes and explain any idea in
+   depth, or watch it, jump between AI chapters, and tap **L** ("I'm lost") or **I** ("Important") on what's unclear.
 2. **Map** — Lectheo builds a concept map of the whole lecture; your markers sit on top.
 3. **Diagnose** — a short, adaptive, confidence-rated diagnostic finds your _confident mistakes_.
 4. **Practice** — _spot the flaw_, _teach-back_, _transfer problems_ and _Stump the AI_ (beta) make you use each idea.

@@ -5,6 +5,7 @@ import {
   alignMarkers,
   beginPipeline,
   draftItems,
+  explainConcepts,
   extractConcepts,
   failProcessing,
   fetchTranscript,
@@ -86,10 +87,15 @@ export async function processLecture(lectureId: string): Promise<'ready' | 'fail
     current = 'alignMarkers'
     await alignMarkers(lectureId)
     await mapReady(lectureId)
-    current = 'draftItems'
-    await draftItems(lectureId)
-    current = 'verifyItems'
-    await verifyItems(lectureId)
+    const prepareItems = async (): Promise<void> => {
+      current = 'draftItems'
+      await draftItems(lectureId)
+      current = 'verifyItems'
+      await verifyItems(lectureId)
+    }
+    // F9.15: depth is written beside the items, so ready comes no later. Its failure (already
+    // logged by runStep) only hides Explain in depth; it never fails the lecture.
+    await Promise.all([prepareItems(), explainConcepts(lectureId).catch(() => undefined)])
     await finishLecture(lectureId)
     return 'ready'
   } catch {

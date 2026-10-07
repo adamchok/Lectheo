@@ -8,6 +8,7 @@
     "test": "vitest run",
     "seed-library": "tsx seed-library.ts",
     "library-chapters": "tsx library-chapters.ts",
+    "library-depth": "tsx library-depth.ts",
     "eval-items": "tsx eval-items.ts",
     "eval-judge": "tsx eval-judge.ts",
     "eval-guard": "tsx eval-guard.ts",
