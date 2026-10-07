@@ -1,8 +1,9 @@
 import type { DiagnosticResultsResponse, Finding } from '@lectheo/contracts'
-import { concepts, inArray } from '@lectheo/db'
+import { concepts, eq, inArray, lectures } from '@lectheo/db'
 import { NO_FLAGS_NOTE, orderFindings, resolveSessionFindings } from '@lectheo/domain'
 import type { Actor } from '../auth'
 import { appDb, type DbLike } from '../db'
+import { loadCoverage } from './coverage'
 import {
   itemSource,
   loadItems,
@@ -16,7 +17,7 @@ const count = (findings: readonly { finding: Finding }[], ...kinds: Finding[]): 
 
 /**
  * GET /diagnostic/{sid}/results (F3.6): answered questions resolved with their follow-ups,
- * ordered confident mistakes → wrong → unsure-right → right.
+ * ordered confident mistakes → wrong → unsure-right → right, plus the lecture's coverage (F3.10).
  */
 export async function getResults(
   actor: Actor,
@@ -71,7 +72,10 @@ export async function getResults(
     }),
   )
 
-  const counts = await markerCountsByConcept(db, actor.userId, session.lectureId)
+  const [counts, coverage] = await Promise.all([
+    markerCountsByConcept(db, actor.userId, session.lectureId),
+    lectureCoverage(db, actor.userId, session.lectureId),
+  ])
   const hasMarkers = [...counts.values()].some((c) => c.lostCount > 0 || c.importantCount > 0)
   return {
     findings: orderFindings(findings),
@@ -84,5 +88,21 @@ export async function getResults(
       right: count(findings, 'right'),
     },
     ...(hasMarkers ? {} : { note: NO_FLAGS_NOTE }),
+    coverage,
   }
+}
+
+/** The session's lecture was read-checked by loadOwnedSession. */
+async function lectureCoverage(db: DbLike, userId: string, lectureId: string) {
+  const [lecture] = await db
+    .select({
+      id: lectures.id,
+      courseId: lectures.courseId,
+      chapters: lectures.chapters,
+      hasTimestamps: lectures.hasTimestamps,
+    })
+    .from(lectures)
+    .where(eq(lectures.id, lectureId))
+  if (!lecture) throw new Error(`lecture ${lectureId} missing`)
+  return loadCoverage(db, userId, lecture)
 }

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { NO_FLAGS_NOTE, planDiagnostic } from './diagnostic-plan'
+import {
+  diagnosticCoverage,
+  evenSpread,
+  homeChapterIndex,
+  MAX_REST_ITEMS,
+  NO_FLAGS_NOTE,
+  planDiagnostic,
+  planRestRound,
+} from './diagnostic-plan'
 
 const concept = (conceptId: string, lostCount = 0, importantCount = 0) => ({ conceptId, lostCount, importantCount })
 const items = (conceptId: string, n: number) =>
@@ -37,5 +45,114 @@ describe('planDiagnostic (F3.1)', () => {
   it('ignores items for unknown concepts', () => {
     const plan = planDiagnostic([concept('a', 1)], [...items('x', 3), ...items('a', 3)], 3)
     expect(plan.itemIds).toEqual(['a-1', 'a-2', 'a-3'])
+  })
+})
+
+const inChapter = (conceptId: string, chapterIndex: number, lostCount = 0) => ({
+  ...concept(conceptId, lostCount),
+  chapterIndex,
+})
+const oneEach = (...ids: string[]) => ids.flatMap((id) => items(id, 2))
+
+describe('planDiagnostic baseline spread (F3.9)', () => {
+  it('takes baseline concepts one per chapter in turn, learning order inside', () => {
+    const concepts = [inChapter('a1', 0), inChapter('a2', 0), inChapter('b1', 1), inChapter('c1', 2)]
+    const plan = planDiagnostic(concepts, oneEach('a1', 'a2', 'b1', 'c1'), 4)
+    expect(plan.itemIds).toEqual(['a1-1', 'b1-1', 'c1-1', 'a2-1'])
+  })
+
+  it('keeps marked concepts first, then spreads the baseline', () => {
+    const concepts = [inChapter('a1', 0), inChapter('a2', 0), inChapter('b1', 1, 2), inChapter('c1', 2)]
+    const plan = planDiagnostic(concepts, oneEach('a1', 'a2', 'b1', 'c1'), 3)
+    expect(plan.itemIds).toEqual(['b1-1', 'a1-1', 'c1-1'])
+  })
+
+  it('spreads evenly when there are more chapters than slots', () => {
+    const concepts = Array.from({ length: 10 }, (_, i) => inChapter(`c${i}`, i))
+    const plan = planDiagnostic(concepts, oneEach(...concepts.map((c) => c.conceptId)), 3)
+    expect(plan.itemIds).toEqual(['c1-1', 'c5-1', 'c8-1'])
+  })
+
+  it('spreads through lecture order without chapters (not the first N)', () => {
+    const concepts = Array.from({ length: 9 }, (_, i) => concept(`c${i}`))
+    const plan = planDiagnostic(concepts, oneEach(...concepts.map((c) => c.conceptId)), 3)
+    expect(plan.itemIds).toEqual(['c1-1', 'c4-1', 'c7-1'])
+  })
+
+  it('skips concepts with no items when spreading', () => {
+    const concepts = [inChapter('a1', 0), inChapter('a2', 0), inChapter('b1', 1)]
+    const plan = planDiagnostic(concepts, oneEach('a2', 'b1'), 2)
+    expect(plan.itemIds).toEqual(['a2-1', 'b1-1'])
+  })
+})
+
+describe('evenSpread', () => {
+  it('returns every index when k ≥ n, else k spread indices', () => {
+    expect(evenSpread(3, 5)).toEqual([0, 1, 2])
+    expect(evenSpread(10, 3)).toEqual([1, 5, 8])
+    expect(evenSpread(4, 0)).toEqual([])
+  })
+})
+
+const rest = (conceptId: string, chapterIndex: number | null, tested = false) => ({
+  conceptId,
+  chapterIndex,
+  tested,
+})
+
+describe('planRestRound (F3.10)', () => {
+  it('asks one unseen item per untested concept, in chapter order', () => {
+    const concepts = [rest('b', 1), rest('a', 0, true), rest('c', 0), rest('d', 2)]
+    expect(planRestRound(concepts, oneEach('a', 'b', 'c', 'd'))).toEqual(['c-1', 'b-1', 'd-1'])
+  })
+
+  it('skips concepts with no question and stops at the max', () => {
+    const ids = Array.from({ length: 12 }, (_, i) => `c${i}`)
+    const plan = planRestRound(
+      ids.map((id) => rest(id, null)),
+      oneEach(...ids.filter((id) => id !== 'c0')),
+    )
+    expect(plan).toHaveLength(MAX_REST_ITEMS)
+    expect(plan[0]).toBe('c1-1')
+  })
+
+  it('returns nothing when everything is tested', () => {
+    expect(planRestRound([rest('a', 0, true)], oneEach('a'))).toEqual([])
+  })
+})
+
+describe('diagnosticCoverage (F3.10–F3.11)', () => {
+  it('counts tested, no question and untested, per chapter', () => {
+    const coverage = diagnosticCoverage([
+      { ...rest('a', 0, true), hasQuestion: true, hasUnseen: false },
+      { ...rest('b', 0), hasQuestion: true, hasUnseen: true },
+      { ...rest('c', 1), hasQuestion: false, hasUnseen: false },
+      { ...rest('d', 1, true), hasQuestion: false, hasUnseen: false },
+      { ...rest('e', 1), hasQuestion: true, hasUnseen: false },
+    ])
+    expect(coverage).toEqual({
+      tested: 2,
+      total: 5,
+      noQuestion: 1,
+      untested: 1,
+      byChapter: [
+        { chapterIndex: 0, tested: 1, total: 2 },
+        { chapterIndex: 1, tested: 1, total: 3 },
+      ],
+    })
+  })
+
+  it('has no chapters without chapter indices', () => {
+    expect(diagnosticCoverage([{ ...rest('a', null), hasQuestion: true, hasUnseen: true }]).byChapter).toEqual([])
+  })
+})
+
+describe('homeChapterIndex', () => {
+  it('finds the chapter holding the first segment', () => {
+    expect(homeChapterIndex([], 4)).toBeNull()
+    expect(homeChapterIndex([0, 10, 20], 0)).toBe(0)
+    expect(homeChapterIndex([0, 10, 20], 15)).toBe(1)
+    expect(homeChapterIndex([0, 10, 20], 99)).toBe(2)
+    expect(homeChapterIndex([5, 10], 2)).toBe(0)
   })
 })

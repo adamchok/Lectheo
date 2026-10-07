@@ -1,6 +1,10 @@
 import { z } from 'zod'
 import { Id, MasterySummary, SourceRef } from '../common'
-import { ConfidenceLevel, Finding } from '../enums'
+import { ConfidenceLevel, DiagnosticRound, Finding } from '../enums'
+
+/** F3.10: optional; `rest` tests the concepts still *Not tested*. */
+export const StartDiagnosticRequest = z.object({ round: DiagnosticRound.default('core') })
+export type StartDiagnosticRequest = z.infer<typeof StartDiagnosticRequest>
 
 export const DiagnosticItemStub = z.object({
   id: Id,
@@ -70,5 +74,22 @@ export const DiagnosticResultsResponse = z.object({
     right: z.number().int(),
   }),
   note: z.string().optional(),
+  /** F3.10–F3.11: the lecture's concepts tested so far (any round, any activity). */
+  coverage: z.object({
+    tested: z.number().int(),
+    total: z.number().int(),
+    /** Untested concepts with no verified question (F3.11). */
+    noQuestion: z.number().int(),
+    /** Untested concepts *Test the rest* can still ask about. */
+    untested: z.number().int(),
+    byChapter: z.array(
+      z.object({
+        chapterId: z.string(),
+        title: z.string(),
+        tested: z.number().int(),
+        total: z.number().int(),
+      }),
+    ),
+  }),
 })
 export type DiagnosticResultsResponse = z.infer<typeof DiagnosticResultsResponse>

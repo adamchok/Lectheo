@@ -72,7 +72,7 @@ async function maybeIssueFollowUp(
   }
   if (!shouldIssueFollowUp(answer, session.followUpsUsed)) return session
   const [next] = await unseenMcqs(db, session.userId, session.lectureId, {
-    conceptId: item.conceptId,
+    conceptIds: [item.conceptId],
   })
   if (!next) return session
   const [updated] = await db

@@ -91,7 +91,7 @@ const loadSegments = (db: DbLike, lectureId: string): Promise<SegmentRow[]> =>
     .where(eq(transcriptSegments.lectureId, lectureId))
     .orderBy(asc(transcriptSegments.idx))
 
-interface EdgeEnd {
+export interface EdgeEnd {
   /** The concept the edge is read from. */
   of: string
   id: string
@@ -99,7 +99,7 @@ interface EdgeEnd {
 }
 
 /** The course's depends_on edges, read from the dependent side: `of` builds on `id`. */
-const loadPrerequisites = (db: DbLike, courseId: string): Promise<EdgeEnd[]> =>
+export const loadPrerequisites = (db: DbLike, courseId: string): Promise<EdgeEnd[]> =>
   db
     .select({ of: conceptEdges.fromConceptId, id: concepts.id, name: concepts.name })
     .from(conceptEdges)

@@ -25,6 +25,7 @@ import {
   ATTEMPT_ACTIVITY_TYPES,
   CONFIDENCE_LEVELS,
   COURSE_KINDS,
+  DIAGNOSTIC_ROUNDS,
   ITEM_KINDS,
   ITEM_STATUSES,
   LECTURE_SOURCES,
@@ -83,6 +84,7 @@ export const relation = pgEnum('relation', RELATIONS)
 export const itemKind = pgEnum('item_kind', ITEM_KINDS)
 export const itemStatus = pgEnum('item_status', ITEM_STATUSES)
 export const sessionStatus = pgEnum('session_status', SESSION_STATUSES)
+export const diagnosticRound = pgEnum('diagnostic_round', DIAGNOSTIC_ROUNDS)
 export const confidence = pgEnum('confidence', CONFIDENCE_LEVELS)
 export const activityType = pgEnum('activity_type', ACTIVITY_TYPES)
 export const activityStatus = pgEnum('activity_status', ACTIVITY_STATUSES)
@@ -379,6 +381,8 @@ export const diagnosticSessions = pgTable(
     plannedItemIds: uuid('planned_item_ids').array().notNull(),
     followUpsUsed: integer('follow_ups_used').notNull().default(0),
     status: sessionStatus('status').notNull().default('active'),
+    /** F3.10: `rest` = a *Test the rest* round on untested concepts. */
+    round: diagnosticRound('round').notNull().default('core'),
     createdAt: createdAt(),
     completedAt: tsz('completed_at'),
   },

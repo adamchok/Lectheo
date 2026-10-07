@@ -10,6 +10,7 @@ import {
 } from '@lectheo/contracts'
 import {
   activities,
+  and,
   attempts,
   diagnosticSessions,
   eq,
@@ -22,7 +23,7 @@ import {
 } from '@lectheo/db'
 import { conceptId, lectureId, seedAll } from '@lectheo/db/seed'
 import { createTestDb } from '@lectheo/db/testing'
-import { NO_FLAGS_NOTE } from '@lectheo/domain'
+import { MAX_REST_ITEMS, NO_FLAGS_NOTE } from '@lectheo/domain'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Actor } from '../auth'
 import type { DbLike } from '../db'
@@ -337,5 +338,75 @@ describe('ownership', () => {
     await expect(
       recordConfidence(ALICE, 'nope', at(planned, 0).id, 'sure', db),
     ).rejects.toMatchObject({ code: 'not_found' })
+  })
+})
+
+/** Answers every planned question right (no follow-ups), completing the session. */
+async function finish(actor: Actor, start: StartDiagnosticResponse) {
+  for (const item of start.items) await answer(actor, start.sessionId, item.id, 'sure', true)
+}
+
+describe('coverage and Test the rest (F3.9–F3.11)', () => {
+  it('shows coverage after a core round, then tests only the untested concepts', async () => {
+    const core = await startDiagnostic(ALICE, L5, db)
+    await finish(ALICE, core)
+    const coreConcepts = new Set(core.items.map((i) => i.conceptId))
+
+    const { coverage } = DiagnosticResultsResponse.parse(
+      await getResults(ALICE, core.sessionId, db),
+    )
+    expect(coverage.tested).toBe(coreConcepts.size)
+    expect(coverage.total).toBeGreaterThan(coverage.tested)
+    expect(coverage.untested).toBe(coverage.total - coverage.tested - coverage.noQuestion)
+    expect(coverage.byChapter.reduce((n, c) => n + c.total, 0)).toBe(coverage.total)
+
+    const rest = await startDiagnostic(ALICE, L5, db, 'rest')
+    expect(rest.sessionId).not.toBe(core.sessionId)
+    expect(rest.note).toBeUndefined()
+    expect(rest.items).toHaveLength(Math.min(coverage.untested, MAX_REST_ITEMS))
+    expect(rest.items.some((i) => coreConcepts.has(i.conceptId))).toBe(false)
+    expect(new Set(rest.items.map((i) => i.conceptId)).size).toBe(rest.items.length)
+    const [row] = await db
+      .select()
+      .from(diagnosticSessions)
+      .where(eq(diagnosticSessions.id, rest.sessionId))
+    expect(row?.round).toBe('rest')
+
+    await finish(ALICE, rest)
+    const after = DiagnosticResultsResponse.parse(await getResults(ALICE, rest.sessionId, db))
+    expect(after.coverage).toMatchObject({ tested: coverage.total, untested: 0 })
+    await expect(startDiagnostic(ALICE, L5, db, 'rest')).rejects.toMatchObject({
+      code: 'invalid_state',
+      details: { reason: 'nothing_to_test' },
+    })
+  })
+
+  it('resumes the active session whatever round is asked for', async () => {
+    const core = await startDiagnostic(ALICE, L5, db)
+    expect((await startDiagnostic(ALICE, L5, db, 'rest')).sessionId).toBe(core.sessionId)
+  })
+
+  it('counts a concept with no verified question as "no question" and never asks it', async () => {
+    const core = await startDiagnostic(ALICE, L5, db)
+    await finish(ALICE, core)
+    const asked = new Set(core.items.map((i) => i.conceptId))
+    const all = await db
+      .select({ conceptId: items.conceptId })
+      .from(items)
+      .where(and(eq(items.lectureId, L5), eq(items.kind, 'diagnostic_mcq')))
+    const unasked = all.map((r) => r.conceptId).find((id) => !asked.has(id))
+    if (!unasked) throw new Error('every concept was asked')
+    await db
+      .update(items)
+      .set({ status: 'retired' })
+      .where(and(eq(items.lectureId, L5), eq(items.conceptId, unasked)))
+
+    const { coverage } = DiagnosticResultsResponse.parse(
+      await getResults(ALICE, core.sessionId, db),
+    )
+    expect(coverage.noQuestion).toBe(1)
+    const rest = await startDiagnostic(ALICE, L5, db, 'rest')
+    expect(rest.items.map((i) => i.conceptId)).not.toContain(unasked)
+    expect(rest.items).toHaveLength(coverage.untested)
   })
 })

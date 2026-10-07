@@ -4,6 +4,7 @@ import type {
   AnswerResponse,
   ConfidenceLevel,
   DiagnosticResultsResponse,
+  DiagnosticRound,
   Finding,
 } from '@lectheo/contracts'
 import { ArrowRight, CircleCheck, CircleX, TriangleAlert } from 'lucide-react'
@@ -34,11 +35,18 @@ import { SourceRef } from '@/components/source-ref'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
+import { CoverageSummary, TestRestButton } from './diagnostic-coverage'
 import { LectureFrame } from './lecture-frame'
 import { Spinner } from '@/components/ui/spinner'
 
 /** /lectures/[id]/diagnostic — adaptive, confidence-first diagnostic (F3). */
-export function DiagnosticView({ lectureId }: { lectureId: string }) {
+export function DiagnosticView({
+  lectureId,
+  round,
+}: {
+  lectureId: string
+  round: DiagnosticRound
+}) {
   return (
     <LectureFrame
       lectureId={lectureId}
@@ -48,7 +56,7 @@ export function DiagnosticView({ lectureId }: { lectureId: string }) {
     >
       {(lecture) => (
         <div>
-          <DiagnosticRunner lectureId={lectureId} courseId={lecture.courseId} />
+          <DiagnosticRunner lectureId={lectureId} courseId={lecture.courseId} round={round} />
         </div>
       )}
     </LectureFrame>
@@ -88,15 +96,27 @@ function Note({ children }: { children: string }) {
   )
 }
 
-/** Every verified question for this lecture has been seen (start → 409 no_items). */
-function FinishedState({ lectureId, courseId }: { lectureId: string; courseId: string }) {
+interface FinishedStateProps {
+  lectureId: string
+  courseId: string
+  round: DiagnosticRound
+}
+
+/**
+ * Nothing left to ask: every verified question for this lecture has been seen (core → 409
+ * no_items), or every concept with a checked question is tested (rest → 409 nothing_to_test).
+ */
+function FinishedState({ lectureId, courseId, round }: FinishedStateProps) {
+  const body =
+    round === 'rest'
+      ? 'Every concept with a checked question in this lecture has been tested.'
+      : "You've answered every question we have for this lecture."
   return (
     <section className="bg-card space-y-4 rounded-xl border p-6 text-center shadow-sm">
       <CircleCheck aria-hidden className="text-mastery-green mx-auto size-5" />
       <h2 className="text-title-md">You&apos;ve finished this diagnostic</h2>
       <p className="text-muted-foreground text-body-sm">
-        You&apos;ve answered every question we have for this lecture. Keep going with practice on
-        the concept map.
+        {body} Keep going with practice on the concept map.
       </p>
       <div className="flex flex-wrap justify-center gap-3">
         <Button asChild>
@@ -113,15 +133,25 @@ function FinishedState({ lectureId, courseId }: { lectureId: string; courseId: s
   )
 }
 
-const isNoItemsLeft = (error: unknown): boolean =>
-  isApiClientError(error) && error.code === 'invalid_state' && error.details?.reason === 'no_items'
+const NOTHING_LEFT = ['no_items', 'nothing_to_test']
 
-function DiagnosticRunner({ lectureId, courseId }: { lectureId: string; courseId: string }) {
-  const start = useStartDiagnostic(lectureId)
+const isNothingLeft = (error: unknown): boolean =>
+  isApiClientError(error) &&
+  error.code === 'invalid_state' &&
+  NOTHING_LEFT.includes(String(error.details?.reason))
+
+interface RunnerProps {
+  lectureId: string
+  courseId: string
+  round: DiagnosticRound
+}
+
+function DiagnosticRunner({ lectureId, courseId, round }: RunnerProps) {
+  const start = useStartDiagnostic(lectureId, round)
   const session = useDiagnosticSession(start.data?.sessionId)
 
-  if (start.isError && isNoItemsLeft(start.error)) {
-    return <FinishedState lectureId={lectureId} courseId={courseId} />
+  if (start.isError && isNothingLeft(start.error)) {
+    return <FinishedState lectureId={lectureId} courseId={courseId} round={round} />
   }
   if (start.isError) {
     return (
@@ -149,6 +179,7 @@ function DiagnosticRunner({ lectureId, courseId }: { lectureId: string; courseId
   return (
     <DiagnosticFlow
       key={start.data.sessionId}
+      lectureId={lectureId}
       courseId={courseId}
       sessionId={start.data.sessionId}
       initial={unanswered}
@@ -160,6 +191,7 @@ function DiagnosticRunner({ lectureId, courseId }: { lectureId: string; courseId
 
 interface FlowProps {
   sessionId: string
+  lectureId: string
   courseId: string
   /** Unanswered questions in session order (resume). */
   initial: Question[]
@@ -167,7 +199,14 @@ interface FlowProps {
   note?: string
 }
 
-function DiagnosticFlow({ sessionId, courseId, initial, answeredBefore, note }: FlowProps) {
+function DiagnosticFlow({
+  sessionId,
+  lectureId,
+  courseId,
+  initial,
+  answeredBefore,
+  note,
+}: FlowProps) {
   const [queue, setQueue] = useState(initial)
   const [index, setIndex] = useState(0)
   const [answers, setAnswers] = useState<ReadonlyMap<string, AnswerResponse>>(new Map())
@@ -175,7 +214,13 @@ function DiagnosticFlow({ sessionId, courseId, initial, answeredBefore, note }: 
 
   if (!current) {
     return (
-      <DiagnosticResults sessionId={sessionId} courseId={courseId} answers={answers} note={note} />
+      <DiagnosticResults
+        sessionId={sessionId}
+        lectureId={lectureId}
+        courseId={courseId}
+        answers={answers}
+        note={note}
+      />
     )
   }
 
@@ -447,6 +492,7 @@ function FeedbackCard({ feedback, isLast, onNext }: FeedbackCardProps) {
 
 interface ResultsProps {
   sessionId: string
+  lectureId: string
   courseId: string
   /** Answers from this visit, for the "why" on the headline card. */
   answers: ReadonlyMap<string, AnswerResponse>
@@ -454,7 +500,7 @@ interface ResultsProps {
 }
 
 /** Results ordered confident mistakes → wrong → unsure-right → right (F3.6). */
-function DiagnosticResults({ sessionId, courseId, answers, note }: ResultsProps) {
+function DiagnosticResults({ sessionId, lectureId, courseId, answers, note }: ResultsProps) {
   const results = useDiagnosticResults(sessionId)
   // "See results" unmounted with the last question: land on the results heading.
   const heading = useRef<HTMLHeadingElement>(null)
@@ -473,7 +519,7 @@ function DiagnosticResults({ sessionId, courseId, answers, note }: ResultsProps)
   }
   if (!results.data) return <Loading label="Loading results" />
 
-  const { findings, summary } = results.data
+  const { findings, summary, coverage } = results.data
   const headline = findings.find((f) => f.finding === 'confident_mistake')
   const rest = findings.filter((f) => f !== headline)
   const shownNote = results.data.note ?? note
@@ -493,6 +539,7 @@ function DiagnosticResults({ sessionId, courseId, answers, note }: ResultsProps)
         {pluralize(summary.total, 'question')} · {mistakes} · {summary.wrong} wrong ·{' '}
         {summary.unsureRight} right but unsure · {summary.right} right
       </p>
+      <CoverageSummary coverage={coverage} />
       {rest.length > 0 && (
         <ul className="divide-y rounded-xl border">
           {rest.map((f) => (
@@ -520,6 +567,9 @@ function DiagnosticResults({ sessionId, courseId, answers, note }: ResultsProps)
             <ArrowRight aria-hidden />
           </Link>
         </Button>
+        {coverage.untested > 0 && (
+          <TestRestButton lectureId={lectureId} untested={coverage.untested} />
+        )}
         {weakest && <PracticeWeakestButton finding={weakest} />}
       </div>
     </div>
