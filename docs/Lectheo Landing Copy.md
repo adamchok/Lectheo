@@ -69,7 +69,7 @@ The words for the public landing page at `/`. Layout, tokens and section rules a
 **Title:** From "I'm lost" to proven, in four steps.
 
 1. **Read the brief or watch. Mark what's unclear.**
-   Read a few-minute brief of the lecture, or watch it and press **L** when you're lost and **I** when something matters. No pausing, no notes. Your marks sit on the lecture's timeline.
+   Read a few-minute brief of the lecture, chapter by chapter, and open an idea in depth. Or watch it and press **L** when you're lost and **I** when something matters. No pausing, no notes. Your marks sit on the lecture's timeline.
 2. **See the lecture as a map.**
    Lectheo builds a concept map of the lecture and shows how ideas depend on each other. Your marks land on the concepts they belong to, so confusion is traced back to where it started. Every lecture with timestamps is split into chapters, so you can jump to the part you need.
 3. **Get a diagnosis, not a quiz.**
@@ -158,8 +158,6 @@ Three columns:
 - **A transcript.** Paste or upload the text. Without timestamps you can't mark moments, but you still get the map, the diagnosis and practice.
 - **A YouTube video.** Paste the link. It plays through YouTube, and Lectheo builds the map from its transcript.
 
-*Ship when Explain in depth (F9.13) is live: in How it works step 1, "Read a few-minute brief of the lecture, chapter by chapter, and open any idea in depth." In the comparison, the last row becomes "Flashcards and streaks" (Lectheo: — by design), because "Notes, summaries" no longer holds once Lectheo writes explanations.*
-
 **Caption:** With a Google account, up to 3 lectures a day, each up to 2 hours.
 
 ---
@@ -181,7 +179,7 @@ Compares **categories**, not named products (decided 6 Oct): easier to keep true
 | Questions checked by a second AI before you see them | ✓ | — | — | — |
 | Feedback links to the lecture moment | ✓ | Some | ✓ | — |
 | Mastery needs two kinds of evidence | ✓ | — | — | — |
-| Notes, summaries, flashcards | — by design | ✓ | ✓ | Some |
+| Flashcards | — by design | ✓ | ✓ | Some |
 
 Text alternatives: ✓ = "Yes", — = "No", other cells read as written.
 

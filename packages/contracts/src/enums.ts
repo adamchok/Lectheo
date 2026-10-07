@@ -64,6 +64,8 @@ export const PIPELINE_STEPS = [
   'alignMarkers',
   'draftItems',
   'verifyItems',
+  /** F9.13: runs beside draftItems/verifyItems; not on the progress path. */
+  'explainConcepts',
 ] as const
 export const REPROCESS_FROM_STEPS = [
   'parseTranscript',

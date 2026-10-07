@@ -40,7 +40,7 @@ test('study Lecture 5: mark a concept, then Test me starts with it', async ({ pa
   await expect(tries.getByRole('listitem').first()).toBeVisible() // key points
   const triesId = (await tries.getAttribute('id'))?.replace('concept-', '') ?? ''
 
-  await tries.getByRole('button', { name: /watch this part/i }).click()
+  await tries.getByRole('button', { name: /^watch from/i }).click()
   await expect(tries.locator('audio')).toBeAttached()
 
   const lost = tries.getByRole('button', { name: "I'm lost here" })
@@ -60,9 +60,8 @@ test('study Lecture 5: mark a concept, then Test me starts with it', async ({ pa
   expect(plan.items[0]?.conceptId).toBe(triesId)
 })
 
-test('chapters tab: jump to a chapter and mark it', async ({ page }) => {
-  await offlineMedia(page)
-  // Records where the player is sent (the silent MP3 is too short to really get there).
+/** Records where the player is sent (the silent MP3 is too short to really get there). */
+async function recordSeeks(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const desc = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'currentTime')
     Object.defineProperty(HTMLMediaElement.prototype, 'currentTime', {
@@ -75,6 +74,80 @@ test('chapters tab: jump to a chapter and mark it', async ({ page }) => {
       },
     })
   })
+}
+
+const lastSeek = (page: Page) =>
+  page.evaluate(() => (window as unknown as { lastSeek?: number }).lastSeek)
+
+test('study by chapter: outline jump, explain in depth, a ▶ link plays (F9.10–F9.13)', async ({
+  page,
+}) => {
+  await offlineMedia(page)
+  await recordSeeks(page)
+  await signInSample(page)
+  await page.goto(`/lectures/${L5}`)
+
+  const outline = page.getByRole('navigation', { name: 'Outline' })
+  await expect(outline.getByRole('listitem')).toHaveCount(L5_CHAPTERS.length)
+  await expect(outline.getByRole('link', { name: 'Test me' })).toBeVisible()
+  await expect(page.getByText(/min with depth/)).toBeVisible()
+  await expect(page.getByText(/in chapter \d/i)).toHaveCount(0) // F9.12: the section replaces it
+
+  // Jump to the Tries chapter: the URL and the outline follow.
+  const triesLink = outline.getByRole('link', { name: /Tries/ })
+  await triesLink.click()
+  await expect(page).toHaveURL(/#chapter-/)
+  const section = page.getByRole('region', { name: 'Tries', exact: true })
+  await expect(section.getByRole('heading', { level: 2, name: 'Tries' })).toBeInViewport()
+  await expect(triesLink).toHaveAttribute('aria-current', 'location')
+  await expect(section.getByRole('button', { name: /play this chapter/i })).toBeVisible()
+
+  // Explain in depth: collapsed, then the four parts, labelled as AI-written.
+  const tries = page.getByRole('article', { name: 'Tries' })
+  const explain = tries.getByRole('button', { name: /explain in depth/i })
+  await expect(explain).toHaveAttribute('aria-expanded', 'false')
+  await explain.click()
+  for (const part of ['How it works', 'Worked example', 'Common mistakes']) {
+    await expect(tries.getByRole('heading', { name: part })).toBeVisible()
+  }
+  await expect(tries.getByText('AI-written from the lecture')).toBeVisible()
+
+  // A ▶ link in How it works plays that moment in the block's player.
+  const how = tries.getByRole('heading', { name: 'How it works' }).locator('..')
+  const play = how.getByRole('button', { name: /^play from/i }).first()
+  const at = (await play.textContent())?.match(/\d+(?::\d+)+/)?.[0] ?? ''
+  await play.click()
+  await expect(tries.locator('audio')).toBeAttached()
+  const toSeconds = (clock: string) => clock.split(':').reduce((acc, p) => acc * 60 + Number(p), 0)
+  await expect.poll(() => lastSeek(page)).toBeGreaterThanOrEqual(toSeconds(at))
+
+  // One player per page: playing the chapter closes the concept's, and the other way round.
+  await section.getByRole('button', { name: /play this chapter/i }).click()
+  await expect(page.locator('audio')).toHaveCount(1)
+  await expect(tries.locator('audio')).toHaveCount(0)
+  await tries.getByRole('button', { name: /^watch from/i }).click()
+  await expect(page.locator('audio')).toHaveCount(1)
+  await expect(tries.locator('audio')).toHaveCount(1)
+})
+
+test('study on a phone: the outline is a Jump to menu', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 })
+  await offlineMedia(page)
+  await signInSample(page)
+  await page.goto(`/lectures/${L5}`)
+  await expect(page.getByRole('navigation', { name: 'Outline' })).toBeHidden()
+  const jump = page.getByLabel('Jump to')
+  await expect(jump.locator('option')).toHaveCount(L5_CHAPTERS.length)
+  const value = await jump.locator('option', { hasText: 'Tries' }).getAttribute('value')
+  await jump.selectOption(value ?? '')
+  await expect(
+    page.getByRole('region', { name: 'Tries', exact: true }).getByRole('heading', { level: 2 }),
+  ).toBeInViewport()
+})
+
+test('chapters tab: jump to a chapter and mark it', async ({ page }) => {
+  await offlineMedia(page)
+  await recordSeeks(page)
   const tries = L5_CHAPTERS.find((c) => c.title === 'Tries')
   const triesStartMs = L5_SEGMENTS[tries?.start ?? -1]?.startMs ?? 0
   expect(triesStartMs).toBeGreaterThan(0)

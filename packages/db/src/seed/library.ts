@@ -1,6 +1,7 @@
 import {
   AnswerKeyByKind,
   Chapters,
+  ConceptDepth,
   CourseAttributionJson,
   DistractorMeta,
   HintsSecret,
@@ -13,6 +14,7 @@ import {
 import { chapterErrors, toChapterRanges } from '@lectheo/domain'
 import type * as s from '../schema'
 import { LIBRARY_CHAPTERS } from './fixtures/chapters'
+import { LIBRARY_DEPTH } from './fixtures/depth'
 import { EDGES, EXTRA_OCCURRENCES } from './fixtures/edges'
 import { lecture3Items } from './fixtures/l3-items'
 import { lecture3 } from './fixtures/l3-lecture'
@@ -197,6 +199,15 @@ const buildItems = (owners: Map<string, LectureFx>): Pick<LibraryRows, 'items' |
   return { items, itemSecrets }
 }
 
+/** F9.15: the fixture's depth, citing segments of the lecture that introduces the concept. */
+const buildDepth = (lecture: LectureFx, key: string): ConceptDepth | null => {
+  const fx = LIBRARY_DEPTH[key]
+  if (!fx) return null
+  const depth = ConceptDepth.parse(fx)
+  depth.howItWorks.forEach((p, i) => assertCites(lecture, p.cites, `depth ${key}/${i}`))
+  return depth
+}
+
 const buildGraph = (
   owners: Map<string, LectureFx>,
 ): Pick<LibraryRows, 'concepts' | 'occurrences' | 'edges'> => {
@@ -218,6 +229,7 @@ const buildGraph = (
         canonicalKey: c.key,
         summary: c.summary,
         keyPoints,
+        depth: buildDepth(lecture, c.key),
         firstLectureId: lectureId(lecture.key),
       })
       occurrences.push({

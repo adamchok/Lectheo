@@ -118,7 +118,7 @@ Benchmarks used (checked 4 Oct 2026):
 | Teach-back (~4 turns + 1 judge call) | Sonnet + Sol | ≈ $0.05 |
 | Transfer / Stump (beta) | Sol / Sonnet + Sol ×2 | ≈ $0.03 / $0.07 |
 | On-demand item (if the bank runs out) | Sonnet + Sol | ≈ $0.05 |
-| In-depth explanations per lecture ([[Lectheo Product Spec#F9. Study mode — Must|F9.13]]) *(decided 7 Oct 2026, to be built)* | Sonnet 5.5 (`reasoner`) | ≈ $0.08–0.12 (about 12 concepts; library once, by script) |
+| In-depth explanations per lecture ([[Lectheo Product Spec#F9. Study mode — Must|F9.13]]) | Sonnet 5.5 (`reasoner`) | ≈ $0.08–0.12 (about 12 concepts; library once, by script) |
 | YouTube lecture transcript [[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]] | Gemini 3.8 Flash, direct key | ≈ $0.42 per hour of video (2-hour max ≈ $0.85; $0.35/h measured on MIT 6.006); cached per video; capped by `GOOGLE_AI_BUDGET_USD` (default $10) |
 | **Judge path** (diagnostic + spot the flaw + teach-back) | | **≈ $0.10–0.15** |
 
@@ -229,7 +229,7 @@ Format: context → decision → consequences. All **Accepted, 4 Oct 2026** (v2 
   - Spot-flaw verdict and location are checked in code. Only the correction goes to the judge.
   - Rubrics are frozen into `activities.rubric_snapshot`.
   - Author replies are capped at 150 tokens and leak-checked before display ([[#ADR-013 · TypeSafe Jev as the leak check, with an LLM escalation|ADR-013]]).
-  - **Amended 7 Oct 2026 (built):** `concepts.key_points` stop being secret, because the Study brief ([[Lectheo Product Spec#F9. Study mode — Must|F9]]) shows them. Teach-back still grades against them via `rubric_snapshot`. Everything else above stays hidden. **Cost, accepted on purpose:** the key points are teach-back's rubric criteria (and items are drafted from them), so a student can read them in Study and paraphrase them into a teach-back for full marks. No answer key, flaw or hint leaks, and Mastered still needs a second, different activity type. If this is abused, the follow-up is a copy-overlap penalty in `judge-teach-back` (high verbatim overlap with the key points caps the criterion score), not hiding the key points again.
+  - **Amended 7 Oct 2026 (built):** `concepts.key_points` stop being secret, because the Study brief ([[Lectheo Product Spec#F9. Study mode — Must|F9]]) shows them. Teach-back still grades against them via `rubric_snapshot`. Everything else above stays hidden. **Cost, accepted on purpose:** the key points are teach-back's rubric criteria (and items are drafted from them), so a student can read them in Study and paraphrase them into a teach-back for full marks. No answer key, flaw or hint leaks, and Mastered still needs a second, different activity type. If this is abused, the follow-up is a copy-overlap penalty in `judge-teach-back` (high verbatim overlap with the key points caps the criterion score), not hiding the key points again. **Amended 8 Oct 2026 (F9.13–F9.14):** `concepts.depth` (*Explain in depth*) is not secret either and is shown only in the Study brief. It is written from names, summaries, key points and transcript segments, never from `item_secrets`. Its *Common mistakes* can overlap the misconceptions items test; accepted for the same reason as key points (Study before the diagnostic is the intended flow), with an overlap check in `verifyItems` as the follow-up if needed.
 - **Consequences:**
   - \+ Leak risk reduced structurally.
   - − Author replies aren't streamed (~2.5–3.5 s).

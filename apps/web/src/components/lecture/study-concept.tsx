@@ -4,8 +4,8 @@ import type { BriefConcept, LectureResponse } from '@lectheo/contracts'
 import { FileText, Play } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
-import { useId } from 'react'
-import { formatTimestamp, formatTimestampLong } from '@/client/format'
+import { useEffect, useId, useRef } from 'react'
+import { formatTimestamp } from '@/client/format'
 import { useTranscript } from '@/client/queries'
 import { MasteryBadge } from '@/components/mastery-badge'
 import { SourceRef } from '@/components/source-ref'
@@ -14,14 +14,15 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ClipPlayer, clipLength, type Clip } from './clip-player'
 import { canWatch } from './lecture-modes'
 import { MarkButtons } from './mark-buttons'
+import { StudyDepth } from './study-depth'
 
-/* One concept of the Study brief (Design System §4 "Lecture: Study", F9.2–F9.4, F11.5). */
+/* One concept of the Study brief (Design System §4 "Lecture: Study", F9.2–F9.4, F9.12–F9.13). */
 
-/** What the block shows below its buttons: nothing, its clips, or playback from a key point. */
+/** What the block shows below its buttons: nothing, its clips, or playback from a moment. */
 export type OpenPart = 'clips' | number | null
 
 /** No playable media: the clips' transcript lines instead of a player (F9.3). */
-function ClipText({ lectureId, clips }: { lectureId: string; clips: readonly Clip[] }) {
+export function ClipText({ lectureId, clips }: { lectureId: string; clips: readonly Clip[] }) {
   const transcript = useTranscript(lectureId)
   if (transcript.isPending) return <Skeleton label="Loading the transcript" className="h-24" />
   const lines = (transcript.data ?? []).filter((s) =>
@@ -67,35 +68,6 @@ function BuildsOn({
   )
 }
 
-/** "In chapter 4 · 23:10": the watch page where there is media, else the transcript. */
-function ChapterLink({
-  lecture,
-  chapter,
-  number,
-}: {
-  lecture: LectureResponse
-  chapter: NonNullable<BriefConcept['chapter']>
-  number: number
-}) {
-  const watch = canWatch(lecture)
-  const href = watch
-    ? `/lectures/${lecture.id}/watch?t=${chapter.startMs}`
-    : `/lectures/${lecture.id}?view=transcript&t=${chapter.startMs}#transcript`
-  return (
-    <p className="text-caption">
-      <Link href={href as Route} className="text-primary underline-offset-2 hover:underline">
-        <span aria-hidden>
-          In chapter {number} · {formatTimestamp(chapter.startMs)}
-        </span>
-        <span className="sr-only">
-          In chapter {number}, {chapter.title}. {watch ? 'Watch' : 'Read the transcript'} from{' '}
-          {formatTimestampLong(chapter.startMs)}
-        </span>
-      </Link>
-    </p>
-  )
-}
-
 export interface StudyConceptProps {
   lecture: LectureResponse
   concept: BriefConcept
@@ -104,13 +76,30 @@ export interface StudyConceptProps {
   /** One player at a time on the page: the page owns which block is open. */
   open: OpenPart
   onOpen: (part: OpenPart) => void
+  /** h3 under a chapter heading (F9.10), h2 in the flat list. */
+  headingLevel?: 2 | 3
 }
 
-export function StudyConcept({ lecture, concept: c, onPage, open, onOpen }: StudyConceptProps) {
+export function StudyConcept({
+  lecture,
+  concept: c,
+  onPage,
+  open,
+  onOpen,
+  headingLevel = 2,
+}: StudyConceptProps) {
   const headingId = useId()
+  const Heading = headingLevel === 3 ? 'h3' : 'h2'
   const playable = canWatch(lecture) && lecture.media !== null
-  const chapterNo = c.chapter ? lecture.chapters.findIndex((ch) => ch.id === c.chapter?.id) + 1 : 0
   const firstMoment = c.clips[0]?.startMs
+  /** A cited moment plays in this block when it is in this lecture; else it links out. */
+  const seekable = (lectureId: string) =>
+    playable && lectureId === lecture.id ? (ms: number) => onOpen(ms) : undefined
+  // A ▶ in an open depth panel opens the player above it, possibly off-screen: bring it in.
+  const playerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (open !== null) playerRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [open])
 
   return (
     <article
@@ -120,9 +109,9 @@ export function StudyConcept({ lecture, concept: c, onPage, open, onOpen }: Stud
     >
       <header className="space-y-1.5">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <h2 id={headingId} tabIndex={-1} className="text-title-md outline-none">
+          <Heading id={headingId} tabIndex={-1} className="text-title-md outline-none">
             {c.name}
-          </h2>
+          </Heading>
           <MasteryBadge
             size="sm"
             state={c.mastery.state}
@@ -138,25 +127,24 @@ export function StudyConcept({ lecture, concept: c, onPage, open, onOpen }: Stud
         <ul className="marker:text-muted-foreground text-body list-disc space-y-2 pl-5">
           {c.keyPoints.map((k) => {
             const source = k.sources[0]
-            const here = playable && source?.lectureId === lecture.id
             return (
-              <li key={k.id} className="text-pretty">
-                {k.text}{' '}
-                {source && lecture.hasTimestamps && (
-                  <SourceRef
-                    compact
-                    source={source}
-                    onSeek={here ? (ms) => onOpen(ms) : undefined}
-                  />
-                )}
+              <li key={k.id}>
+                <div className="flex items-baseline justify-between gap-4">
+                  <span className="min-w-0 break-words text-pretty">{k.text}</span>
+                  {source && lecture.hasTimestamps && (
+                    <SourceRef
+                      compact
+                      quiet
+                      source={source}
+                      onSeek={seekable(source.lectureId)}
+                      className="shrink-0"
+                    />
+                  )}
+                </div>
               </li>
             )
           })}
         </ul>
-      )}
-
-      {c.chapter && chapterNo > 0 && (
-        <ChapterLink lecture={lecture} chapter={c.chapter} number={chapterNo} />
       )}
 
       <div className="flex flex-wrap items-center gap-2">
@@ -168,12 +156,11 @@ export function StudyConcept({ lecture, concept: c, onPage, open, onOpen }: Stud
             onClick={() => onOpen(open === 'clips' ? null : 'clips')}
           >
             {playable ? <Play aria-hidden /> : <FileText aria-hidden />}
-            {playable ? 'Watch this part' : 'Read this part'}
-            {playable && firstMoment !== undefined && (
-              <span className="text-muted-foreground font-normal">
-                · from {formatTimestamp(firstMoment)}
-                {c.clipMs > 0 && ` · ${clipLength(c.clipMs)}`}
-              </span>
+            {playable && firstMoment !== undefined
+              ? `Watch from ${formatTimestamp(firstMoment)}`
+              : 'Read this part'}
+            {playable && c.clipMs > 0 && (
+              <span className="text-muted-foreground font-normal">· {clipLength(c.clipMs)}</span>
             )}
           </Button>
         )}
@@ -187,18 +174,34 @@ export function StudyConcept({ lecture, concept: c, onPage, open, onOpen }: Stud
         )}
       </div>
 
-      {open !== null &&
-        (playable ? (
-          <ClipPlayer
-            key={String(open)}
-            lecture={lecture}
-            title={`Lecture clip: ${c.name}`}
-            clips={open === 'clips' ? c.clips : null}
-            startMs={open === 'clips' ? undefined : open}
-          />
-        ) : (
-          <ClipText lectureId={lecture.id} clips={c.clips} />
-        ))}
+      <div ref={playerRef} className="scroll-my-[calc(var(--topbar-height)+1rem)] empty:hidden">
+        {open !== null &&
+          (playable ? (
+            <ClipPlayer
+              key={String(open)}
+              lecture={lecture}
+              title={`Lecture clip: ${c.name}`}
+              clips={open === 'clips' ? c.clips : null}
+              startMs={open === 'clips' ? undefined : open}
+            />
+          ) : (
+            <ClipText lectureId={lecture.id} clips={c.clips} />
+          ))}
+      </div>
+      <p role="status" className="sr-only">
+        {typeof open === 'number' && playable ? `Player opened at ${formatTimestamp(open)}` : ''}
+      </p>
+
+      {c.depth && (
+        <StudyDepth
+          depth={c.depth}
+          courseId={lecture.courseId}
+          onPage={onPage}
+          seekable={seekable}
+          name={c.name}
+          headingLevel={headingLevel === 3 ? 4 : 3}
+        />
+      )}
     </article>
   )
 }

@@ -30,7 +30,7 @@ const ROWS: ReadonlyArray<{ label: ReactNode; cells: readonly [Cell, Cell, Cell,
   },
   { label: 'Feedback links to the lecture moment', cells: [true, 'Some', true, false] },
   { label: 'Mastery needs two kinds of evidence', cells: [true, false, false, false] },
-  { label: 'Notes, summaries, flashcards', cells: ['— by design', true, true, 'Some'] },
+  { label: 'Flashcards', cells: ['— by design', true, true, 'Some'] },
 ]
 
 function CellContent({ cell }: { cell: Cell }) {

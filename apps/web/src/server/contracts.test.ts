@@ -123,9 +123,9 @@ describe('response contracts never expose secret fields', () => {
     expect(leaks).toEqual([])
   })
 
-  it('the Study brief shows key points (F9.8)', () => {
+  it('the Study brief shows key points (F9.8) and depth (F9.13)', () => {
     expect(collectKeys(contracts.BriefResponse)).toEqual(
-      expect.arrayContaining(['$.concepts[].keyPoints']),
+      expect.arrayContaining(['$.concepts[].keyPoints', '$.concepts[].depth']),
     )
   })
 })

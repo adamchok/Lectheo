@@ -14,6 +14,8 @@ export interface SourceRefProps {
   onSeek?: (ms: number) => void
   /** Hide the excerpt and show only "▶ 12:41". */
   compact?: boolean
+  /** Muted mono-sm time (the Study brief's right-aligned key point times, F9.12). */
+  quiet?: boolean
   className?: string
 }
 
@@ -24,7 +26,13 @@ const baseClass =
  * Grounding link "▶ 12:41 · excerpt" (Architecture §7). Seeks the player when one is
  * registered; otherwise opens the transcript panel, falling back to the lecture page.
  */
-export function SourceRef({ source, onSeek, compact = false, className }: SourceRefProps) {
+export function SourceRef({
+  source,
+  onSeek,
+  compact = false,
+  quiet = false,
+  className,
+}: SourceRefProps) {
   const player = usePlayer()
   const seek = onSeek ?? player.seek
   // WCAG 2.5.3: the accessible name contains the visible "12:41" (no aria-label override).
@@ -32,9 +40,22 @@ export function SourceRef({ source, onSeek, compact = false, className }: Source
 
   const content = (
     <>
-      <Play aria-hidden className="text-primary size-3.5 shrink-0 translate-y-px fill-current" />
+      <Play
+        aria-hidden
+        className={cn(
+          'size-3.5 shrink-0 translate-y-px fill-current',
+          quiet ? 'text-muted-foreground group-hover:text-foreground' : 'text-primary',
+        )}
+      />
       <span className="sr-only">{verb}</span>
-      <span className="text-primary font-mono text-[0.8125rem] font-medium tabular-nums">
+      <span
+        className={cn(
+          'tabular-nums',
+          quiet
+            ? 'text-mono-sm text-muted-foreground group-hover:text-foreground'
+            : 'text-primary font-mono text-[0.8125rem] font-medium',
+        )}
+      >
         {formatTimestamp(source.startMs)}
       </span>
       {!compact && source.excerpt && (

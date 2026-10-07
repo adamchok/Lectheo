@@ -69,18 +69,18 @@ interface DraftRequest {
   spotFlaw: number
 }
 
-const chunk = <T>(list: readonly T[], size: number): T[][] =>
+export const chunk = <T>(list: readonly T[], size: number): T[][] =>
   Array.from({ length: Math.ceil(list.length / size) }, (_, i) =>
     list.slice(i * size, (i + 1) * size),
   )
 
 /** Parallel model calls per step, to stay under the gateway's rate limits. */
-const MAX_PARALLEL_CALLS = 4
+export const MAX_PARALLEL_CALLS = 4
 /** The diagnostic's follow-up rule needs two verified MCQs on a concept. */
 const MIN_VERIFIED_MCQS = 2
 
 /** Promise.all with at most `limit` calls in flight; results keep the input order. */
-async function mapLimit<T, R>(list: readonly T[], limit: number, fn: (x: T) => Promise<R>) {
+export async function mapLimit<T, R>(list: readonly T[], limit: number, fn: (x: T) => Promise<R>) {
   const results: R[] = new Array(list.length)
   let next = 0
   const worker = async () => {
@@ -94,7 +94,7 @@ async function mapLimit<T, R>(list: readonly T[], limit: number, fn: (x: T) => P
 }
 
 /** AI context billed to the lecture's owner (llm_calls.user_id), pipeline quota rules. */
-async function pipelineAi(db: DbLike, lectureId: string) {
+export async function pipelineAi(db: DbLike, lectureId: string) {
   const { ownerId } = await loadLecture(db, lectureId)
   return aiContext({ userId: ownerId, lectureId, intake: true, skipQuota: true, db })
 }

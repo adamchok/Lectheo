@@ -45,6 +45,7 @@ import {
   type DistractorMeta,
   type HintsSecret,
   type ItemVerification,
+  type ConceptDepth,
   type KeyPoints,
   type LectureError,
   type LectureMediaJson,
@@ -246,6 +247,8 @@ export const concepts = pgTable(
     summary: text('summary').notNull(),
     /** Shown in the Study brief (ADR-009 amended); frozen into rubric_snapshot for teach-back. */
     keyPoints: jsonb('key_points').$type<KeyPoints>().notNull(),
+    /** F9.13 "Explain in depth" (not secret); written by explainConcepts for its first lecture. */
+    depth: jsonb('depth').$type<ConceptDepth>(),
     firstLectureId: uuid('first_lecture_id').references(() => lectures.id, {
       onDelete: 'set null',
     }),
