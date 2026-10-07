@@ -157,6 +157,10 @@ Three columns:
 - **Audio only.** Upload the audio; Lectheo transcribes it, then deletes the audio.
 - **A transcript.** Paste or upload the text. Without timestamps you can't mark moments, but you still get the map, the diagnosis and practice.
 
+*Ship when YouTube lectures (F10) are live: add a bullet "**A YouTube video.** Paste the link. It plays through YouTube, and Lectheo builds the map from its transcript."*
+
+*Ship when Study mode (F9) is live: in the hero lead and How it works step 1, change "Mark while you watch" to "Read the brief or watch. Mark what's unclear.", and add the FAQ "Do I have to watch the whole lecture?" → "No. Study the brief in a few minutes, watch only the parts you got stuck on, then get tested."*
+
 **Caption:** With a Google account, up to 3 lectures a day, each up to 2 hours.
 
 ---

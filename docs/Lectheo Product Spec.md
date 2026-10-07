@@ -234,6 +234,37 @@ Activities are ordered by the recommender: confident mistakes → red → marked
 | F8.4 | **AI unavailable mode:** if the AI budget runs out, practice on already-prepared items and the map still work, and new processing pauses with a clear message. |
 | F8.5 | The README states which providers receive data (transcription, AI models) and what is stored. |
 
+### F9. Study mode — Must
+
+*Decided 7 Oct 2026, to be built.* Students don't want to sit through a 2-hour lecture before they can be tested. Study mode lets them take in a lecture in minutes, mark what's unclear, then go straight to the diagnosis.
+
+| ID | Requirement | Priority |
+|---|---|---|
+| F9.1 | Every lecture with a map has a **Study** view: a reading page (the lecture page's **Study \| Watch \| Transcript** switch, Study selected by default once the map exists). It is available from `map_ready`. | Must |
+| F9.2 | Concepts appear in **learning order**: prerequisites first (the map's *depends on* links), ties by first appearance in the lecture. Each concept shows its name and mastery badge, "Builds on: …" links to its prerequisites, the one-line summary, its **key points** (each with a `▶ 12:41` lecture link) and **Watch this part** with the total clip time. | Must |
+| F9.3 | **Watch this part** plays the concept's source moments (neighbouring moments merged into short ranges) in an **inline mini player** inside the block. Lectures without media show the transcript excerpt instead. | Must |
+| F9.4 | **I'm lost here** and **Important** on each concept create normal markers linked **directly to that concept** (no time-window alignment), with capture `study`, at the concept's first source moment. They feed the diagnosis like watch-mode markers. Hidden for lectures without timestamps. | Must |
+| F9.5 | The header shows "N concepts · about M min to read · H min of video". A **Test me** button (the diagnostic) is always visible and ends the page: "Ready? Find out what you misunderstood." | Must |
+| F9.6 | No reading progress is tracked: no ticks, percentages or "read" states. Marks and the diagnostic are the only signals. | Must |
+| F9.7 | The next-step card offers **Study** first for a lecture the student hasn't started ("Study Lecture 5 · about 5 min"), with **Watch** second and a quiet **Skip to the diagnostic**. | Must |
+| F9.8 | **Key points are shown to students.** This changes ADR-009: key points stop being secret. Teach-back still grades against them (now "explain it in your own words"); answer keys, flaws, rubrics, hints and leak keywords stay hidden. Mastered still needs two different activity types. | Must |
+| F9.9 | No new AI text: the brief uses the existing summary and key points, so it costs nothing per lecture. | Must |
+
+### F10. YouTube lectures — Should (after a spike)
+
+*Decided 7 Oct 2026, to be built only if the spike passes.* Students learn from long YouTube lectures too. They paste a link and get the same map, brief, diagnosis and practice.
+
+| ID | Requirement | Priority |
+|---|---|---|
+| F10.1 | **Spike first** (no product code): can a Gemini model read a public YouTube URL through Vercel AI Gateway (else a direct Google AI key with its own budget) and return a timestamped transcript? Pass if, on CS50 Lecture 3 against its official subtitles, 95% of cue times are within 5 s, word errors are under 10%, cost is ≤ $0.50 per hour of video and a 60-minute video is ready in about 5 minutes. Results go to `docs/spikes/youtube-transcripts.md`. If it fails, F10 is dropped. | Must (gate) |
+| F10.2 | **Add lecture → From YouTube**: paste any YouTube link form (`watch?v=`, `youtu.be`, `&t=`, playlist, mobile); only the video id is kept. A preview card shows thumbnail, title, channel and duration (YouTube Data API). | Should |
+| F10.3 | Checked **before any AI spend**: public or unlisted, embedding allowed, not live or upcoming, at least 5 minutes, English audio (v1), within the tier limit (Google ≤ 2 h; sample ≤ 20 min). Each refusal names the reason. Embedding disabled → refused. | Should |
+| F10.4 | A consent tick, "I'm using this video for my own study", then the lecture is created with source `youtube` and processed. It counts as one lecture against the daily quota (sample accounts included: 1 per day). | Should |
+| F10.5 | The pipeline transcribes the video in 10–15 minute chunks with Gemini, checks the result (cues in order, inside the video, no large gaps) and continues with the normal steps. No speech → the step fails with "We couldn't find speech in this video" and the quota is refunded. | Should |
+| F10.6 | Transcripts of public videos are **cached by video id** and reused across students; each student still gets their own map, marks and practice. | Should |
+| F10.7 | Watch and Study use the YouTube embed (marks work as in the library). If the embed fails, show "Open on YouTube"; there is no audio fallback. The video is never downloaded. | Should |
+| F10.8 | Privacy page and README list Google (Gemini, transcription of YouTube links) and the YouTube Data API. | Should |
+
 ---
 
 ## 4. User journeys
@@ -269,6 +300,10 @@ Sign in with Google → **empty first-run dashboard** → Add your first lecture
 Sign in with Google → **Record live** in the lecture hall and tap L / I → stop and upload → map in a few minutes → diagnostic → practice. *(Record live is a cut Should; until it ships, this student uploads the audio afterwards and gets the map without markers.)*
 
 ---
+
+### 4.4 Student with a long lecture (Study mode, *(decided 7 Oct 2026, to be built)*)
+
+Sign in → add the lecture (recording + .vtt, audio, transcript, or a YouTube link once F10 ships) → **Study** the brief in ~15 minutes, tapping *I'm lost here* on two concepts → watch only those two clips → **Test me** → the diagnostic starts with the marked concepts and finds a confident mistake → Spot the flaw → Mastered over the following days. The full video is never watched end to end.
 
 ## 5. Value proposition
 
@@ -306,6 +341,8 @@ Full analysis, profiles, feature matrix and sources: **[[Lectheo Competition]]**
 
 **In scope (Must):** sign-in page (Google + sample account); dashboard; CS50 library with watch mode; import recording + transcript; audio and transcript upload; markers; concept map + list view; adaptive diagnostic; spot the flaw; teach-back; Socratic feedback; mastery map; consent, deletion and limits.
 
+**Decided 7 Oct 2026, to be built:** Study mode ([[#F9. Study mode — Must|F9]], Must); YouTube lectures ([[#F10. YouTube lectures — Should (after a spike)|F10]], Should, only if the spike passes).
+
 **Should (in order):** record live (slim) → Stump the AI (beta) → transfer problems → slides as extra input → transcript correction → own-course dedupe → persona picker.
 
 **Out of scope (Later):**
@@ -317,7 +354,7 @@ Full analysis, profiles, feature matrix and sources: **[[Lectheo Competition]]**
 - Video upload; audio extraction from video in the browser
 - Re-marking on replay; aligning marks made during a live Teams meeting with a later recording
 - Picture-in-picture controller; slide or whiteboard photos
-- Arbitrary YouTube URLs; Microsoft 365 / Panopto integrations
+- Microsoft 365 / Panopto integrations
 - Points, XP, leaderboards, badges, streaks
 - Cross-course maps
 - Voice as the main interface
@@ -362,6 +399,8 @@ Full analysis, profiles, feature matrix and sources: **[[Lectheo Competition]]**
 - [ ] Final tagline.
 - [ ] Any evidence from 3–5 real students that they would tap "I'm lost" during a lecture? (Strengthens Real-World Impact.)
 
+*Decided on 7 Oct 2026:* **Study mode** (F9): a lecture brief from the existing summaries and key points, in prerequisite order, with inline clips, *I'm lost here* marks linked straight to concepts (capture `study`), no progress tracking, Study before Watch in the next step, and **key points shown to students** (ADR-009 amended). **YouTube lectures** (F10): spike first; if it passes, Gemini transcribes public YouTube links (direct Google key if the gateway can't), transcripts cached per video, English only, embed-disabled videos refused, sample accounts allowed 1 per day ≤ 20 min.
+
 *Decided on 7 Oct 2026:* Teams `.docx` import is dropped: real Teams exports carry one timestamp per speaker turn, which breaks marker alignment and the lecture links. Teams always offers `.vtt` from the same menu, so `.docx` adds no reach. A `.docx` upload is refused with a pointer to the `.vtt`.
 
 *Decided on 6 Oct 2026:* self-serve account deletion · rename and delete own courses · Teams `.docx` import becomes Must (reversed 7 Oct, see above) · record live stays cut · app usable on phones but desktop-first · code licensed MIT · launch on `lectheo.vercel.app` (no custom domain) · no analytics · the author reviews the eval labels before submission.
@@ -384,6 +423,13 @@ Recorded at submission (6 Oct 2026). Each deviation is deliberate; evidence is i
 | F7.1 | Library processed from the official subtitles **and slides** | Built from the official timestamped subtitles only (`scripts/seed-library.ts`). | Slides input is a Should in the decision log (§10). Every concept and item cites subtitle timestamps, so grounding is checkable without slides. |
 
 Built on 6 Oct 2026: F0.4 (the dashboard follows the student's own course), F0.6 (self-serve *Delete account*), F0.7 (rename and delete own courses; the CS50 library is visible to sample and owner accounts only), F0.8 (first-run screen), F0.9 (processing steps on the dashboard), F0.10–F0.12 (why, how long, payoff, *Also worth doing*, no dead end) and F8.2 (delete course and delete account).
+
+### Decided 7 Oct 2026, to be built
+
+| Req | Item |
+|---|---|
+| F9 | Study mode (lecture brief) |
+| F10 | YouTube lectures, only if the F10.1 spike passes |
 
 ### Should items: built or cut
 

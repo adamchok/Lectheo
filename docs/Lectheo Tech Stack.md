@@ -75,6 +75,7 @@ All slugs live in `packages/ai/src/models.ts` and were checked against the live 
 | `answerer` | The AI's answer in Stump the AI | `anthropic/claude-sonnet-5.5` | medium effort | `google/gemini-3.8-flash` |
 | `guard` | Leak check on author replies | `typesafe-ai/jev` | 2 boolean questions, timeout 800 ms | `guard-escalation` |
 | `guard-escalation` | Gray zone (0.3–0.7) or Jev unavailable | `openai/gpt-6-luna` | low effort, boolean + reason | canned deflection (fail closed) |
+| `transcriber` *(decided 7 Oct 2026, to be built)* | YouTube lecture transcripts ([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]]) | a Gemini model chosen by the spike | low media resolution, 10–15 min clips, structured output | none (the step fails with Retry) |
 | `vision` *(Should, unused: slides input not built)* | Slides PDF pages that have no text layer | `google/gemini-3.8-flash` | low thinking | `anthropic/claude-sonnet-5.5` |
 
 > **Why the verifier and judge aren't Claude:** generation, personas and the Stump answerer are Claude. A different family checking and grading avoids correlated blind spots and self-preference bias.
@@ -226,6 +227,7 @@ Format: context → decision → consequences. All **Accepted, 4 Oct 2026** (v2 
   - Spot-flaw verdict and location are checked in code. Only the correction goes to the judge.
   - Rubrics are frozen into `activities.rubric_snapshot`.
   - Author replies are capped at 150 tokens and leak-checked before display ([[#ADR-013 · TypeSafe Jev as the leak check, with an LLM escalation|ADR-013]]).
+  - **Amended 7 Oct 2026 *(decided 7 Oct 2026, to be built)*:** `concepts.key_points` stop being secret, because the Study brief ([[Lectheo Product Spec#F9. Study mode — Must|F9]]) shows them. Teach-back still grades against them via `rubric_snapshot`. Everything else above stays hidden.
 - **Consequences:**
   - \+ Leak risk reduced structurally.
   - − Author replies aren't streamed (~2.5–3.5 s).
@@ -299,6 +301,18 @@ Format: context → decision → consequences. All **Accepted, 4 Oct 2026** (v2 
   - \+ Consistent screens and a product the demo can show without apology.
   - − About 5 kB of JavaScript for Motion's first load; the feature bundle loads asynchronously.
 - **Rejected:** GSAP, react-spring, Lottie (weight and style); View Transitions (still experimental in Next.js).
+
+### ADR-017 · YouTube lectures through Gemini, never by downloading *(decided 7 Oct 2026, to be built)*
+- **Context:** Students study from long YouTube lectures. Every Lectheo feature needs a timestamped transcript, and YouTube's captions can't be used: scraping breaks YouTube's terms and is blocked from cloud servers, the Data API only lets owners download captions, and downloading audio breaks the terms too.
+- **Decision:**
+  - A Gemini model reads the public YouTube URL (Google's own feature) and returns timestamped cues, in 10–15 minute clips. Through the AI Gateway if it supports YouTube inputs, otherwise a direct Google AI key with its own budget.
+  - The YouTube Data API checks the video (public or unlisted, embeddable, not live, length, language) before any AI spend.
+  - Transcripts are cached by video id; the video only ever plays through the embed.
+  - Gated by a spike ([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]].1): drift, word errors and cost measured against CS50's official subtitles.
+- **Consequences:**
+  - \+ No files to find; creators keep their views; no media handling on our side.
+  - − Depends on one Google feature; quality is measured, not assumed. English only in v1.
+- **Rejected:** caption scraping, the YouTube captions API, downloading audio for AssemblyAI.
 
 ---
 

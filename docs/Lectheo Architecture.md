@@ -164,6 +164,8 @@ The sample account is **lived-in**: L3 practiced (mostly green/amber), L4 with a
 | **B. Import** | local file → `<video src=objectURL>` | `video.currentTime` | transcript file (.vtt / .srt) + markers | `parseTranscript` |
 | **C. Live (Should, *not built*)** | `MediaRecorder` (Opus codec, 32 kbps, 10 s pieces) | elapsed media time = pieces × 10 s + offset into the current piece | audio (signed URL) + markers | `transcribe` |
 | **D. Upload** | audio file, or transcript / text | none (no markers) | audio or transcript | `transcribe` or `parseTranscript` |
+| **E. Study** *(decided 7 Oct 2026, to be built)* | the brief's inline clips | none: the mark names its concept; `t_ms` = the concept's first source moment | markers only (capture `study`) | none: the lecture is already processed |
+| **F. YouTube** *(decided 7 Oct 2026, to be built)* | YouTube IFrame embed | `player.getCurrentTime()` | the link only | `transcribeVideo` |
 
 ```mermaid
 sequenceDiagram
@@ -199,6 +201,8 @@ Workflow `processLecture(lectureId, from?)`. Every step is a `'use step'` functi
 ```mermaid
 flowchart TD
     start(["POST /lectures/{id}/process<br/>guarded claim → status=processing"]) --> src{"source"}
+    src -- "youtube (to be built, F10)" --> tv["transcribeVideo<br/>cache by video id · Gemini 10–15 min clips · validate cues"]
+    tv --> seg
     src -- "import / transcript" --> pt["parseTranscript<br/>VTT/SRT/TXT · strip speakers · cap tokens by tier"]
     src -- "live / audio" --> kt["buildKeyterms<br/>from slides (Should, not built: no keyterms sent)"]
     kt --> sub["submitTranscription<br/>reserve stt_job_id first · reuse if set"]
@@ -353,7 +357,7 @@ concept           = argmax overlap(markerSegments, concept.occurrence segments)
                     ties → concept with most occurrences in the window
                     none → "unlinked" (shown on the lecture timeline)
 ```
-Runs on write for processed lectures, and in the pipeline otherwise. Window sizes are tuned on the CS50 lectures.
+Runs on write for processed lectures, and in the pipeline otherwise. Study marks ([[Lectheo Product Spec#F9. Study mode — Must|F9]], *(decided 7 Oct 2026, to be built)*) skip alignment: they name their concept. Window sizes are tuned on the CS50 lectures.
 
 ### 6.2 Mastery
 Input: the user's attempts for a concept (excluding `invalid`). *Independent* = diagnostic with confidence `sure`, or a practice attempt with `assisted = false`.
@@ -413,6 +417,7 @@ nothing at all left → add_lecture ("Add Lecture N+1" in an own course / "Add y
 | `/lectures/[id]` | Processing progress (2 s polling) and transcript |
 | `/lectures/[id]/diagnostic` | Confidence-first questions, instant feedback, results |
 | `/activities/[id]` | Spot the flaw / Teach-back / Transfer / Stump (beta) |
+| `/lectures/[id]` Study *(decided 7 Oct 2026, to be built)* | The lecture page gains a **Study \| Watch \| Transcript** switch; Study ([[Lectheo Product Spec#F9. Study mode — Must|F9]]) is the reading brief with inline clips, concept marks and *Test me* |
 
 Signed-in pages share one layout (`app/(app)/layout.tsx`) with `error.tsx` and `not-found.tsx`, so errors render inside the shell. The visual language, the app shell, loading states and motion rules are specified in [[Lectheo Design System]].
 
@@ -468,6 +473,7 @@ Signed-in pages share one layout (`app/(app)/layout.tsx`) with `error.tsx` and `
 - Consent checkbox before any recording or upload.
 - Uploaded audio is deleted after transcription, and remote transcripts are deleted at AssemblyAI. Imported video never leaves the device.
 - Speaker names are stripped from imported transcripts.
+- YouTube lectures *(decided 7 Oct 2026, to be built)*: only the video link goes to Google for transcription; the video is never downloaded; the cached transcript of a public video holds no student data.
 - `DELETE /lectures/{id}` cascades to derived data and Storage. Orphaned concepts are removed. `DELETE /courses/{id}` does the same for every lecture in a course, and `DELETE /me` deletes a Google account's courses, Storage objects, counters, profile and auth user (each step idempotent, so a retry finishes a partial deletion). `llm_calls` rows stay, with a bare user id, for budget accounting.
 - Sample accounts are purged after 24 h.
 - Secrets live only in Vercel env vars.
@@ -523,5 +529,6 @@ Signed-in pages share one layout (`app/(app)/layout.tsx`) with `error.tsx` and `
 | 5 | Teams `.docx` transcript format varies | Teams .docx dropped (7 Oct): timestamps are per speaker turn; .vtt is the Teams format we support. A `.docx` upload gets `422` with a pointer to the `.vtt` |
 | 6 | Long recordings exceed 50 MB | 32 kbps Opus. 2 h cap. Suggest transcript import |
 | 7 | YouTube embed blocked (school network or privacy settings) | Detect the player error and fall back to CS50's official lecture MP3 (CC-licensed, same timeline as the subtitles) in a local `<audio>` player |
+| 10 | YouTube transcription quality or cost *(decided 7 Oct 2026, to be built)* | The F10.1 spike measures timestamp drift, word errors and cost against CS50's official subtitles before any product code; F10 is dropped if it fails |
 | 8 | Name collision | Resolved: renamed to **Lectheo**. Register lectheo.com and the GitHub org before submission |
 | 9 | The demo looks like a prototype | [[Lectheo Design System]]: one token set, a SaaS app shell and a product landing page, built after the features froze |

@@ -82,6 +82,8 @@ Part of the architecture set: [[Lectheo Architecture]] · **API Spec** · [[Lect
   /lectures/{id}/transcript/segments/{idx}  PATCH   (Should, not built)
   /lectures/{id}/slides-upload-url  POST           (Should, not built)
   /lectures/{id}/process            POST
+  /lectures/{id}/brief              GET            Study mode brief            (to be built, F9)
+  /youtube/preview?url=             GET            YouTube link check          (to be built, F10)
   /lectures/{id}/markers            GET POST
   /lectures/{id}/markers/{markerId} DELETE        (undo)
   /lectures/{id}/diagnostic         POST
@@ -188,7 +190,7 @@ Examples:
 ```json
 { "id": "uuid-v7", "courseId": "…", "title": "Week 6 – Trees", "source": "import" }
 ```
-`source`: `import` | `live` | `audio` | `transcript`. `library` can't be created at runtime. *As built: `live` (the recorder, Should) is not built and returns `404`.*
+`source`: `import` | `live` | `audio` | `transcript`. `library` can't be created at runtime. *(decided 7 Oct 2026, to be built)*: `youtube` with `youtubeUrl` ([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]]); the server re-runs the preview checks and stores `media.youtubeId`. *As built: `live` (the recorder, Should) is not built and returns `404`.*
 → `201 lecture { id, status: "draft" }`. A replay with the same `id` returns the existing lecture.
 
 ### `GET /lectures/{id}`
@@ -235,6 +237,14 @@ For **library and already-processed** lectures, markers are linked to concepts *
 
 ### `DELETE /lectures/{id}/markers/{markerId}`
 Undo (soft delete) → `204`.
+
+Study marks *(decided 7 Oct 2026, to be built)*: `{ id, kind, capture: "study", conceptId }`. The server sets `tMs` to the concept's first source moment in this lecture and links the marker to `conceptId` directly. `409 invalid_state` for lectures without timestamps.
+
+### `GET /lectures/{id}/brief` *(decided 7 Oct 2026, to be built)*
+The Study brief ([[Lectheo Product Spec#F9. Study mode — Must|F9]]). `200 { lectureId, readMinutes, videoMinutes, concepts: [{ id, name, mastery: { state, confidentMistake }, prerequisites: [{ id, name }], summary, keyPoints: [{ id, text, sources: [SourceRef] }], clips: [{ startMs, endMs }], clipMs, marks: { lost, important } }] }`. Concepts in learning order (prerequisites first, then first appearance). Available from `map_ready`. `readMinutes` = words ÷ 200, rounded up. No AI calls.
+
+### `GET /youtube/preview?url=` *(decided 7 Oct 2026, to be built)*
+([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]]) `200 { videoId, title, channel, durationMs, thumbnailUrl, ok, reason? }`. `reason`: `not_found` · `private` · `embed_disabled` · `live` · `too_short` · `too_long` (tier limit) · `not_english`. Uses the YouTube Data API (`videos.list`, server key); no AI spend.
 
 ### `GET /lectures/{id}/markers`
 `200 { data: [{ id, kind, tMs, capture, conceptIds[] }] }`. Only the caller's markers.
@@ -360,7 +370,7 @@ Anonymous sign-ins enabled. Supabase's per-IP limit is **raised from the default
 ### Cloudflare Turnstile
 Widget on the sign-in page. The server verifies the token via `POST https://challenges.cloudflare.com/turnstile/v0/siteverify`.
 
-### YouTube (watch mode, library only)
+### YouTube (watch mode: library; *(decided 7 Oct 2026, to be built)*: `youtube` lectures and Study clips)
 Embedded with the **IFrame Player API** (`youtube-nocookie.com`). The client reads `getCurrentTime()` when L or I is pressed. Video is never downloaded or re-hosted. If the embed fails, the player falls back to CS50's official MP3 (`media.fallbackAudioUrl`) in a local `<audio>` element on the same timeline.
 
 ### AssemblyAI (only for `live` and `audio` sources)
@@ -381,6 +391,7 @@ Embedded with the **IFrame Player API** (`youtube-nocookie.com`). The client rea
 | Decisions (Jev) | `experimental_evaluate({ model: 'typesafe-ai/jev', state, questions })` (`ai` ≥ 7.0.105), used by the leak check |
 | Caching | Anthropic prompt caching set explicitly with `providerOptions.anthropic.cacheControl` on the lecture-context block (only worth it above ~1–2k tokens) |
 | Models by role | `reasoner`/`persona`/`answerer`: `anthropic/claude-sonnet-5.5` · `reasoner-premium` (library seed only): `anthropic/claude-opus-5.5` · `verifier`/`judge`: `openai/gpt-6.1-sol` · `judge` fallback: `google/gemini-3.8-flash` · `vision` (Should, unused: slides not built): `google/gemini-3.8-flash` · `guard`: `typesafe-ai/jev` · `guard-escalation`: `openai/gpt-6-luna`. See [[Lectheo Tech Stack#Model routing table]] |
+| YouTube transcription *(decided 7 Oct 2026, to be built)* | ([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]]) a Gemini model reads the public YouTube URL in 10–15 min clips (video start/end offsets, low media resolution) and returns `[{ startMs, endMs, text }]`. Through the gateway if it passes YouTube inputs, otherwise a direct Google AI key with its own budget (decided by the spike) |
 | Errors | 402 `quota_for_entity_exceeded` → set `ai_degraded`, return `503 ai_paused` · 429 → backoff · 5xx → 1 retry, then the role's fallback model |
 
 ### Supabase (provisioned through the Vercel Marketplace)

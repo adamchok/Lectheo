@@ -93,7 +93,7 @@ Index: `(owner_id)`.
 | `course_id` | uuid FK → courses ON DELETE CASCADE | |
 | `title` | text | |
 | `seq` | int | order within course |
-| `source` | enum | `library`, `import`, `live`, `audio`, `transcript` |
+| `source` | enum | `library`, `import`, `live`, `audio`, `transcript`. *(decided 7 Oct 2026, to be built)*: `youtube` ([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]]) |
 | `status` | enum | `draft` → `uploading` → `processing` → `map_ready` → `ready`, or `failed` |
 | `progress` | jsonb | `{step, done, total}` for the polling UI |
 | `media` | jsonb null | library: `{youtubeId, startMs, endMs}`. Import: `{localFileName, durationMs}` (metadata only; the file stays on the device) |
@@ -152,7 +152,7 @@ Edits never re-segment, so citations stay stable.
 | `user_id` | uuid FK → profiles ON DELETE CASCADE | |
 | `kind` | enum `lost`, `important` | |
 | `t_ms` | int | media time |
-| `capture` | enum `watch`, `live` | |
+| `capture` | enum `watch`, `live` | *(decided 7 Oct 2026, to be built)*: `study` ([[Lectheo Product Spec#F9. Study mode — Must|F9]]), a mark made on a concept in the brief; linked to that concept directly (`marker_concepts.overlap_score = 1`), `t_ms` = the concept's first source moment |
 | `deleted_at` | timestamptz null | undo within 5 s (soft delete) |
 | `created_at` | timestamptz | |
 
@@ -179,7 +179,7 @@ Index: `(concept_id)`.
 | `name` | text | |
 | `canonical_key` | text | normalized name. `UNIQUE (course_id, canonical_key)` |
 | `summary` | text | one grounded sentence |
-| `key_points` 🔒 | jsonb | 2–5 points with segment citations. The source for teach-back rubrics; never serialized to clients |
+| `key_points` 🔒 | jsonb | 2–5 points with segment citations. The source for teach-back rubrics; never serialized to clients. *(decided 7 Oct 2026, to be built)*: **no longer secret**: shown in the Study brief ([[Lectheo Product Spec#F9. Study mode — Must|F9]], ADR-009 amended); still frozen into `rubric_snapshot` for teach-back |
 | `first_lecture_id` | uuid FK ON DELETE SET NULL | |
 
 Index: `(course_id)`.
@@ -360,6 +360,16 @@ No prompt or answer text is stored here; the ledger is tokens, cost and outcome 
 | `count` | int | atomic `INSERT … ON CONFLICT DO UPDATE SET count = count + 1 RETURNING count`, so concurrent requests can't both slip under the limit |
 
 Windows older than 24 h are pruned on each sample sign-in.
+
+**`youtube_transcripts`** *(decided 7 Oct 2026, to be built)* ([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]]): a cache of transcripts of public YouTube videos, shared across students (the transcript of a public video is not personal data). Server-only, RLS deny-all.
+
+| Column | Type | Notes |
+|---|---|---|
+| `video_id` | text PK | the 11-character YouTube id |
+| `duration_ms` | int | from the YouTube Data API |
+| `cues` | jsonb | `[{ startMs, endMs, text }]`, validated (in order, inside the video) |
+| `model`, `prompt_version` | text | provenance |
+| `created_at` | timestamptz | |
 
 ---
 
