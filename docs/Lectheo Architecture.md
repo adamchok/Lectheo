@@ -242,8 +242,8 @@ sequenceDiagram
     participant DB
 
     S->>API: POST /lectures/{id}/diagnostic
-    API->>DB: plan 3–6 unseen verified items: lost → important → baseline (to be built, F3.9: one per chapter in turn)
-    Note over S,API: to be built (F3.10): results show coverage and offer a "rest" round, one item per untested concept, ≤ 8
+    API->>DB: plan 3–6 unseen verified items: lost → important → baseline (F3.9: one per chapter in turn)
+    Note over S,API: F3.10: results show coverage and offer a "rest" round, one item per untested concept, ≤ 8
     API-->>S: stems only
     loop each item
         S->>API: POST …/items/{item}/confidence {sure | unsure | guess | no_idea}
