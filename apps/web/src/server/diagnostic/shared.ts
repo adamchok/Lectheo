@@ -91,26 +91,40 @@ export async function loadResponses(db: DbLike, sessionId: string): Promise<Resp
 }
 
 /**
- * Verified diagnostic MCQs of this lecture the user has never seen: not used by any of their
- * activities, not planned in nor answered in any of their diagnostics, not in `excludeIds`.
- * Lowest variant first. Raw subqueries spell `"items"."id"` (Drizzle single-table gotcha).
+ * Items of this lecture, or of the lecture that introduced the item's concept once that lecture
+ * is `ready` (a recurring concept's questions live there; F3.10–F3.11). Never an unfinished
+ * lecture, so source links always open a finished one.
+ */
+export const fromLectureOrIntroducer = (lectureId: string) =>
+  sql`("items"."lecture_id" = ${lectureId} or exists (select 1 from concepts c
+        join lectures l on l.id = c.first_lecture_id
+        where c.id = "items"."concept_id" and l.id = "items"."lecture_id"
+        and l.status = 'ready'))`
+
+/**
+ * Verified diagnostic MCQs the user has never seen: not used by any of their activities, not
+ * planned in nor answered in any of their diagnostics, not in `excludeIds`. Scope: this lecture's
+ * items, or with `conceptIds` those concepts' items from this lecture or the one that introduced
+ * them (`fromLectureOrIntroducer`), this lecture's first. Then lowest variant first. Raw subqueries spell `"items"."id"` (Drizzle single-table gotcha).
  */
 export async function unseenMcqs(
   db: DbLike,
   userId: string,
   lectureId: string,
-  opts: { conceptId?: string; excludeIds?: readonly string[] } = {},
+  opts: { conceptIds?: readonly string[]; excludeIds?: readonly string[] } = {},
 ): Promise<{ itemId: string; conceptId: string }[]> {
   const exclude = opts.excludeIds ?? []
+  if (opts.conceptIds?.length === 0) return []
   return db
     .select({ itemId: items.id, conceptId: items.conceptId })
     .from(items)
     .where(
       and(
-        eq(items.lectureId, lectureId),
+        opts.conceptIds
+          ? and(inArray(items.conceptId, [...opts.conceptIds]), fromLectureOrIntroducer(lectureId))
+          : eq(items.lectureId, lectureId),
         eq(items.kind, 'diagnostic_mcq'),
         eq(items.status, 'verified'),
-        opts.conceptId ? eq(items.conceptId, opts.conceptId) : undefined,
         exclude.length > 0 ? not(inArray(items.id, [...exclude])) : undefined,
         sql`not exists (select 1 from activities a
               where a.user_id = ${userId} and a.item_id = "items"."id")`,
@@ -121,7 +135,12 @@ export async function unseenMcqs(
                   where r.session_id = s.id and r.item_id = "items"."id")))`,
       ),
     )
-    .orderBy(asc(items.variant), asc(items.createdAt), asc(items.id))
+    .orderBy(
+      sql`("items"."lecture_id" = ${lectureId}) desc`,
+      asc(items.variant),
+      asc(items.createdAt),
+      asc(items.id),
+    )
 }
 
 export interface MarkerCounts {

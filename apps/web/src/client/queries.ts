@@ -8,6 +8,7 @@ import {
   DiagnosticSessionResponse,
   StartDiagnosticResponse,
   type ConfidenceLevel,
+  type DiagnosticRound,
   CourseMapResponse,
   CreateActivityResponse,
   LectureResponse,
@@ -40,7 +41,8 @@ export const queryKeys = {
   lecture: (lectureId: string) => ['lectures', lectureId] as const,
   activity: (activityId: string) => ['activities', activityId] as const,
   // Not under ['lectures', id]: a prefix invalidation of the lecture must never re-POST a start.
-  diagnosticStart: (lectureId: string) => ['diagnostic-start', lectureId] as const,
+  diagnosticStart: (lectureId: string, round: DiagnosticRound = 'core') =>
+    ['diagnostic-start', lectureId, round] as const,
   diagnostic: (sessionId: string) => ['diagnostic', sessionId] as const,
   diagnosticResults: (sessionId: string) => ['diagnostic', sessionId, 'results'] as const,
 }
@@ -172,13 +174,13 @@ export function useTranscript(lectureId: string | undefined) {
 }
 
 /** POST /lectures/{id}/diagnostic: the active session or a new plan (idempotent per lecture). */
-export function useStartDiagnostic(lectureId: string) {
+export function useStartDiagnostic(lectureId: string, round: DiagnosticRound = 'core') {
   return useQuery({
-    queryKey: queryKeys.diagnosticStart(lectureId),
+    queryKey: queryKeys.diagnosticStart(lectureId, round),
     queryFn: ({ signal }) =>
       apiFetch(`/lectures/${lectureId}/diagnostic`, {
         method: 'POST',
-        body: {},
+        body: { round },
         schema: StartDiagnosticResponse,
         signal,
       }),

@@ -5,8 +5,14 @@ import { DiagnosticView } from '@/components/lecture/diagnostic-view'
 
 export const metadata: Metadata = { title: 'Diagnostic' }
 
-export default async function DiagnosticPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
+interface DiagnosticPageProps {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ round?: string | string[] }>
+}
+
+export default async function DiagnosticPage({ params, searchParams }: DiagnosticPageProps) {
+  const [{ id }, { round }] = await Promise.all([params, searchParams])
   if (!Id.safeParse(id).success) notFound()
-  return <DiagnosticView lectureId={id} />
+  // F3.10: ?round=rest is a "Test the rest" round; anything else is the core diagnostic.
+  return <DiagnosticView lectureId={id} round={round === 'rest' ? 'rest' : 'core'} />
 }
