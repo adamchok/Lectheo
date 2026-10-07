@@ -201,7 +201,7 @@ Workflow `processLecture(lectureId, from?)`. Every step is a `'use step'` functi
 ```mermaid
 flowchart TD
     start(["POST /lectures/{id}/process<br/>guarded claim → status=processing"]) --> src{"source"}
-    src -- "youtube (to be built, F10)" --> tv["transcribeVideo<br/>cache by video id · Gemini 10–15 min clips · validate cues"]
+    src -- "youtube (to be built, F10)" --> tv["transcribeVideo<br/>cache by video id · Gemini direct API, 2-min clips in parallel · stitch · validate cues"]
     tv --> seg
     src -- "import / transcript" --> pt["parseTranscript<br/>VTT/SRT/TXT · strip speakers · cap tokens by tier"]
     src -- "live / audio" --> kt["buildKeyterms<br/>from slides (Should, not built: no keyterms sent)"]
@@ -529,6 +529,6 @@ Signed-in pages share one layout (`app/(app)/layout.tsx`) with `error.tsx` and `
 | 5 | Teams `.docx` transcript format varies | Teams .docx dropped (7 Oct): timestamps are per speaker turn; .vtt is the Teams format we support. A `.docx` upload gets `422` with a pointer to the `.vtt` |
 | 6 | Long recordings exceed 50 MB | 32 kbps Opus. 2 h cap. Suggest transcript import |
 | 7 | YouTube embed blocked (school network or privacy settings) | Detect the player error and fall back to CS50's official lecture MP3 (CC-licensed, same timeline as the subtitles) in a local `<audio>` player |
-| 10 | YouTube transcription quality or cost *(decided 7 Oct 2026, to be built)* | The F10.1 spike measures timestamp drift, word errors and cost against CS50's official subtitles before any product code; F10 is dropped if it fails |
+| 10 | YouTube transcription quality or cost *(decided 7 Oct 2026, to be built)* | Spike **passed** 7 Oct 2026 (`docs/spikes/youtube-transcripts.md`): 2-minute clips through the direct Google key. Remaining risks: one lecture tested (a second is scored before shipping), spend outside the gateway (logged to `llm_calls` plus a Google budget alert), Google 503s (retry with backoff) |
 | 8 | Name collision | Resolved: renamed to **Lectheo**. Register lectheo.com and the GitHub org before submission |
 | 9 | The demo looks like a prototype | [[Lectheo Design System]]: one token set, a SaaS app shell and a product landing page, built after the features froze |
