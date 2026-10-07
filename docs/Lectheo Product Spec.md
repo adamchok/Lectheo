@@ -355,7 +355,7 @@ Full analysis, profiles, feature matrix and sources: **[[Lectheo Competition]]**
 
 **In scope (Must):** sign-in page (Google + sample account); dashboard; CS50 library with watch mode; import recording + transcript; audio and transcript upload; markers; concept map + list view; adaptive diagnostic; spot the flaw; teach-back; Socratic feedback; mastery map; consent, deletion and limits; Study mode ([[#F9. Study mode — Must|F9]], built 7 Oct 2026); chapters ([[#F11. Chapters — Must|F11]], built 7 Oct 2026).
 
-**Decided 7 Oct 2026, to be built:** YouTube lectures ([[#F10. YouTube lectures — Should (after a spike)|F10]], Should, only if the spike passes).
+**Decided 7 Oct 2026, to be built:** YouTube lectures ([[#F10. YouTube lectures — Should (after a spike)|F10]], Should; the spike passed 7 Oct 2026).
 
 **Should (in order):** record live (slim) → Stump the AI (beta) → transfer problems → slides as extra input → transcript correction → own-course dedupe → persona picker.
 
@@ -446,7 +446,7 @@ Built on 7 Oct 2026: F9 (Study mode: the lecture brief, concept marks, Test me, 
 
 | Req | Item |
 |---|---|
-| F10 | YouTube lectures, only if the F10.1 spike passes |
+| F10 | YouTube lectures (the F10.1 spike passed 7 Oct 2026) |
 
 ### Should items: built or cut
 
