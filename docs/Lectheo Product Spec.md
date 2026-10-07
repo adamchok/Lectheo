@@ -133,6 +133,8 @@ There are four ways to add a lecture. All of them feed the same pipeline after t
 | F2.7 | **Deduplicate:** new concepts are matched against existing ones in the course. | Should (own courses) |
 | F2.8 | **Accessible alternative:** a list view of concepts with state, markers and links. The map is keyboard-navigable. | Must |
 | F2.9 | Edge case: a lecture with very little conceptual content (e.g. an admin session) shows a short map with an explanatory empty state rather than inventing concepts. | Must |
+| F2.10 | *(decided 7 Oct 2026, to be built)* **The map gets the full content width.** Clicking a node opens the concept panel as a sheet over the map's right side (`panel-width`, closed with Esc or ✕) instead of a permanent column. Phones: one column, the panel as a full-height sheet, as today. | Must |
+| F2.11 | *(decided 7 Oct 2026, to be built)* **Your markers** (the per-lecture L/I timeline, F2.3) moves below the map at full width. Each track runs over the **real lecture length** with its start and end time under it, shows the lecture's **chapter ticks**, and keeps its dots inside the track. Fewer dots cluster because the track is about three times wider. | Must |
 
 ### F3. Adaptive, confidence-rated diagnostic — Must
 
@@ -146,6 +148,9 @@ There are four ways to add a lecture. All of them feed the same pipeline after t
 | F3.6 | Results are ordered: confident mistakes → wrong → unsure-but-right → right. | Must |
 | F3.7 | Only questions that passed **independent verification** are shown ([[#8. Product quality rules\|§8.1]]). If fewer than 3 verified questions exist, the diagnostic runs shorter and says so. | Must |
 | F3.8 | Results set the initial mastery state ([[#F6. Mastery map — Must\|F6]]) and the practice order ([[#F4. Understanding-level practice\|F4]]). | Must |
+| F3.9 | *(decided 7 Oct 2026, to be built)* **Baseline spread across the lecture:** after marked concepts (F3.1 order unchanged), unmarked baseline concepts are taken **one per chapter in turn** (chapter order, learning order inside a chapter), so a run without marks no longer asks only about the first minutes. Lectures without chapters spread evenly through lecture order. | Must |
+| F3.10 | *(decided 7 Oct 2026, to be built)* **Coverage and "test the rest":** the results show "Tested 6 of 14 concepts" and, per chapter, "Chapter 3 · 2 of 3 tested". If any concept of the lecture is still *Not tested*, the results end with **Test the other 8 →**, which starts a new round of one question per untested concept (in chapter order, at most 8 per round, repeatable) under the same rules: confidence first, immediate feedback, follow-ups (max 2 per round), verified items only. The first round stays short and targeted. | Must |
+| F3.11 | *(decided 7 Oct 2026, to be built)* **Every concept can be tested:** the pipeline already drafts two diagnostic questions per concept for user lectures (the CS50 library has them too). A concept left with no verified question after the redraft round counts as "No checked question yet" in the coverage line, never as tested, and is skipped by *Test the rest*. | Must |
 
 ### F4. Understanding-level practice
 
@@ -236,7 +241,7 @@ Activities are ordered by the recommender: confident mistakes → red → marked
 
 ### F9. Study mode — Must
 
-*Decided and built 7 Oct 2026.* Students don't want to sit through a 2-hour lecture before they can be tested. Study mode lets them take in a lecture in minutes, mark what's unclear, then go straight to the diagnosis.
+*Decided and built 7 Oct 2026.* Students don't want to sit through a 2-hour lecture before they can be tested. Study mode lets them take in a lecture in minutes, mark what's unclear, then go straight to the diagnosis. *Redesign decided 7 Oct 2026, to be built (F9.9–F9.15):* the brief felt like one long, flat list and too thin to prepare for the diagnosis, so it is organised by chapter with an outline, and each concept can be explained in depth.
 
 | ID | Requirement | Priority |
 |---|---|---|
@@ -248,7 +253,13 @@ Activities are ordered by the recommender: confident mistakes → red → marked
 | F9.6 | No reading progress is tracked: no ticks, percentages or "read" states. Marks and the diagnostic are the only signals. | Must |
 | F9.7 | The next-step card offers **Study** first for a lecture the student hasn't started ("Study Lecture 5 · about 5 min"), with **Watch** second and a quiet **Skip to the diagnostic**. *As built:* the button reads "Study Lecture 5" and the card's caption gives the brief's reading time ("About 5 minutes"). | Must |
 | F9.8 | **Key points are shown to students.** This changes ADR-009: key points stop being secret. Teach-back still grades against them (now "explain it in your own words"); answer keys, flaws, rubrics, hints and leak keywords stay hidden. Mastered still needs two different activity types. | Must |
-| F9.9 | No new AI text: the brief uses the existing summary and key points, so it costs nothing per lecture. | Must |
+| F9.9 | The summary and key points come from extraction at no extra cost. *Amended 7 Oct 2026:* was "no new AI text"; the in-depth explanations (F9.13) are one extra AI call per lecture. | Must |
+| F9.10 | *(decided 7 Oct 2026, to be built)* **Organised by chapter** (F11): each chapter is a section (title, time range, its one-line summary, **Play this chapter** in the inline mini player, chapter-level *I'm lost* / *Important* as in F11.4); its concepts follow in learning order. A concept sits in the chapter where it **first appears**; a later chapter that revisits it shows "Also revisits: Hash functions →". A concept outside every chapter goes to the nearest one. Chapters without concepts (announcements, Q&A) are one collapsed line with **▶ Play**. Lectures without chapters keep the flat list (F9.2). | Must |
+| F9.11 | *(decided 7 Oct 2026, to be built)* **Outline:** on desktop a sticky left rail lists the chapters with their reading time (concept-free chapters greyed), highlights the section in view and ends with **Test me**; on phones it is a sticky **Jump to** menu under the header. Highlighting where you are is not progress tracking (F9.6 holds). | Must |
+| F9.12 | *(decided 7 Oct 2026, to be built)* **Quieter concept blocks:** every key point still shows, its time moved to the right in muted `mono-sm`; the "In chapter N" line (F11.5) goes, as the section replaces it; the clip button reads **Watch from 12:52 · 1 min 30 s** so its length isn't read as a start time. | Must |
+| F9.13 | *(decided 7 Oct 2026, to be built)* **Explain in depth:** each concept has a collapsed **Explain in depth · 3 min read** with four parts: **How it works** (2–4 short paragraphs, each citing lecture moments as `▶` links), **Worked example** (a trace or code; anything beyond the lecture is labelled so), **Common mistakes** (2–3 misconceptions and why they fail) and **Connects to** (its *builds on* / *leads to* concepts from the map, no AI). Labelled "AI-written from the lecture". The header adds the depth time: "about 15 min to read · 40 min with depth". | Must |
+| F9.14 | *(decided 7 Oct 2026, to be built)* **Grounded and safe:** the writer gets the concept's transcript segments and cites them by segment index (`[s42]`), never by time; the server turns them into lecture links. Validated: every *How it works* paragraph cites at least one real segment of the lecture. The writer never sees answer keys, flaws, rubrics, hints or leak keywords (ADR-009). **No outside links**: resources are the lecture's clips and the linked concepts. | Must |
+| F9.15 | *(decided 7 Oct 2026, to be built)* **Generated in the pipeline:** one call per lecture after `map_ready`, in parallel with item drafting, so `ready` comes no later. If it fails, the lecture still turns ready and *Explain in depth* is hidden for it. Re-processing replaces it. A concept deduplicated into an earlier lecture keeps that lecture's explanation. The **CS50 library** gets it through a one-off script on the dev key (stable ids unchanged). About $0.10 per lecture. | Must |
 
 ### F10. YouTube lectures — Should (after a spike)
 
@@ -355,6 +366,8 @@ Full analysis, profiles, feature matrix and sources: **[[Lectheo Competition]]**
 
 **In scope (Must):** sign-in page (Google + sample account); dashboard; CS50 library with watch mode; import recording + transcript; audio and transcript upload; markers; concept map + list view; adaptive diagnostic; spot the flaw; teach-back; Socratic feedback; mastery map; consent, deletion and limits; Study mode ([[#F9. Study mode — Must|F9]], built 7 Oct 2026); chapters ([[#F11. Chapters — Must|F11]], built 7 Oct 2026).
 
+**Decided 7 Oct 2026, to be built:** Study redesign ([[#F9. Study mode — Must|F9.9–F9.15]]: by chapter, outline, *Explain in depth*); course page layout ([[#F2. Concept map — Must|F2.10–F2.11]]: full-width map, markers timeline below it); diagnostic coverage ([[#F3. Adaptive, confidence-rated diagnostic — Must|F3.9–F3.11]]: baseline spread across chapters, *Test the rest*).
+
 **Built 7 Oct 2026:** YouTube lectures ([[#F10. YouTube lectures — Should (after a spike)|F10]], Should), behind the `FEATURE_YOUTUBE_LECTURES` switch; F10.9 passed after the review.
 
 **Should (in order):** record live (slim) → Stump the AI (beta) → transfer problems → slides as extra input → transcript correction → own-course dedupe → persona picker.
@@ -412,6 +425,10 @@ Full analysis, profiles, feature matrix and sources: **[[Lectheo Competition]]**
 - [x] **Product name: Lectheo** (decided 4 Oct 2026). When checked, lectheo.com was unregistered and github.com/lectheo was free; register both. Search engines may correct it to near-misses (Lecto, LectO, Lectio), so always write "Lectheo (LEK-thee-oh)" in the README and demo video.
 - [ ] Final tagline.
 - [ ] Any evidence from 3–5 real students that they would tap "I'm lost" during a lecture? (Strengthens Real-World Impact.)
+
+*Decided on 7 Oct 2026:* **Diagnostic coverage** (F3.9–F3.11): a 3–6 question first round can leave most of a long lecture untested, and without marks it only asked about the start. Baseline questions are now spread one per chapter, the results show how many concepts were tested (overall and per chapter), and **Test the other N** runs further rounds on untested concepts only. Rejected: testing every concept every time (long, and marks would stop mattering). No extra cost: user lectures already get two diagnostic questions per concept.
+
+*Decided on 7 Oct 2026:* **Study redesign and course layout** (F9.9–F9.15, F2.10–F2.11): the brief is organised by chapter (a concept sits where it first appears) with a sticky outline, all key points kept, quieter blocks and "Watch from 12:52 · 1 min 30 s". Each concept gets a collapsed **Explain in depth** (how it works, worked example, common mistakes, connects to), written from the lecture with segment citations, generated in the pipeline in parallel with items (≈ $0.10 per lecture), never shown 🔒 data, and **no outside links** (models invent URLs). This reverses F9.9's "no new AI text": key points alone were too thin to prepare for the diagnosis. The course page gives the map the full width (node panel as a sheet) and moves *Your markers* below it, on the real lecture length with chapter ticks, because the 352px column squeezed the map and made marker dots overlap.
 
 *Decided on 7 Oct 2026:* **Chapters** (F11): AI chapters from the existing extraction call, anchored to transcript lines so times are exact; a Chapters tab with *play this chapter only*; chapter-level marks linked straight to the chapter's concepts; the library gets chapters by a one-off script; built in the same session as Study mode.
 
