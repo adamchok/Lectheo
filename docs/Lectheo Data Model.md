@@ -93,10 +93,10 @@ Index: `(owner_id)`.
 | `course_id` | uuid FK → courses ON DELETE CASCADE | |
 | `title` | text | |
 | `seq` | int | order within course |
-| `source` | enum | `library`, `import`, `live`, `audio`, `transcript`. *(decided 7 Oct 2026, to be built)*: `youtube` ([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]]) |
+| `source` | enum | `library`, `import`, `live`, `audio`, `transcript`, `youtube` ([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]], migration `0007`) |
 | `status` | enum | `draft` → `uploading` → `processing` → `map_ready` → `ready`, or `failed` |
 | `progress` | jsonb | `{step, done, total}` for the polling UI |
-| `media` | jsonb null | library: `{youtubeId, startMs, endMs}`. Import: `{localFileName, durationMs}` (metadata only; the file stays on the device) |
+| `media` | jsonb null | library: `{youtubeId, startMs, endMs}`. Import: `{localFileName, durationMs}` (metadata only; the file stays on the device). YouTube: `{youtubeId, durationMs}` (only the 11-character id; the link itself isn't stored) |
 | `has_timestamps` | bool | false for plain-text transcripts, which disables markers |
 | `audio_path` | text null | Storage path for uploaded or recorded audio. **Cleared, and the object deleted, after transcription** |
 | `duration_ms` | int null | measured: from the transcription result or the last transcript cue |
@@ -336,7 +336,7 @@ Constraints: `UNIQUE (activity_id, try_no)`, `UNIQUE (diagnostic_session_id, ite
 | `user_id` | uuid null | |
 | `lecture_id` | uuid null | |
 | `task`, `role`, `model`, `prompt_version` | text | |
-| `gateway_key` | text default `'prod'` | which AI Gateway key paid: `dev` or `prod`. The governor and quotas sum `prod` rows only, so seeding and evals never pause the app |
+| `gateway_key` | text default `'prod'` | who paid: the AI Gateway keys `dev` or `prod`, or `google` for the direct Google key (the YouTube transcriber, F10; capped by `GOOGLE_AI_BUDGET_USD`). The governor and quotas sum `prod` rows only, so seeding and evals never pause the app |
 | `input_tokens`, `cached_tokens`, `output_tokens` | int | output includes reasoning tokens |
 | `cost_usd` | numeric(10,6) | from gateway response metadata |
 | `latency_ms` | int | |
@@ -363,15 +363,19 @@ No prompt or answer text is stored here; the ledger is tokens, cost and outcome 
 
 Windows older than 24 h are pruned on each sample sign-in.
 
-**`youtube_transcripts`** *(decided 7 Oct 2026, to be built)* ([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]]): a cache of transcripts of public YouTube videos, shared across students (the transcript of a public video is not personal data). Server-only, RLS deny-all.
+**`youtube_transcripts`** ([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]], migration `0007`): a cache of transcripts of public YouTube videos, shared across students (the transcript of a public video is not personal data). Server-only, RLS deny-all, no `anon`/`authenticated` privileges.
 
 | Column | Type | Notes |
 |---|---|---|
-| `video_id` | text PK | the 11-character YouTube id |
+| `video_id`, `model`, `prompt_version` | text | **PK** (all three): a new prompt or model never reuses an old transcript, and `AI_FAKE` rows (`model = 'fake'`) never serve real runs |
 | `duration_ms` | int | from the YouTube Data API |
-| `cues` | jsonb | `[{ startMs, endMs, text }]`, validated (in order, inside the video) |
-| `model`, `prompt_version` | text | provenance |
+| `cues` | jsonb | `[{ startMs, endMs, text }]`, stitched and checked (in order, inside the video); empty for a refusal |
+| `refusal` | text null | a cached verdict, `no_speech` or `not_english`: the same video is refused before any spend |
 | `created_at` | timestamptz | |
+
+Written only for a whole video (a tier-capped transcript isn't shared).
+
+**`youtube_transcript_chunks`** (F10.5, migration `0007`): the finished 2-minute chunks of a transcription in progress, so a step that dies, or a Retry, never pays for them again. **PK** `(video_id, model, prompt_version, start_ms, end_ms)`; `cues` jsonb; `attempts` int (2 after the one retry of a bad chunk); `created_at`. Deleted once the transcript (or its refusal) is cached, or when the transcript fails its checks. Server-only, RLS deny-all.
 
 ---
 

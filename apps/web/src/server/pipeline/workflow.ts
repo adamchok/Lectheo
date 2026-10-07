@@ -14,6 +14,7 @@ import {
   parseTranscript,
   pollTranscription,
   submitTranscription,
+  transcribeVideo,
   validateGraph,
   verifyItems,
 } from './steps'
@@ -28,6 +29,15 @@ import {
 const POLL_INTERVAL = '15s'
 /** 240 × 15 s = 60 min. */
 const MAX_POLLS = 240
+/**
+ * transcribeVideo waves: a 2-hour video is 6 waves of 10 chunks plus up to 6 retry waves; the
+ * rest is room for waves cut short by the step deadline or transient Google errors.
+ */
+const MAX_VIDEO_WAVES = 20
+const VIDEO_TIMEOUT = {
+  code: 'transcription_stalled',
+  message: 'Google kept failing on this video. Retry later; finished parts are kept.',
+}
 const STT_TIMEOUT = {
   code: 'stt_timeout',
   message: 'Transcription took longer than an hour. Try uploading a transcript instead.',
@@ -37,7 +47,18 @@ export async function processLecture(lectureId: string): Promise<'ready' | 'fail
   'use workflow'
   let current: PipelineStep = 'parseTranscript'
   try {
-    if ((await beginPipeline(lectureId)) === 'audio') {
+    const kind = await beginPipeline(lectureId)
+    if (kind === 'youtube') {
+      current = 'transcribeVideo'
+      let waves = 1
+      while ((await transcribeVideo(lectureId)) !== 'done') {
+        if (waves >= MAX_VIDEO_WAVES) {
+          await failProcessing(lectureId, current, VIDEO_TIMEOUT)
+          return 'failed'
+        }
+        waves += 1
+      }
+    } else if (kind === 'audio') {
       current = 'submitTranscription'
       await submitTranscription(lectureId)
       current = 'pollTranscription'

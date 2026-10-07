@@ -30,14 +30,27 @@ const AUDIO_PATH = [
   ...TRANSCRIPT_PATH.slice(1),
 ] as const satisfies readonly PipelineStep[]
 
-export type SourceKind = 'audio' | 'transcript'
+const YOUTUBE_PATH = [
+  'transcribeVideo',
+  ...TRANSCRIPT_PATH.slice(1),
+] as const satisfies readonly PipelineStep[]
 
-export const sourceKind = (source: LectureSource): SourceKind =>
-  source === 'audio' || source === 'live' ? 'audio' : 'transcript'
+export type SourceKind = 'audio' | 'transcript' | 'youtube'
+
+export function sourceKind(source: LectureSource): SourceKind {
+  if (source === 'youtube') return 'youtube'
+  return source === 'audio' || source === 'live' ? 'audio' : 'transcript'
+}
+
+const PATHS: Readonly<Record<SourceKind, readonly PipelineStep[]>> = {
+  audio: AUDIO_PATH,
+  transcript: TRANSCRIPT_PATH,
+  youtube: YOUTUBE_PATH,
+}
 
 /** The steps a lecture runs through, in order (drives lectures.progress). */
 export function pipelinePath(kind: SourceKind): readonly PipelineStep[] {
-  return kind === 'audio' ? AUDIO_PATH : TRANSCRIPT_PATH
+  return PATHS[kind]
 }
 
 /** Every step at or after `from` in the shared enum order (cleared by ?from=). */

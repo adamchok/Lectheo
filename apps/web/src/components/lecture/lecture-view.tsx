@@ -1,6 +1,11 @@
 'use client'
 
-import type { LectureResponse, LectureSource, PipelineStep } from '@lectheo/contracts'
+import {
+  FINAL_VIDEO_FAILURES,
+  type LectureResponse,
+  type LectureSource,
+  type PipelineStep,
+} from '@lectheo/contracts'
 import { ClipboardCheck, Network, Play, RotateCw, Sparkles } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
@@ -32,8 +37,12 @@ import { StudyView } from './study-view'
 
 type ReprocessFrom = 'parseTranscript' | 'submitTranscription' | 'extractConcepts' | 'draftItems'
 
-/** Earliest re-runnable step (API `?from=`) that redoes the failed one. */
-function retryFrom(step: string, code: string, source: LectureSource): ReprocessFrom {
+/**
+ * Earliest re-runnable step (API `?from=`) that redoes the failed one; undefined resumes the run
+ * at the failed step (a YouTube transcription has no `?from`).
+ */
+function retryFrom(step: string, code: string, source: LectureSource): ReprocessFrom | undefined {
+  if (step === 'transcribeVideo') return undefined
   // A missing transcript is fixed by reading it again, whichever step noticed.
   if (code === 'no_transcript') return isAudio(source) ? 'submitTranscription' : 'parseTranscript'
   if (['submitTranscription', 'pollTranscription', 'fetchTranscript'].includes(step)) {
@@ -107,6 +116,9 @@ function FailedPanel({ lecture }: { lecture: LectureResponse }) {
   const processLecture = useProcessLecture()
   const step = lecture.error?.step ?? ''
   const label = STEP_LABELS[step as PipelineStep] ?? 'Processing'
+  // A YouTube video that can't be transcribed won't change on Retry: offer another lecture.
+  const final =
+    step === 'transcribeVideo' && FINAL_VIDEO_FAILURES.includes(lecture.error?.code ?? '')
   return (
     <ErrorState
       title={`Processing stopped at: ${label}`}
@@ -121,18 +133,24 @@ function FailedPanel({ lecture }: { lecture: LectureResponse }) {
         </>
       }
       action={
-        <Button
-          onClick={() =>
-            processLecture.mutate({
-              lectureId: lecture.id,
-              from: retryFrom(step, lecture.error?.code ?? '', lecture.source),
-            })
-          }
-          disabled={processLecture.isPending}
-        >
-          {processLecture.isPending ? <Spinner /> : <RotateCw aria-hidden />}
-          Retry
-        </Button>
+        final ? (
+          <Button asChild variant="outline">
+            <Link href={'/lectures/new' as Route}>Add another lecture</Link>
+          </Button>
+        ) : (
+          <Button
+            onClick={() =>
+              processLecture.mutate({
+                lectureId: lecture.id,
+                from: retryFrom(step, lecture.error?.code ?? '', lecture.source),
+              })
+            }
+            disabled={processLecture.isPending}
+          >
+            {processLecture.isPending ? <Spinner /> : <RotateCw aria-hidden />}
+            Retry
+          </Button>
+        )
       }
     />
   )
@@ -192,8 +210,9 @@ function ConceptCountNote({ count }: { count: number | null }) {
 }
 
 function TranscriptPanel({ lecture }: { lecture: LectureResponse }) {
-  // Audio lectures have no segments until transcription finishes.
-  const available = !isAudio(lecture.source) || ['map_ready', 'ready'].includes(lecture.status)
+  // Audio and YouTube lectures have no segments until transcription finishes.
+  const transcribed = isAudio(lecture.source) || lecture.source === 'youtube'
+  const available = !transcribed || ['map_ready', 'ready'].includes(lecture.status)
   const transcript = useTranscript(available ? lecture.id : undefined)
   const segments = transcript.data
   // Deep link: /lectures/{id}?t=<ms>#transcript highlights and scrolls to the segment at t.
@@ -218,7 +237,8 @@ function TranscriptPanel({ lecture }: { lecture: LectureResponse }) {
       </h2>
       {!available && (
         <p className="text-muted-foreground text-sm">
-          The transcript appears here once the audio has been transcribed.
+          The transcript appears here once the {lecture.source === 'youtube' ? 'video' : 'audio'}{' '}
+          has been transcribed.
         </p>
       )}
       {available && transcript.isPending && (
@@ -274,6 +294,7 @@ function LectureActions({
   return (
     <>
       {(lecture.source === 'import' ||
+        lecture.source === 'youtube' ||
         (lecture.source === 'library' && lecture.status === 'ready')) && (
         <Button asChild>
           <Link href={`/lectures/${lecture.id}/watch` as Route}>

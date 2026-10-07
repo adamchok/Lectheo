@@ -11,7 +11,14 @@ import type { Actor } from './auth'
 import { appDb, type DbLike } from './db'
 import { serverEnv } from './env'
 import { ApiError } from './errors'
-import { consume, evaluateSpend, markAiDegraded } from './quota'
+import {
+  consume,
+  evaluateSpend,
+  googleSpend,
+  markAiDegraded,
+  readAppFlags,
+  YOUTUBE_PAUSED_MESSAGE,
+} from './quota'
 
 export interface AiContextOptions {
   /** The user the call is for (quota + ledger). Omit for system work (pipeline on behalf of a lecture). */
@@ -23,6 +30,11 @@ export interface AiContextOptions {
   intake?: boolean
   /** Skip the per-user llm_tasks quota (e.g. pipeline steps already counted as `lectures`). */
   skipQuota?: boolean
+  /**
+   * Direct Google calls (the transcriber, ADR-017): the budget check is the Google key's own cap
+   * (stop at 100 %) on top of the global AI pause; the prod gateway budget doesn't apply.
+   */
+  google?: boolean
   db?: DbLike
 }
 
@@ -34,11 +46,18 @@ export function aiHooks(opts: AiContextOptions = {}): TaskHooks {
   const db = opts.db ?? appDb()
   const { actor } = opts
   return {
-    checkBudget: async () => {
-      const status = await evaluateSpend(db, serverEnv().AI_PROD_BUDGET_USD)
-      if (status.aiPaused) throw new ApiError('ai_paused')
-      if (opts.intake && status.intakePaused) throw new ApiError('intake_paused')
-    },
+    checkBudget: opts.google
+      ? async () => {
+          if ((await readAppFlags(db)).aiPaused) throw new ApiError('ai_paused')
+          if ((await googleSpend(db, serverEnv().GOOGLE_AI_BUDGET_USD)).exhausted) {
+            throw new ApiError('intake_paused', YOUTUBE_PAUSED_MESSAGE)
+          }
+        }
+      : async () => {
+          const status = await evaluateSpend(db, serverEnv().AI_PROD_BUDGET_USD)
+          if (status.aiPaused) throw new ApiError('ai_paused')
+          if (opts.intake && status.intakePaused) throw new ApiError('intake_paused')
+        },
     consumeQuota:
       actor && !opts.skipQuota
         ? async () => {
@@ -49,7 +68,8 @@ export function aiHooks(opts: AiContextOptions = {}): TaskHooks {
       await db.insert(llmCalls).values({
         ...entry,
         costUsd: entry.costUsd ?? 0,
-        gatewayKey: serverEnv().AI_GATEWAY_KEY_NAME,
+        // Direct Google calls say so themselves ('google'); everything else paid by this key.
+        gatewayKey: entry.gatewayKey ?? serverEnv().AI_GATEWAY_KEY_NAME,
       })
     },
   }

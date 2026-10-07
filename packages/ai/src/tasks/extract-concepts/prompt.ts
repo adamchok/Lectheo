@@ -1,8 +1,8 @@
-import { lectureContext, UNTRUSTED_RULE } from '../../prompt'
+import { lectureContext, untrusted, UNTRUSTED_RULE } from '../../prompt'
 import type { PromptSpec } from '../../run-task'
 import type { ExtractConceptsInput } from './schema'
 
-export const PROMPT_VERSION = 'extract-concepts@0.3'
+export const PROMPT_VERSION = 'extract-concepts@0.4'
 
 // TODO(feature-pipeline): first draft. Add CS50 few-shot examples and tune on Lectures 3–5.
 export const SYSTEM = [
@@ -40,7 +40,8 @@ export function buildPrompt(input: ExtractConceptsInput): PromptSpec {
     system: SYSTEM,
     cacheKeyBlocks: [lectureContext(input.segments)],
     prompt: [
-      `Lecture: ${input.lectureTitle}`,
+      // A YouTube title comes from a third-party uploader (F10): material, not instructions.
+      `Lecture: ${untrusted('lecture_title', input.lectureTitle.replace(/\s+/g, ' ').trim())}`,
       `Existing course concepts:\n${existing}`,
       `Extract about ${input.targetCount} concepts (±2) and their edges.`,
       chaptersAsk(input.chapterCount),

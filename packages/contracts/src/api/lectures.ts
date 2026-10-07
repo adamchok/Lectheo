@@ -11,17 +11,31 @@ import {
 } from '../enums'
 import { Chapter, StudyTarget } from '../payloads'
 
-/** `library` can't be created at runtime. */
-export const CreateLectureRequest = z.object({
-  id: ClientId,
-  courseId: Id,
-  title: z.string().trim().min(1).max(200),
-  source: LectureSource.exclude(['library']),
-  /** Import (B) only: metadata of the local file. The file itself is never uploaded. */
-  media: z
-    .object({ localFileName: z.string().trim().min(1).max(255), durationMs: Ms.nullable() })
-    .optional(),
-})
+/**
+ * `library` can't be created at runtime. `youtube` (F10) takes `youtubeUrl`, and its title
+ * defaults to the video's title; every other source needs a title.
+ */
+export const CreateLectureRequest = z
+  .object({
+    id: ClientId,
+    courseId: Id,
+    title: z.string().trim().min(1).max(200).optional(),
+    source: LectureSource.exclude(['library']),
+    /** Import (B) only: metadata of the local file. The file itself is never uploaded. */
+    media: z
+      .object({ localFileName: z.string().trim().min(1).max(255), durationMs: Ms.nullable() })
+      .optional(),
+    /** YouTube (F) only: any link form; the server keeps only the video id. */
+    youtubeUrl: z.string().trim().min(1).max(500).optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.source === 'youtube' && !v.youtubeUrl) {
+      ctx.addIssue({ code: 'custom', path: ['youtubeUrl'], message: 'Paste a YouTube link.' })
+    }
+    if (v.source !== 'youtube' && !v.title) {
+      ctx.addIssue({ code: 'custom', path: ['title'], message: 'Add a title.' })
+    }
+  })
 
 export const LectureMedia = z.object({
   youtubeId: z.string().nullable(),

@@ -506,7 +506,10 @@ export const llmCalls = pgTable(
     role: text('role').notNull(),
     model: text('model').notNull(),
     promptVersion: text('prompt_version').notNull(),
-    /** Which AI Gateway key paid for the call: 'dev' | 'prod'. The governor sums 'prod' only. */
+    /**
+     * Who paid for the call: AI Gateway keys 'dev' | 'prod' (the governor sums 'prod' only), or
+     * 'google' for the direct Google key (the transcriber, capped by GOOGLE_AI_BUDGET_USD).
+     */
     gatewayKey: text('gateway_key').notNull().default('prod'),
     inputTokens: integer('input_tokens').notNull().default(0),
     cachedTokens: integer('cached_tokens').notNull().default(0),
@@ -553,4 +556,44 @@ export const rateLimits = pgTable(
     count: integer('count').notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.key, t.windowStart] })],
+)
+
+/**
+ * F10.6: transcripts of public YouTube videos, shared across students (a public video's
+ * transcript is not personal data), keyed by the model and prompt that made them. Cues are
+ * validated and stitched. `refusal` caches a negative verdict (`no_speech`, `not_english`, with
+ * empty cues) so the same video is refused before any spend. Server-only, RLS deny-all.
+ */
+export const youtubeTranscripts = pgTable(
+  'youtube_transcripts',
+  {
+    videoId: text('video_id').notNull(),
+    model: text('model').notNull(),
+    promptVersion: text('prompt_version').notNull(),
+    durationMs: integer('duration_ms').notNull(),
+    cues: jsonb('cues').$type<{ startMs: number; endMs: number; text: string }[]>().notNull(),
+    refusal: text('refusal'),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.videoId, t.model, t.promptVersion] })],
+)
+
+/**
+ * F10.5: each finished 2-minute chunk of a transcription in progress, so a step that dies or a
+ * Retry never pays for finished chunks again. Deleted once the transcript (or its refusal) is
+ * cached. `attempts` counts the one retry of a bad chunk. Server-only, RLS deny-all.
+ */
+export const youtubeTranscriptChunks = pgTable(
+  'youtube_transcript_chunks',
+  {
+    videoId: text('video_id').notNull(),
+    model: text('model').notNull(),
+    promptVersion: text('prompt_version').notNull(),
+    startMs: integer('start_ms').notNull(),
+    endMs: integer('end_ms').notNull(),
+    cues: jsonb('cues').$type<{ startMs: number; endMs: number; text: string }[]>().notNull(),
+    attempts: integer('attempts').notNull().default(1),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.videoId, t.model, t.promptVersion, t.startMs, t.endMs] })],
 )

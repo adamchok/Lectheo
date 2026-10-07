@@ -1,5 +1,5 @@
 import type { UsageMetric } from '@lectheo/contracts'
-import { appFlags, eq, gte, llmCalls, sql, usageCounters } from '@lectheo/db'
+import { and, appFlags, eq, gte, llmCalls, sql, usageCounters } from '@lectheo/db'
 import type { Actor } from './auth'
 import { appDb, type DbLike } from './db'
 import { ApiError } from './errors'
@@ -7,7 +7,7 @@ import { ApiError } from './errors'
 /* Per-user daily quotas and the global spend governor (Architecture §9.2). */
 
 const MB = 1024 * 1024
-const MINUTE_MS = 60_000
+export const MINUTE_MS = 60_000
 
 export type Tier = 'sample' | 'google'
 
@@ -26,6 +26,8 @@ export const GOVERNOR = {
   hourlyIntakePauseUsd: 3,
   intakePauseFraction: 0.75,
   aiPauseFraction: 0.95,
+  /** Google key (F10): ≥ 25% of its budget in one hour also pauses new YouTube lectures. */
+  googleHourlyPauseFraction: 0.25,
 } as const
 
 /** ponytail: the `owner` account uses the Google tier. */
@@ -38,7 +40,8 @@ export function nextUtcMidnight(now = new Date()): Date {
 
 /**
  * Counts one use of `metric` for today (UTC) and throws 429 `quota_exceeded` past the limit.
- * ponytail: a rejected or failed operation still counts (no refund); limits are generous enough.
+ * ponytail: a rejected or failed operation still counts, except the explicit refunds
+ * (`refundUsage`: a re-run that couldn't start, a YouTube video with no speech).
  */
 export async function consume(
   actor: Actor,
@@ -65,6 +68,25 @@ export async function consume(
     })
   }
   return used
+}
+
+/** Gives back one use of `metric` on the UTC day of `at` (never below zero). */
+export async function refundUsage(
+  db: DbLike,
+  userId: string,
+  metric: UsageMetric,
+  at: Date,
+): Promise<void> {
+  await db
+    .update(usageCounters)
+    .set({ count: sql`greatest(${usageCounters.count} - 1, 0)` })
+    .where(
+      and(
+        eq(usageCounters.userId, userId),
+        eq(usageCounters.day, at.toISOString().slice(0, 10)),
+        eq(usageCounters.metric, metric),
+      ),
+    )
 }
 
 export interface AppFlags {
@@ -131,6 +153,47 @@ export async function evaluateSpend(
       .where(eq(appFlags.id, 1))
   }
   return { aiPaused, intakePaused, spentLastHourUsd, spentTotalUsd }
+}
+
+/**
+ * The direct Google key's own cap (ADR-017, F10.9): its calls are logged with gateway_key
+ * 'google', outside the prod gateway budget. At 75 % (or 25 % within the last hour) new YouTube
+ * lectures and their transcription Retries are refused; at 100 % transcription calls stop.
+ * Other features never look at it.
+ * ponytail: a check, not a reservation; concurrent starts can overshoot by the transcriptions
+ * already running (≤ ~$0.85 each). The hourly pause bounds a burst; the Google budget alert backs it.
+ */
+export async function googleSpend(
+  db: DbLike,
+  budgetUsd: number,
+  now = new Date(),
+): Promise<{ spentUsd: number; intakePaused: boolean; exhausted: boolean }> {
+  const hourAgo = new Date(now.getTime() - 60 * MINUTE_MS)
+  const [row] = await db
+    .select({
+      total: sql<string>`coalesce(sum(${llmCalls.costUsd}), 0)`,
+      lastHour: sql<string>`coalesce(sum(${llmCalls.costUsd}) filter (where ${gte(llmCalls.createdAt, hourAgo)}), 0)`,
+    })
+    .from(llmCalls)
+    .where(eq(llmCalls.gatewayKey, 'google'))
+  const spentUsd = Number(row?.total ?? 0)
+  const lastHourUsd = Number(row?.lastHour ?? 0)
+  return {
+    spentUsd,
+    intakePaused:
+      spentUsd >= GOVERNOR.intakePauseFraction * budgetUsd ||
+      lastHourUsd >= GOVERNOR.googleHourlyPauseFraction * budgetUsd,
+    exhausted: spentUsd >= budgetUsd,
+  }
+}
+
+export const YOUTUBE_PAUSED_MESSAGE = 'Adding YouTube lectures is paused for now. Try again later.'
+
+/** New YouTube lectures (POST /lectures source youtube). */
+export async function assertGoogleIntakeOpen(db: DbLike, budgetUsd: number): Promise<void> {
+  if ((await googleSpend(db, budgetUsd)).intakePaused) {
+    throw new ApiError('intake_paused', YOUTUBE_PAUSED_MESSAGE)
+  }
 }
 
 /** Gateway 402 (key budget hit): same effect as the governor's AI pause. */

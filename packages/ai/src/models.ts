@@ -33,6 +33,7 @@ export type Role =
   | 'guard'
   | 'guard-escalation'
   | 'vision'
+  | 'transcriber'
 
 export interface ModelChoice {
   readonly model: ModelSlug
@@ -46,6 +47,11 @@ export interface RoleConfig {
   /** Only for `guard`: the role to escalate to instead of a model fallback. */
   readonly escalateTo?: Role
   readonly timeoutMs?: number
+  /**
+   * Set for roles that call a provider's own API instead of the AI Gateway (ADR-017). Such a role
+   * has no attempt plan: `runTask` sends it to that client and nowhere else.
+   */
+  readonly direct?: 'google'
   readonly note: string
 }
 
@@ -58,10 +64,23 @@ export const MAX_OUTPUT_TOKENS = {
   persona: 600,
   guardEscalation: 300,
   answerer: 2_000,
+  /** A 2-minute clip is ~1.5k tokens of cues; with the thinking cap this bounds a call's cost. */
+  transcriber: 8_192,
   smoke: 200,
 } as const
 
 export const JEV_TIMEOUT_MS = 800
+
+/**
+ * The direct Google API (ADR-017, F10.5): model and list prices (USD per 1M tokens, ≤ 200k
+ * context, 7 Oct 2026) used to price `llm_calls` rows, since the direct key reports no cost.
+ * Output includes thinking tokens.
+ */
+export const GOOGLE_DIRECT = {
+  model: 'gemini-3.8-flash',
+  inputUsdPerMTok: 0.75,
+  outputUsdPerMTok: 3.75,
+} as const
 
 const sonnet = (reasoning: ReasoningEffort): ModelChoice => ({
   model: MODEL_SLUGS.sonnet,
@@ -124,8 +143,18 @@ export const ROLES: Readonly<Record<Role, RoleConfig>> = {
     fallback: sonnet('low'),
     note: 'slides pages without a text layer (Should)',
   },
+  transcriber: {
+    // Never through the gateway: it drops the clip offsets and bills the whole video (spike).
+    primary: flash('none'),
+    fallback: null,
+    direct: 'google',
+    note: 'YouTube transcripts, 2-minute clips via the direct Google API (ADR-017)',
+  },
 }
 
 export function roleConfig(role: Role): RoleConfig {
   return ROLES[role]
 }
+
+/** True for roles that must never go through the AI Gateway. */
+export const isDirectRole = (role: Role): boolean => ROLES[role].direct !== undefined

@@ -1,7 +1,7 @@
 'use client'
 
 import type { LectureResponse } from '@lectheo/contracts'
-import { AudioLines, FileText, FileVideo } from 'lucide-react'
+import { AudioLines, FileText, FileVideo, Link } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { newId } from '@/client/ids'
 import {
@@ -22,10 +22,12 @@ import { type CourseChoice, CoursePicker } from './course-picker'
 import { RequiredMark } from './form-parts'
 import { ImportForm } from './import-form'
 import { TranscriptForm } from './transcript-form'
+import { YoutubeForm } from './youtube-form'
 
 export interface DraftInput {
   source: CreateLectureInput['source']
   media?: CreateLectureInput['media']
+  youtubeUrl?: string
   /** Identity of the picked file(s) / text: a changed input gets a fresh lecture id. */
   fileKey: string
 }
@@ -56,8 +58,15 @@ function idFor(ids: Map<string, string>, key: string): string {
   return id
 }
 
-/** /lectures/new: "add your own lecture" (F0.7, F1 modes B and D, F1.11). */
-export function NewLectureView() {
+type CaptureTab = 'import' | 'audio' | 'transcript' | 'youtube'
+const isCaptureTab = (value: string): value is CaptureTab =>
+  ['import', 'audio', 'transcript', 'youtube'].includes(value)
+
+/**
+ * /lectures/new: "add your own lecture" (F0.7, F1 modes B and D, F1.11, F10). `youtube`: the F10
+ * switch (server/features.ts), read by the page on the server.
+ */
+export function NewLectureView({ youtube: youtubeEnabled }: { youtube: boolean }) {
   const me = useMe()
   const courses = useCourses()
   const consent = useConsent()
@@ -65,6 +74,7 @@ export function NewLectureView() {
   const createLecture = useCreateLecture()
   const [title, setTitle] = useState('')
   const [choice, setChoice] = useState<CourseChoice | null>(null)
+  const [tab, setTab] = useState<CaptureTab>('import')
   const courseIds = useRef(new Map<string, string>())
   const lectureIds = useRef(new Map<string, string>())
 
@@ -94,14 +104,16 @@ export function NewLectureView() {
   const usable = choice && !(choice.kind === 'new' && !canCreate) ? choice : null
   const course: CourseChoice =
     usable ?? (firstCourse ? { kind: 'existing', id: firstCourse.id } : { kind: 'new', title: '' })
+  // A YouTube lecture takes the video's title by default and asks its own consent (F10.4).
+  const youtube = youtubeEnabled && tab === 'youtube'
   const missing = [
     course.kind === 'new' && !course.title.trim() && 'name the course',
-    !title.trim() && 'add a title',
-    !consent.given && 'confirm you have permission',
+    !youtube && !title.trim() && 'add a title',
+    !youtube && !consent.given && 'confirm you have permission',
   ].filter((step): step is string => Boolean(step))
 
-  const createDraft: CreateDraft = async ({ source, media, fileKey }) => {
-    const lectureTitle = title.trim()
+  const createDraft: CreateDraft = async ({ source, media, youtubeUrl, fileKey }) => {
+    const lectureTitle = title.trim() || undefined
     let courseId: string
     if (course.kind === 'existing') {
       courseId = course.id
@@ -112,7 +124,14 @@ export function NewLectureView() {
     }
     const key = JSON.stringify([source, courseId, lectureTitle, fileKey])
     const id = idFor(lectureIds.current, key)
-    return createLecture.mutateAsync({ id, courseId, title: lectureTitle, source, media })
+    return createLecture.mutateAsync({
+      id,
+      courseId,
+      title: lectureTitle,
+      source,
+      media,
+      youtubeUrl,
+    })
   }
   const formProps: DraftFormProps = { missing, isSample, createDraft }
 
@@ -131,21 +150,33 @@ export function NewLectureView() {
         />
         <div className="space-y-2">
           <Label htmlFor="lecture-title">
-            Lecture title <RequiredMark />
+            Lecture title{' '}
+            {youtube ? <span className="text-muted-foreground">(optional)</span> : <RequiredMark />}
           </Label>
           <Input
             id="lecture-title"
-            required
-            placeholder="e.g. Week 6 · Trees"
+            required={!youtube}
+            placeholder={youtube ? undefined : 'e.g. Week 6 · Trees'}
             maxLength={200}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
+            aria-describedby={youtube ? 'lecture-title-help' : undefined}
           />
+          {youtube && (
+            <p id="lecture-title-help" className="text-caption text-muted-foreground">
+              Defaults to the video’s title.
+            </p>
+          )}
         </div>
       </div>
-      <ConsentCheckbox consent={consent} />
-      <Tabs defaultValue="import" className="bg-card rounded-xl border p-4 sm:p-6">
-        <TabsList className="flex-wrap">
+      {!youtube && <ConsentCheckbox consent={consent} />}
+      <Tabs
+        value={tab}
+        onValueChange={(value) => isCaptureTab(value) && setTab(value)}
+        className="bg-card rounded-xl border p-4 sm:p-6"
+      >
+        {/* Four tabs wrap onto two rows on narrow screens; the list grows with them. */}
+        <TabsList className="flex-wrap group-data-[orientation=horizontal]/tabs:h-auto">
           <TabsTrigger value="import">
             <FileVideo aria-hidden />
             Recording + transcript
@@ -158,6 +189,12 @@ export function NewLectureView() {
             <FileText aria-hidden />
             Transcript only
           </TabsTrigger>
+          {youtubeEnabled && (
+            <TabsTrigger value="youtube">
+              <Link aria-hidden />
+              From YouTube
+            </TabsTrigger>
+          )}
         </TabsList>
         <TabsContent value="import" forceMount className={tabPanelClass}>
           <ImportForm
@@ -171,6 +208,11 @@ export function NewLectureView() {
         <TabsContent value="transcript" forceMount className={tabPanelClass}>
           <TranscriptForm {...formProps} />
         </TabsContent>
+        {youtubeEnabled && (
+          <TabsContent value="youtube" forceMount className={tabPanelClass}>
+            <YoutubeForm {...formProps} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   )

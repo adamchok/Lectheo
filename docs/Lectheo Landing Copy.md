@@ -156,8 +156,7 @@ Three columns:
 - **A recording with its transcript.** Pick the video or audio file and its `.vtt` or `.srt` captions (Teams, Zoom and Panopto can export them). The video plays from your laptop and is never uploaded.
 - **Audio only.** Upload the audio; Lectheo transcribes it, then deletes the audio.
 - **A transcript.** Paste or upload the text. Without timestamps you can't mark moments, but you still get the map, the diagnosis and practice.
-
-*Ship when YouTube lectures (F10) are live: add a bullet "**A YouTube video.** Paste the link. It plays through YouTube, and Lectheo builds the map from its transcript."*
+- **A YouTube video.** Paste the link. It plays through YouTube, and Lectheo builds the map from its transcript.
 
 **Caption:** With a Google account, up to 3 lectures a day, each up to 2 hours.
 

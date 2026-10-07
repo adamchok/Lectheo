@@ -8,8 +8,9 @@ import {
 } from 'ai'
 import type { z } from 'zod'
 import { attemptPlan, isFakeMode, resolveModel, withFallback } from './call-model'
+import { runGoogleDirect, type GoogleRequest } from './google-direct'
 import { AiPausedError, errorMessage, FatalTaskError } from './errors'
-import type { ReasoningEffort, Role } from './models'
+import { GOOGLE_DIRECT, isDirectRole, type ReasoningEffort, type Role } from './models'
 import { callEntry, runGates, type Logger } from './log'
 import type { LlmOutcome, TaskContext } from './types'
 import { addUsage, usageFrom, ZERO_USAGE, type UsageTotals } from './usage'
@@ -39,6 +40,8 @@ export interface TaskDef<I, O> {
   readonly reasoning?: ReasoningEffort
   /** Deterministic, schema-valid output used when AI_FAKE=1. */
   readonly fake: (input: I) => O
+  /** Direct roles only (`transcriber`): the Google `generateContent` request for this input. */
+  readonly google?: (input: I) => GoogleRequest
 }
 
 export function defineTask<I, O>(def: TaskDef<I, O>): TaskDef<I, O> {
@@ -183,7 +186,8 @@ async function runFake<I, O>(
 }
 
 /**
- * The single AI seam. Governor → quota → (fake | gateway call with structured output) →
+ * The single AI seam. Governor → quota → (fake | direct Google call for direct roles | gateway
+ * call with structured output) →
  * semantic validation → one repair → FatalTaskError; always logs one llm_calls entry.
  */
 export async function runTask<I, O>(
@@ -194,12 +198,15 @@ export async function runTask<I, O>(
   const started = Date.now()
   const log: Logger = (outcome, usage, model) =>
     ctx.hooks.logCall(callEntry(task, ctx, { outcome, usage, model, started }))
-  const primary = attemptPlan(task.role)[0]?.model ?? 'unknown'
+  const direct = isDirectRole(task.role)
+  const primary = direct ? GOOGLE_DIRECT.model : (attemptPlan(task.role)[0]?.model ?? 'unknown')
 
   await runGates(ctx, log, primary)
 
   const result = isFakeMode(ctx)
     ? await runFake(task, input, log)
-    : await runLive(task, input, ctx, log)
+    : direct
+      ? await runGoogleDirect(task, input, ctx, log)
+      : await runLive(task, input, ctx, log)
   return { ...result, latencyMs: Date.now() - started }
 }

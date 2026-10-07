@@ -155,7 +155,8 @@ function chapterOf(
 
 /** Minutes of video to watch; null without playable media (pasted transcripts, audio). */
 function videoMinutes(lecture: Lecture): number | null {
-  const playable = lecture.source === 'library' || lecture.source === 'import'
+  const playable =
+    lecture.source === 'library' || lecture.source === 'import' || lecture.source === 'youtube'
   const ms = playable && lecture.hasTimestamps ? watchMs(lecture) : null
   return ms === null ? null : Math.round(ms / MS_PER_MINUTE)
 }

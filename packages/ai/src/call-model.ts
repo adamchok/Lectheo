@@ -20,6 +20,9 @@ export function resolveModel(ctx: Pick<TaskContext, 'resolveModel'>, slug: strin
  */
 export function attemptPlan(role: Role, reasoning?: ReasoningEffort): readonly ModelChoice[] {
   const cfg = roleConfig(role)
+  if (cfg.direct) {
+    throw new Error(`Role "${role}" calls the ${cfg.direct} API directly, never the AI Gateway`)
+  }
   const primary = reasoning ? { ...cfg.primary, reasoning } : cfg.primary
   return cfg.fallback ? [primary, primary, cfg.fallback] : [primary, primary]
 }

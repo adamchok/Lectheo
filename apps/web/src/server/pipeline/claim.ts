@@ -1,4 +1,8 @@
-import type { LectureStatus, ReprocessFromStep } from '@lectheo/contracts'
+import {
+  FINAL_VIDEO_FAILURES,
+  type LectureStatus,
+  type ReprocessFromStep,
+} from '@lectheo/contracts'
 import {
   and,
   conceptEdges,
@@ -10,16 +14,23 @@ import {
   ne,
   pipelineSteps,
   sql,
-  usageCounters,
 } from '@lectheo/db'
 import type { z } from 'zod'
 import type { Actor } from '../auth'
 import { appDb, type DbLike } from '../db'
 import { ApiError, invalidState } from '../errors'
 import { type Lecture, loadLectureForWrite } from '../ownership'
-import { assertIntakeOpen, consume } from '../quota'
+import { serverEnv } from '../env'
+import { youtubeLecturesEnabled } from '../features'
+import {
+  assertGoogleIntakeOpen,
+  assertIntakeOpen,
+  consume,
+  refundUsage,
+  YOUTUBE_PAUSED_MESSAGE,
+} from '../quota'
 import { dropOrphanConcepts } from './segments'
-import { sourceKind, stepsFrom } from './state'
+import { readStep, sourceKind, stepsFrom } from './state'
 
 /*
  * POST /lectures/{id}/process (API Spec §5, Architecture §4.3 "Claiming"): a guarded update plus
@@ -62,8 +73,40 @@ function assertFromFits(lecture: Lecture, from: ReprocessFrom): void {
   if (kind === 'transcript' && from === 'submitTranscription') {
     throw invalidState('This lecture has no audio to transcribe.')
   }
+  if (kind === 'youtube' && (from === 'parseTranscript' || from === 'submitTranscription')) {
+    // Its transcript comes from the video (cached); a failed transcription resumes on Retry.
+    throw invalidState(
+      'This lecture is transcribed from YouTube. Re-run it from concept extraction.',
+    )
+  }
   if (from === 'submitTranscription' && !lecture.audioPath) {
     throw invalidState('The audio was deleted after transcription. Upload it again to re-run.')
+  }
+}
+
+/**
+ * YouTube lectures (F10, review): a Retry that would transcribe again is refused when the result
+ * can't change, and otherwise obeys the Google spend cap like a new YouTube lecture, so one
+ * student can't drain GOOGLE_AI_BUDGET_USD with free Retries.
+ */
+async function assertYoutubeClaim(
+  db: DbLike,
+  lecture: Lecture,
+  from: ReprocessFrom | undefined,
+): Promise<void> {
+  if (lecture.source !== 'youtube') return
+  // With or without ?from: the run starts at transcribeVideo again while it isn't done.
+  const failedTranscription =
+    lecture.status === 'failed' && lecture.error?.step === 'transcribeVideo'
+  if (failedTranscription && FINAL_VIDEO_FAILURES.includes(lecture.error?.code ?? '')) {
+    throw invalidState(
+      'This video can’t be transcribed. Try another video, or upload a transcript.',
+    )
+  }
+  if ((await readStep(db, lecture.id, 'transcribeVideo'))?.status !== 'done') {
+    // The F10 switch stops all Google spend, existing lectures' transcriptions included.
+    if (!youtubeLecturesEnabled()) throw new ApiError('intake_paused', YOUTUBE_PAUSED_MESSAGE)
+    await assertGoogleIntakeOpen(db, serverEnv().GOOGLE_AI_BUDGET_USD)
   }
 }
 
@@ -155,6 +198,7 @@ export async function claimLecture(
   const { lecture } = await loadLectureForWrite(actor, lectureId, db)
   await assertIntakeOpen(db)
   if (from) assertFromFits(lecture, from)
+  await assertYoutubeClaim(db, lecture, from)
   const claimable = from ? [...CLAIMABLE, 'map_ready' as const] : CLAIMABLE
   let claimed: boolean
   try {
@@ -196,14 +240,5 @@ export async function refundReprocess(
   db: DbLike = appDb(),
   now = new Date(),
 ): Promise<void> {
-  await db
-    .update(usageCounters)
-    .set({ count: sql`greatest(${usageCounters.count} - 1, 0)` })
-    .where(
-      and(
-        eq(usageCounters.userId, actor.userId),
-        eq(usageCounters.day, now.toISOString().slice(0, 10)),
-        eq(usageCounters.metric, 'reprocess'),
-      ),
-    )
+  await refundUsage(db, actor.userId, 'reprocess', now)
 }

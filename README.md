@@ -76,6 +76,7 @@ watch test loads YouTube (or the MP3 fallback), so it needs internet. First run:
 | --- | --- | --- |
 | Google sign-in: name, email, Google account id (`openid email profile` only) | Supabase Auth, `profiles` | You delete your account (account menu) |
 | Courses, lectures, transcript segments | `courses`, `lectures`, `transcript_segments` | You delete the lecture or course |
+| Transcripts of public YouTube videos (no student data; shared across students) | `youtube_transcripts` | Kept as a cache |
 | Uploaded audio | Supabase Storage, `audio` bucket | Transcription finishes |
 | Uploaded transcript files (`.vtt`, `.srt`, `.txt`) | Supabase Storage, `transcripts` bucket | You delete the lecture or course |
 | Your markers ("lost" / "important") | `markers`, `marker_concepts` | You delete the lecture or course |
@@ -95,10 +96,12 @@ Mastery is computed from `attempts` on every read; it is never stored separately
 | **Anthropic** (via AI Gateway) | Lecture text, your practice answers | Generation, practice personas |
 | **OpenAI** (via AI Gateway) | Lecture text, your practice answers | Verification, grading, leak-check escalation |
 | **Google** (via AI Gateway) | Same as above | Fallback models only |
+| **Google** (Gemini API, called directly) | The YouTube link you add (a public video), to transcribe it | Only when you add a YouTube lecture |
+| **YouTube Data API** | The video's id, to check it (public, embeddable, length, language) | Only when you paste a YouTube link |
 | **TypeSafe** (via AI Gateway) | The AI author's reply, plus the scenario and its intended correction (no personal data) | Leak check on Spot the flaw and Transfer replies |
 | **AssemblyAI** | Your audio | Only when you upload audio |
 | **Cloudflare Turnstile** | Browser signals for the bot check | Sample-account button only |
-| **YouTube** | The player script (`www.youtube.com/iframe_api`) and the video embed (`youtube-nocookie.com`) | Watching a library lecture |
+| **YouTube** | The player script (`www.youtube.com/iframe_api`) and the video embed (`youtube-nocookie.com`) | Watching a library or YouTube lecture; the preview thumbnail (`i.ytimg.com`) when you paste a link |
 | **CS50** (`cdn.cs50.net`) | A request for the lecture's official MP3 | Only if the YouTube embed fails |
 
 AI providers never receive your name or email.
