@@ -26,9 +26,9 @@ export function Hero() {
               Find what you missed. <em className="text-primary">Prove</em> what you know.
             </h1>
             <p className="text-body-lg text-muted-foreground max-w-[60ch] text-pretty">
-              Mark the moments you get lost. Lectheo turns them into a short diagnosis of what you
-              actually misunderstand, then makes you reason with those ideas until you can show you
-              know them.
+              Read the brief or watch. Mark what&apos;s unclear. Lectheo turns your marks into a
+              short diagnosis of what you actually misunderstand, then makes you reason with those
+              ideas until you can show you know them.
             </p>
           </div>
           <div className="space-y-4">
@@ -69,17 +69,18 @@ export function Problem() {
 
 const STEPS = [
   {
-    title: 'Mark while you watch.',
+    title: "Read the brief or watch. Mark what's unclear.",
     body: (
       <>
-        Press <KeyHint>L</KeyHint> when you&apos;re lost and <KeyHint>I</KeyHint> when something
-        matters. No pausing, no notes. Your marks sit on the lecture&apos;s timeline.
+        Read a few-minute brief of the lecture, or watch it and press <KeyHint>L</KeyHint> when
+        you&apos;re lost and <KeyHint>I</KeyHint> when something matters. No pausing, no notes. Your
+        marks sit on the lecture&apos;s timeline.
       </>
     ),
   },
   {
     title: 'See the lecture as a map.',
-    body: 'Lectheo builds a concept map of the lecture and shows how ideas depend on each other. Your marks land on the concepts they belong to, so confusion is traced back to where it started.',
+    body: 'Lectheo builds a concept map of the lecture and shows how ideas depend on each other. Your marks land on the concepts they belong to, so confusion is traced back to where it started. Every lecture is split into chapters, so you can jump to the part you need.',
   },
   {
     title: 'Get a diagnosis, not a quiz.',

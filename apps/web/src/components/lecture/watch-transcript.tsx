@@ -1,12 +1,14 @@
 'use client'
 
-import type { TranscriptSegmentDto } from '@lectheo/contracts'
+import type { LectureChapter, TranscriptSegmentDto } from '@lectheo/contracts'
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import type { z } from 'zod'
 import { formatTimestamp } from '@/client/format'
 import { useTranscript } from '@/client/queries'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
+import { ChaptersList } from './chapters-list'
 
 type Segment = z.infer<typeof TranscriptSegmentDto>
 
@@ -17,6 +19,9 @@ const FOLLOW_PAUSE_MS = 5_000
 
 export interface TranscriptPanelProps {
   lectureId: string
+  courseId: string
+  /** F11.3: with chapters, the panel has Transcript | Chapters tabs. */
+  chapters: readonly LectureChapter[]
   startMs: number
   playing: boolean
   /** Player time, or null while no player is ready. */
@@ -27,6 +32,8 @@ export interface TranscriptPanelProps {
 /** Owns the playback tick, so only the transcript re-renders while the video plays. */
 export function TranscriptPanel({
   lectureId,
+  courseId,
+  chapters,
   startMs,
   playing,
   currentMs,
@@ -73,43 +80,80 @@ export function TranscriptPanel({
     [onSeek],
   )
 
+  const body = transcript.isPending ? (
+    <Skeleton label="Loading the transcript" className="space-y-3 p-4">
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-5/6" />
+      <Skeleton className="h-4 w-4/6" />
+    </Skeleton>
+  ) : transcript.isError ? (
+    <p className="text-muted-foreground p-4 text-sm">
+      Couldn&apos;t load the transcript.{' '}
+      <button type="button" className="underline" onClick={() => transcript.refetch()}>
+        Retry
+      </button>
+    </p>
+  ) : transcript.data.length === 0 ? (
+    <p className="text-muted-foreground p-4 text-sm">No transcript for this lecture yet.</p>
+  ) : (
+    <ol
+      ref={list}
+      onWheel={markUserScroll}
+      onTouchMove={markUserScroll}
+      className="relative min-h-0 flex-1 space-y-1 overflow-y-auto p-2"
+    >
+      {transcript.data.map((segment) => (
+        <TranscriptRow
+          key={segment.idx}
+          segment={segment}
+          active={segment.idx === activeIdx}
+          onSeek={onSeek ? seek : null}
+        />
+      ))}
+    </ol>
+  )
+  const hasChapters = chapters.length > 0
+
   return (
     <section
-      aria-label="Transcript"
+      aria-label={hasChapters ? 'Transcript and chapters' : 'Transcript'}
       className="bg-card flex max-h-[28rem] min-h-0 min-w-0 flex-col rounded-xl border lg:sticky lg:top-[calc(var(--topbar-height)+1rem)] lg:max-h-[calc(100dvh-var(--topbar-height)-2rem)]"
     >
-      <h2 className="text-heading border-b px-4 py-3">Transcript</h2>
-      {transcript.isPending ? (
-        <Skeleton label="Loading the transcript" className="space-y-3 p-4">
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-5/6" />
-          <Skeleton className="h-4 w-4/6" />
-        </Skeleton>
-      ) : transcript.isError ? (
-        <p className="text-muted-foreground p-4 text-sm">
-          Couldn&apos;t load the transcript.{' '}
-          <button type="button" className="underline" onClick={() => transcript.refetch()}>
-            Retry
-          </button>
-        </p>
-      ) : transcript.data.length === 0 ? (
-        <p className="text-muted-foreground p-4 text-sm">No transcript for this lecture yet.</p>
-      ) : (
-        <ol
-          ref={list}
-          onWheel={markUserScroll}
-          onTouchMove={markUserScroll}
-          className="relative min-h-0 flex-1 space-y-1 overflow-y-auto p-2"
-        >
-          {transcript.data.map((segment) => (
-            <TranscriptRow
-              key={segment.idx}
-              segment={segment}
-              active={segment.idx === activeIdx}
+      {hasChapters ? (
+        <Tabs defaultValue="transcript" className="min-h-0 flex-1 gap-0">
+          <div className="border-b px-3 py-2">
+            <TabsList>
+              <TabsTrigger value="transcript" className="px-3">
+                Transcript
+              </TabsTrigger>
+              <TabsTrigger value="chapters" className="px-3">
+                Chapters
+              </TabsTrigger>
+            </TabsList>
+          </div>
+          {/* Kept mounted, so the transcript keeps its scroll and follow state across tabs. */}
+          <TabsContent
+            value="transcript"
+            forceMount
+            className="flex min-h-0 flex-col data-[state=inactive]:hidden"
+          >
+            {body}
+          </TabsContent>
+          <TabsContent value="chapters" className="flex min-h-0 flex-col">
+            <ChaptersList
+              lectureId={lectureId}
+              courseId={courseId}
+              chapters={chapters}
+              nowMs={nowMs}
               onSeek={onSeek ? seek : null}
             />
-          ))}
-        </ol>
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <>
+          <h2 className="text-heading border-b px-4 py-3">Transcript</h2>
+          {body}
+        </>
       )}
     </section>
   )

@@ -227,7 +227,7 @@ Format: context → decision → consequences. All **Accepted, 4 Oct 2026** (v2 
   - Spot-flaw verdict and location are checked in code. Only the correction goes to the judge.
   - Rubrics are frozen into `activities.rubric_snapshot`.
   - Author replies are capped at 150 tokens and leak-checked before display ([[#ADR-013 · TypeSafe Jev as the leak check, with an LLM escalation|ADR-013]]).
-  - **Amended 7 Oct 2026 *(decided 7 Oct 2026, to be built)*:** `concepts.key_points` stop being secret, because the Study brief ([[Lectheo Product Spec#F9. Study mode — Must|F9]]) shows them. Teach-back still grades against them via `rubric_snapshot`. Everything else above stays hidden.
+  - **Amended 7 Oct 2026 (built):** `concepts.key_points` stop being secret, because the Study brief ([[Lectheo Product Spec#F9. Study mode — Must|F9]]) shows them. Teach-back still grades against them via `rubric_snapshot`. Everything else above stays hidden.
 - **Consequences:**
   - \+ Leak risk reduced structurally.
   - − Author replies aren't streamed (~2.5–3.5 s).
@@ -242,7 +242,7 @@ Format: context → decision → consequences. All **Accepted, 4 Oct 2026** (v2 
 - **Consequences:**
   - \+ The judge path makes no generation calls.
   - − One-time seed cost: planned ≈ $10–12, actual $5.25.
-  - *(decided 7 Oct 2026, to be built)*: chapters ([[Lectheo Product Spec#F11. Chapters — Must|F11]]) are added to the library by a one-off script on the dev key; user lectures get them from the existing `extractConcepts` call at near-zero extra cost.
+  - Chapters ([[Lectheo Product Spec#F11. Chapters — Must|F11]]) were added to the library by a one-off script on the dev key (`pnpm --filter @lectheo/scripts library-chapters`, 3 calls, $0.15, written to `packages/db/src/seed/fixtures/chapters.ts` and loaded by the seed); user lectures get them from the existing `extractConcepts` call at near-zero extra cost.
 
 ### ADR-011 · Capture modes share one timeline: media time
 - **Decision:**

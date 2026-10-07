@@ -42,7 +42,7 @@ The words for the public landing page at `/`. Layout, tokens and section rules a
 
 **Headline:** Find what you missed. *Prove* what you know.
 
-**Lead:** Mark the moments you get lost. Lectheo turns them into a short diagnosis of what you actually misunderstand, then makes you reason with those ideas until you can show you know them.
+**Lead:** Read the brief or watch. Mark what's unclear. Lectheo turns your marks into a short diagnosis of what you actually misunderstand, then makes you reason with those ideas until you can show you know them.
 
 **Primary button:** Try the sample account
 **Secondary button:** Continue with Google
@@ -68,10 +68,10 @@ The words for the public landing page at `/`. Layout, tokens and section rules a
 **Eyebrow:** How it works
 **Title:** From "I'm lost" to proven, in four steps.
 
-1. **Mark while you watch.**
-   Press **L** when you're lost and **I** when something matters. No pausing, no notes. Your marks sit on the lecture's timeline.
+1. **Read the brief or watch. Mark what's unclear.**
+   Read a few-minute brief of the lecture, or watch it and press **L** when you're lost and **I** when something matters. No pausing, no notes. Your marks sit on the lecture's timeline.
 2. **See the lecture as a map.**
-   Lectheo builds a concept map of the lecture and shows how ideas depend on each other. Your marks land on the concepts they belong to, so confusion is traced back to where it started.
+   Lectheo builds a concept map of the lecture and shows how ideas depend on each other. Your marks land on the concepts they belong to, so confusion is traced back to where it started. Every lecture is split into chapters, so you can jump to the part you need.
 3. **Get a diagnosis, not a quiz.**
    A short diagnostic asks how sure you are *before* you see the options. Sure and wrong, twice, is a **confident mistake**: the gap you didn't feel. Each result links to the moment in the lecture that explains it.
 4. **Practice until it's proven.**
@@ -151,17 +151,13 @@ Three columns:
 **Eyebrow:** Your lectures
 **Title:** Try it on CS50, then bring your own.
 
-**Lead:** The sample account comes with Harvard's CS50x Lectures 3, 4 and 5, ready to watch and practice. A Google account starts empty and is yours alone. Add your own lectures:
+**Lead:** The sample account comes with Harvard's CS50x Lectures 3, 4 and 5, ready to study, watch and practice. A Google account starts empty and is yours alone. Add your own lectures:
 
 - **A recording with its transcript.** Pick the video or audio file and its `.vtt` or `.srt` captions (Teams, Zoom and Panopto can export them). The video plays from your laptop and is never uploaded.
 - **Audio only.** Upload the audio; Lectheo transcribes it, then deletes the audio.
 - **A transcript.** Paste or upload the text. Without timestamps you can't mark moments, but you still get the map, the diagnosis and practice.
 
 *Ship when YouTube lectures (F10) are live: add a bullet "**A YouTube video.** Paste the link. It plays through YouTube, and Lectheo builds the map from its transcript."*
-
-*Ship when chapters (F11) are live: in How it works step 2, add "Every lecture is split into chapters, so you can jump to the part you need."*
-
-*Ship when Study mode (F9) is live: in the hero lead and How it works step 1, change "Mark while you watch" to "Read the brief or watch. Mark what's unclear.", and add the FAQ "Do I have to watch the whole lecture?" → "No. Study the brief in a few minutes, watch only the parts you got stuck on, then get tested."*
 
 **Caption:** With a Google account, up to 3 lectures a day, each up to 2 hours.
 
@@ -199,7 +195,10 @@ An AI study partner for lectures. It finds what you personally don't understand,
 Computer science students who learn from lectures, live or recorded. The sample uses CS50x, and the activities are written for CS concepts.
 
 **Do I need an account to try it?**
-No. **Try the sample account** gives you your own copy of a student partway through CS50x, with Lecture 5 ready to watch. It's deleted after 24 hours. To add your own lectures, continue with Google. Your account starts empty: just your courses, nothing preloaded.
+No. **Try the sample account** gives you your own copy of a student partway through CS50x, with Lecture 5 ready to study. It's deleted after 24 hours. To add your own lectures, continue with Google. Your account starts empty: just your courses, nothing preloaded.
+
+**Do I have to watch the whole lecture?**
+No. Study the brief in a few minutes, watch only the parts you got stuck on, then get tested.
 
 **What happens to my lecture recordings?**
 Video never leaves your laptop; only the transcript is uploaded. Audio you upload is deleted as soon as it's transcribed, and so is the transcription provider's copy. Speaker names are removed from transcripts. Deleting a lecture deletes everything made from it. You can delete your account at any time from the account menu. Details are in the [privacy policy](/privacy).

@@ -52,7 +52,10 @@ test('route change and "Done watching" keep keyboard focus on the page', async (
   await page.route(/youtube\.com|youtube-nocookie\.com|ytimg\.com/, (route) => route.abort())
   await signInSample(page)
 
-  await page.getByRole('link', { name: /start watching/i }).focus()
+  await page
+    .getByRole('region', { name: /lecture 5/i })
+    .getByRole('link', { name: 'Watch', exact: true })
+    .focus()
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL(new RegExp(`/lectures/${L5}/watch$`))
   await expect(page.locator('#main')).toBeFocused()

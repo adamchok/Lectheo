@@ -1,7 +1,7 @@
 'use client'
 
 import type { CourseMapResponse, MapNode } from '@lectheo/contracts'
-import { Flag, Star, X } from 'lucide-react'
+import { BookOpenText, Flag, Star, X } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
 import { useEffect, useRef, type ReactNode } from 'react'
@@ -81,6 +81,10 @@ export function NodePanel({ concept, map, onClose }: NodePanelProps) {
     return []
   })
   const seq = (lectureId: string) => lectureById.get(lectureId)?.seq ?? 0
+  // F9: the concept's block in the Study brief of the first lecture that teaches it.
+  const studyLecture = concept.lectureIds
+    .map((id) => lectureById.get(id))
+    .find((l) => l?.status === 'map_ready' || l?.status === 'ready')
   const moments = [...concept.moments].sort(
     (a, b) => seq(a.lectureId) - seq(b.lectureId) || a.tMs - b.tMs,
   )
@@ -92,12 +96,7 @@ export function NodePanel({ concept, map, onClose }: NodePanelProps) {
       className="bg-card border-border w-full space-y-4 rounded-lg border p-5"
     >
       <div className="flex items-start justify-between gap-3">
-        <h2
-          id="node-panel-heading"
-          ref={headingRef}
-          tabIndex={-1}
-          className="text-title-md"
-        >
+        <h2 id="node-panel-heading" ref={headingRef} tabIndex={-1} className="text-title-md">
           {concept.name}
         </h2>
         <Button variant="ghost" size="icon" aria-label="Close details" onClick={onClose}>
@@ -120,6 +119,14 @@ export function NodePanel({ concept, map, onClose }: NodePanelProps) {
       </div>
 
       {concept.summary && <p className="text-body-sm text-pretty">{concept.summary}</p>}
+      {studyLecture && (
+        <Button asChild variant="outline" size="sm">
+          <Link href={`/lectures/${studyLecture.id}#concept-${concept.id}` as Route}>
+            <BookOpenText aria-hidden />
+            Read about it
+          </Link>
+        </Button>
+      )}
 
       <Section title="Practice">
         <PracticeButtons
@@ -157,7 +164,9 @@ export function NodePanel({ concept, map, onClose }: NodePanelProps) {
 
       <Section title="Your markers">
         {moments.length === 0 ? (
-          <p className="text-muted-foreground text-body-sm">You haven&apos;t marked this concept yet.</p>
+          <p className="text-muted-foreground text-body-sm">
+            You haven&apos;t marked this concept yet.
+          </p>
         ) : (
           <ul className="space-y-1">
             {moments.map((m) => (

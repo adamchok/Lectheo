@@ -26,7 +26,12 @@ test('sample sign-in lands on a dashboard pointing at Lecture 5', async ({ page 
 
   const nextStep = page.getByRole('region', { name: /lecture 5/i })
   await expect(nextStep).toBeVisible()
-  await expect(nextStep.getByRole('link', { name: /start watching/i })).toHaveAttribute(
+  // F9.7: Study first, Watch second.
+  await expect(nextStep.getByRole('link', { name: /study lecture 5/i })).toHaveAttribute(
+    'href',
+    `/lectures/${L5}`,
+  )
+  await expect(nextStep.getByRole('link', { name: 'Watch', exact: true })).toHaveAttribute(
     'href',
     `/lectures/${L5}/watch`,
   )
@@ -44,11 +49,14 @@ test('watch Lecture 5: player, transcript, markers with undo persist after reloa
     route.fulfill({ contentType: 'audio/wav', body: silentWav() }),
   )
   await signInSample(page)
-  await page.getByRole('link', { name: /start watching/i }).click()
+  await page
+    .getByRole('region', { name: /lecture 5/i })
+    .getByRole('link', { name: 'Watch', exact: true })
+    .click()
   await expect(page).toHaveURL(new RegExp(`/lectures/${L5}/watch$`))
 
   await expect(page.locator('audio')).toBeAttached()
-  const transcript = page.getByRole('region', { name: 'Transcript' })
+  const transcript = page.getByRole('tabpanel', { name: 'Transcript' })
   await expect(transcript.getByRole('listitem').first()).toBeVisible()
 
   const lost = page.getByRole('button', { name: /i'm lost/i })
@@ -212,5 +220,5 @@ test('sign out: sample data is gone', async ({ page }) => {
   await page.goto('/dashboard')
   await expect(page).toHaveURL(/\/$/)
   await expect(page.getByRole('heading', { name: /welcome back/i })).toHaveCount(0)
-  await expect(page.getByRole('link', { name: /start watching/i })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: /study lecture/i })).toHaveCount(0)
 })
