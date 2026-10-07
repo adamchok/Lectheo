@@ -7,9 +7,15 @@ const turnstile = 'https://challenges.cloudflare.com'
 // Watch mode: IFrame API script from youtube.com; the player frames youtube-nocookie.com.
 const youtube = 'https://www.youtube.com'
 const youtubeFrame = 'https://www.youtube-nocookie.com'
+// YouTube lecture previews (F10.2): the video's thumbnail from YouTube's image host.
+const youtubeImages = 'https://i.ytimg.com'
+const IMG_SRC = `img-src 'self' blob: data: ${youtubeImages}`
 
-/** Enforced: no framing, plugins or <base> hijack. Safe with Next's inline scripts. */
-const CSP = "frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
+/**
+ * Enforced: no framing, plugins or <base> hijack, and images only from us and YouTube's
+ * thumbnail host. Safe with Next's inline scripts.
+ */
+const CSP = `frame-ancestors 'none'; object-src 'none'; base-uri 'self'; ${IMG_SRC}`
 
 /**
  * Full policy, report-only (Next's no-nonce recipe + Supabase, Turnstile and YouTube origins).
@@ -19,7 +25,7 @@ const CSP_REPORT_ONLY = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} ${turnstile} ${youtube}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' blob: data:",
+  IMG_SRC,
   "font-src 'self'",
   `connect-src 'self' ${supabase} ${supabase.replace(/^http/, 'ws')}`,
   `media-src 'self' blob: ${supabase}`,

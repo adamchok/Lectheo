@@ -22,6 +22,9 @@ const ServerEnv = z.object({
     .transform((v) => v === '1' || v === 'true'),
   AI_PROD_BUDGET_USD: z.coerce.number().positive().default(25),
   ASSEMBLYAI_API_KEY: optional,
+  YOUTUBE_API_KEY: optional,
+  GOOGLE_GENERATIVE_AI_API_KEY: optional,
+  GOOGLE_AI_BUDGET_USD: z.coerce.number().positive().default(10),
   CRON_SECRET: optional,
   VERCEL_GIT_COMMIT_SHA: optional,
 })

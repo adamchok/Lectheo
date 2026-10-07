@@ -11,7 +11,7 @@ export default function NewLecturePage() {
       <PageChrome crumbs={[{ label: 'Home', href: '/dashboard' }, { label: 'New lecture' }]} />
       <PageHeader
         title="Add a lecture"
-        description="Import a recording with its transcript, upload audio, or paste a transcript."
+        description="Import a recording with its transcript, upload audio, paste a transcript, or add a YouTube video."
       />
       <NewLectureView />
     </>

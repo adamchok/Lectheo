@@ -17,9 +17,9 @@ type ModeLecture = Pick<LectureResponse, 'id' | 'status' | 'source' | 'hasTimest
 export const hasMap = (l: Pick<LectureResponse, 'status'>): boolean =>
   l.status === 'map_ready' || l.status === 'ready'
 
-/** Watch mode plays library videos and the student's own imported file. */
+/** Watch mode plays library and YouTube videos (the embed) and the student's own imported file. */
 export const canWatch = (l: Pick<LectureResponse, 'source' | 'hasTimestamps'>): boolean =>
-  l.hasTimestamps && (l.source === 'library' || l.source === 'import')
+  l.hasTimestamps && (l.source === 'library' || l.source === 'import' || l.source === 'youtube')
 
 interface ModeLink {
   mode: LectureMode

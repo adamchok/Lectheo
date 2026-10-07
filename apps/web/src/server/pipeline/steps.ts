@@ -22,6 +22,7 @@ import {
   submitTranscriptionStep,
   type PollStatus,
 } from './transcribe'
+import { transcribeVideoStep } from './transcribe-video'
 
 /*
  * Workflow steps ('use step', ADR-002): full Node access, retried on error (FatalError skips the
@@ -81,6 +82,11 @@ export async function pollTranscription(lectureId: string): Promise<PollStatus> 
 export async function fetchTranscript(lectureId: string): Promise<void> {
   'use step'
   await fetchTranscriptStep(appDb(), lectureId, sttClient())
+}
+
+export async function transcribeVideo(lectureId: string): Promise<void> {
+  'use step'
+  await transcribeVideoStep(appDb(), lectureId)
 }
 
 export async function extractConcepts(lectureId: string): Promise<void> {

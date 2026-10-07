@@ -55,6 +55,11 @@ export { judgeTeachBackTask, keyPointRubric } from './tasks/judge-teach-back/tas
 export { judgeTransferTask } from './tasks/judge-transfer/task'
 export { stumpRefereeTask } from './tasks/stump-referee/task'
 export { stumpAnswerTask } from './tasks/stump-answer/task'
+export {
+  transcribeChunkTask,
+  FAKE_SILENT_VIDEO_ID,
+} from './tasks/transcribe-chunk/task'
+export { GoogleHttpError, googleUsage, type GoogleRequest } from './google-direct'
 export { gradedCriteria, type ChatTurn } from './tasks/common'
 export type { ExtractConceptsInput, ExtractConceptsOutput } from './tasks/extract-concepts/schema'
 export type { DraftItemsInput, DraftItemsOutput } from './tasks/draft-items/schema'
@@ -66,3 +71,7 @@ export type { JudgeTeachBackInput } from './tasks/judge-teach-back/schema'
 export type { JudgeTransferInput } from './tasks/judge-transfer/schema'
 export type { StumpRefereeInput, StumpRefereeOutput } from './tasks/stump-referee/schema'
 export type { StumpAnswerInput, StumpAnswerOutput } from './tasks/stump-answer/schema'
+export type {
+  TranscribeChunkInput,
+  TranscribeChunkOutput,
+} from './tasks/transcribe-chunk/schema'

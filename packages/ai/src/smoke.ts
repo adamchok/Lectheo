@@ -69,7 +69,8 @@ async function main(): Promise<number> {
     out('smoke: AI_GATEWAY_API_KEY is not set (use the dev key). Nothing was called.')
     return 1
   }
-  const roles = (Object.keys(ROLES) as Role[]).filter((r) => r !== 'guard')
+  // The transcriber never goes through the gateway (ADR-017).
+  const roles = (Object.keys(ROLES) as Role[]).filter((r) => r !== 'guard' && !ROLES[r].direct)
   const rows = [...(await Promise.all(roles.map(smokeLanguageRole))), await smokeGuard()]
   for (const r of rows) {
     out(

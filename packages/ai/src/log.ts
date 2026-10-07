@@ -1,4 +1,4 @@
-import type { Role } from './models'
+import { roleConfig, type Role } from './models'
 import type { LlmCallEntry, LlmOutcome, TaskContext } from './types'
 import { ZERO_USAGE, type UsageTotals } from './usage'
 
@@ -42,6 +42,7 @@ export function callEntry(
     costUsd: call.usage.costUsd,
     latencyMs: Date.now() - call.started,
     outcome: call.outcome,
+    ...(roleConfig(task.role).direct ? { gatewayKey: roleConfig(task.role).direct } : {}),
   }
 }
 

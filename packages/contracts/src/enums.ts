@@ -4,7 +4,8 @@ import { z } from 'zod'
 
 export const PROFILE_KINDS = ['google', 'sample', 'seed', 'owner'] as const
 export const COURSE_KINDS = ['library', 'personal'] as const
-export const LECTURE_SOURCES = ['library', 'import', 'live', 'audio', 'transcript'] as const
+/** `youtube`: a public YouTube video transcribed by Gemini (F10). */
+export const LECTURE_SOURCES = ['library', 'import', 'live', 'audio', 'transcript', 'youtube'] as const
 export const LECTURE_STATUSES = [
   'draft',
   'uploading',
@@ -55,6 +56,7 @@ export const PIPELINE_STEPS = [
   'submitTranscription',
   'pollTranscription',
   'fetchTranscript',
+  'transcribeVideo',
   'segment',
   'extractConcepts',
   'validateGraph',

@@ -21,6 +21,8 @@ export interface LlmCallEntry {
   readonly costUsd: number | null
   readonly latencyMs: number
   readonly outcome: LlmOutcome
+  /** Who paid when not the app's gateway key: 'google' for the direct Google API (ADR-017). */
+  readonly gatewayKey?: string
 }
 
 /** Injected by the web app — packages/ai never touches the database. */
@@ -44,4 +46,6 @@ export interface TaskContext {
   readonly retryDelayMs?: number
   /** Overrides AI_FAKE detection (tests). */
   readonly fake?: boolean
+  /** Test seam for direct provider calls (the transcriber). Defaults to global fetch. */
+  readonly fetch?: typeof fetch
 }

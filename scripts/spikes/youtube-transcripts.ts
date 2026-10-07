@@ -899,4 +899,6 @@ async function main(): Promise<void> {
   out(`spent so far: $${spent().toFixed(4)} of $${BUDGET_USD}`)
 }
 
-await main()
+// Importable (youtube-validate.ts reuses the scorer): run only when executed directly.
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href)
+  await main()

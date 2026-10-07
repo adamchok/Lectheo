@@ -1,23 +1,39 @@
-import type { LectureMediaJson, LectureResponse } from '@lectheo/contracts'
+import {
+  youtubeRefusalMessage,
+  type LectureMediaJson,
+  type LectureResponse,
+} from '@lectheo/contracts'
 import { courses, eq, lectures, sql } from '@lectheo/db'
 import type { z } from 'zod'
 import type { Actor } from '../auth'
 import { appDb, type DbLike } from '../db'
+import { serverEnv } from '../env'
 import { ApiError, notFound } from '../errors'
 import { loadCourseForWrite } from '../ownership'
-import { consume, MEDIA_LIMITS, tierOf } from '../quota'
+import { assertGoogleIntakeOpen, consume, MEDIA_LIMITS, tierOf } from '../quota'
+import {
+  checkVideo,
+  requireYoutubeId,
+  youtubeClient,
+  type YoutubeClient,
+  type YoutubeVideo,
+} from '../youtube'
 import { toLectureDto } from './read'
 
-/* POST /lectures (API Spec §5, F0.7, F1.5–F1.7, F8.3). */
+/* POST /lectures (API Spec §5, F0.7, F1.5–F1.7, F8.3, F10.2–F10.4). */
+
+const MAX_TITLE = 200
 
 type LectureDto = z.input<typeof LectureResponse>
 
 export interface CreateLectureInput {
   id: string
   courseId: string
-  title: string
-  source: 'import' | 'live' | 'audio' | 'transcript'
+  /** Required except for `youtube`, which defaults to the video's title. */
+  title?: string
+  source: 'import' | 'live' | 'audio' | 'transcript' | 'youtube'
   media?: { localFileName: string; durationMs: number | null }
+  youtubeUrl?: string
 }
 
 const NO_MARKERS = { lost: 0, important: 0 }
@@ -34,6 +50,7 @@ export async function createLecture(
   input: CreateLectureInput,
   db: DbLike = appDb(),
   now = new Date(),
+  youtube?: YoutubeClient,
 ): Promise<LectureDto> {
   if (input.source === 'live') throw notFound()
   const existing = await findOwned(db, actor, input.id)
@@ -43,8 +60,15 @@ export async function createLecture(
   if (input.source === 'import' && input.media?.durationMs != null) {
     assertDuration(actor, input.media.durationMs)
   }
-  const media: LectureMediaJson | null =
-    input.source === 'import' && input.media
+  const video =
+    input.source === 'youtube'
+      ? await checkYoutube(actor, input.youtubeUrl ?? '', db, youtube ?? youtubeClient())
+      : null
+  const title = input.title ?? video?.title.slice(0, MAX_TITLE)
+  if (!title) throw new ApiError('validation_failed', 'Add a title.')
+  const media: LectureMediaJson | null = video
+    ? { youtubeId: video.id, durationMs: video.durationMs }
+    : input.source === 'import' && input.media
       ? { localFileName: input.media.localFileName, durationMs: input.media.durationMs }
       : null
   // Insert first, then count quota in the same transaction: a failed insert or a lost
@@ -55,7 +79,7 @@ export async function createLecture(
       .values({
         id: input.id,
         courseId: course.id,
-        title: input.title,
+        title,
         // ponytail: max+1 without a lock; two concurrent creates in one course may share a seq.
         seq: sql`(select coalesce(max(l.seq), 0) + 1 from lectures l where l.course_id = ${course.id})`,
         source: input.source,
@@ -73,6 +97,32 @@ export async function createLecture(
   const raced = await findOwned(db, actor, input.id)
   if (raced === undefined) throw notFound()
   return raced
+}
+
+/**
+ * F10.3–F10.4 on the server (never trust the preview the client saw): the Google spend cap, then
+ * every Data API check. Too long for a sample account → 403 like any other source; any other
+ * refusal → 422 with the reason in plain words.
+ */
+async function checkYoutube(
+  actor: Actor,
+  url: string,
+  db: DbLike,
+  client: YoutubeClient,
+): Promise<YoutubeVideo> {
+  await assertGoogleIntakeOpen(db, serverEnv().GOOGLE_AI_BUDGET_USD)
+  const video = await client.video(requireYoutubeId(url))
+  const reason = checkVideo(video, tierOf(actor))
+  if (video && reason === 'too_long') assertDuration(actor, video.durationMs)
+  if (!video || reason) {
+    const maxMinutes = MEDIA_LIMITS[tierOf(actor)].maxDurationMs / MINUTE_MS
+    throw new ApiError(
+      'unprocessable_input',
+      youtubeRefusalMessage(reason ?? 'not_found', maxMinutes),
+      { reason: reason ?? 'not_found' },
+    )
+  }
+  return video
 }
 
 /** The existing lecture with this id: the actor's own → its DTO, someone else's → 404. */

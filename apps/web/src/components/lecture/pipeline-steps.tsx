@@ -10,6 +10,7 @@ export const STEP_LABELS: Readonly<Record<PipelineStep, string>> = {
   submitTranscription: 'Sending audio for transcription',
   pollTranscription: 'Transcribing audio',
   fetchTranscript: 'Fetching the transcript',
+  transcribeVideo: 'Transcribing the video',
   segment: 'Splitting into segments',
   extractConcepts: 'Finding the concepts',
   validateGraph: 'Checking concept links',
@@ -29,10 +30,12 @@ const MAP_STEPS: readonly PipelineStep[] = [
   'verifyItems',
 ]
 export const isAudio = (source: LectureSource): boolean => source === 'audio' || source === 'live'
-export const stepsFor = (source: LectureSource): readonly PipelineStep[] =>
-  isAudio(source)
+export function stepsFor(source: LectureSource): readonly PipelineStep[] {
+  if (source === 'youtube') return ['transcribeVideo', ...MAP_STEPS]
+  return isAudio(source)
     ? ['submitTranscription', 'pollTranscription', 'fetchTranscript', ...MAP_STEPS]
     : ['parseTranscript', ...MAP_STEPS]
+}
 
 type StepState = 'done' | 'current' | 'pending' | 'failed'
 

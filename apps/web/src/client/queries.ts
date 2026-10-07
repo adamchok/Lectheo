@@ -18,6 +18,7 @@ import {
   type ReprocessFromStep,
   RedirectResponse,
   TranscriptResponse,
+  YoutubePreviewResponse,
   CourseSummary,
   type ActivityType,
   type LectureStatus,
@@ -290,9 +291,26 @@ export function useDeleteAccount() {
 export interface CreateLectureInput {
   id: string
   courseId: string
-  title: string
-  source: 'import' | 'audio' | 'transcript'
+  /** Optional for `youtube` only: it defaults to the video's title. */
+  title?: string
+  source: 'import' | 'audio' | 'transcript' | 'youtube'
   media?: { localFileName: string; durationMs: number | null }
+  youtubeUrl?: string
+}
+
+/** GET /youtube/preview?url= (F10.2): the card and verdict for a pasted link. */
+export function useYoutubePreview(url: string) {
+  return useQuery({
+    queryKey: ['youtube-preview', url] as const,
+    queryFn: ({ signal }) =>
+      apiFetch(`/youtube/preview?url=${encodeURIComponent(url)}`, {
+        schema: YoutubePreviewResponse,
+        signal,
+      }),
+    enabled: url.length > 0,
+    staleTime: 5 * 60_000,
+    retry: false,
+  })
 }
 
 /** POST /lectures (replay-safe on the caller-held id). */

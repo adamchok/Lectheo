@@ -10,14 +10,13 @@ import {
   ne,
   pipelineSteps,
   sql,
-  usageCounters,
 } from '@lectheo/db'
 import type { z } from 'zod'
 import type { Actor } from '../auth'
 import { appDb, type DbLike } from '../db'
 import { ApiError, invalidState } from '../errors'
 import { type Lecture, loadLectureForWrite } from '../ownership'
-import { assertIntakeOpen, consume } from '../quota'
+import { assertIntakeOpen, consume, refundUsage } from '../quota'
 import { dropOrphanConcepts } from './segments'
 import { sourceKind, stepsFrom } from './state'
 
@@ -61,6 +60,10 @@ function assertFromFits(lecture: Lecture, from: ReprocessFrom): void {
   }
   if (kind === 'transcript' && from === 'submitTranscription') {
     throw invalidState('This lecture has no audio to transcribe.')
+  }
+  if (kind === 'youtube' && (from === 'parseTranscript' || from === 'submitTranscription')) {
+    // Its transcript comes from the video (cached); a failed transcription resumes on Retry.
+    throw invalidState('This lecture is transcribed from YouTube. Re-run it from concept extraction.')
   }
   if (from === 'submitTranscription' && !lecture.audioPath) {
     throw invalidState('The audio was deleted after transcription. Upload it again to re-run.')
@@ -196,14 +199,5 @@ export async function refundReprocess(
   db: DbLike = appDb(),
   now = new Date(),
 ): Promise<void> {
-  await db
-    .update(usageCounters)
-    .set({ count: sql`greatest(${usageCounters.count} - 1, 0)` })
-    .where(
-      and(
-        eq(usageCounters.userId, actor.userId),
-        eq(usageCounters.day, now.toISOString().slice(0, 10)),
-        eq(usageCounters.metric, 'reprocess'),
-      ),
-    )
+  await refundUsage(db, actor.userId, 'reprocess', now)
 }

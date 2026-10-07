@@ -1,9 +1,10 @@
 'use client'
 
 import type { LectureMedia } from '@lectheo/contracts'
-import { Headphones } from 'lucide-react'
+import { ArrowUpRight, Headphones } from 'lucide-react'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import type { z } from 'zod'
+import { Button } from '@/components/ui/button'
 import { loadYouTubeApi, YT_STATE, type YTPlayer } from './watch-player-youtube'
 
 /** What watch mode needs from whichever player is mounted. Times are lecture/player time in ms. */
@@ -34,7 +35,7 @@ const frameClass = 'bg-muted relative aspect-video w-full overflow-hidden rounde
 /**
  * Watch mode player (F1.4): YouTube embed (youtube-nocookie) clipped to [startMs, endMs]. If the
  * embed is blocked (API script or player error), falls back to the official MP3 on the same
- * timeline (Architecture risk 7).
+ * timeline (Architecture risk 7); without one (YouTube lectures, F10.7), links to YouTube.
  */
 export function WatchPlayer({ media, title = 'Lecture video', ...events }: WatchPlayerProps) {
   const [blocked, setBlocked] = useState(false)
@@ -62,13 +63,30 @@ export function WatchPlayer({ media, title = 'Lecture video', ...events }: Watch
       <AudioPlayer src={media.fallbackAudioUrl} startMs={startMs} endMs={endMs} events={latest} />
     )
   }
+  if (media.youtubeId) {
+    // F10.7: a student's YouTube lecture has no audio fallback; YouTube itself may still play it.
+    const at = Math.floor(startMs / 1000)
+    return (
+      <div
+        className={`${frameClass} flex flex-col items-center justify-center gap-3 p-6 text-center`}
+      >
+        <p className="text-muted-foreground text-sm">The video can’t play here.</p>
+        <Button asChild variant="outline" size="sm">
+          <a
+            href={`https://www.youtube.com/watch?v=${media.youtubeId}${at ? `&t=${at}s` : ''}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Open on YouTube
+            <ArrowUpRight aria-hidden />
+          </a>
+        </Button>
+      </div>
+    )
+  }
   return (
     <div className={`${frameClass} flex items-center justify-center p-6 text-center`}>
-      <p className="text-muted-foreground text-sm">
-        {blocked
-          ? 'The video is blocked on this network and there is no audio fallback.'
-          : 'This lecture has no video to play here.'}
-      </p>
+      <p className="text-muted-foreground text-sm">This lecture has no video to play here.</p>
     </div>
   )
 }

@@ -554,3 +554,16 @@ export const rateLimits = pgTable(
   },
   (t) => [primaryKey({ columns: [t.key, t.windowStart] })],
 )
+
+/**
+ * F10.6: transcripts of public YouTube videos, shared across students (a public video's
+ * transcript is not personal data). Cues are validated and stitched. Server-only, RLS deny-all.
+ */
+export const youtubeTranscripts = pgTable('youtube_transcripts', {
+  videoId: text('video_id').primaryKey(),
+  durationMs: integer('duration_ms').notNull(),
+  cues: jsonb('cues').$type<{ startMs: number; endMs: number; text: string }[]>().notNull(),
+  model: text('model').notNull(),
+  promptVersion: text('prompt_version').notNull(),
+  createdAt: createdAt(),
+})

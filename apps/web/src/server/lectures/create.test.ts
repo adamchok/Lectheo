@@ -1,5 +1,5 @@
-import { eq, lectures } from '@lectheo/db'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { eq, lectures, llmCalls } from '@lectheo/db'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   ACTOR_A,
   ACTOR_B,
@@ -8,7 +8,10 @@ import {
   type Fixture,
   ID,
 } from '../courses/test-fixtures'
+import { fakeYoutubeClient } from '../youtube'
 import { createLecture, type CreateLectureInput } from './create'
+
+vi.mock('server-only', () => ({}))
 
 let f: Fixture
 const NEW = '0190a000-0000-7000-8000-00000000a001'
@@ -125,5 +128,96 @@ describe('POST /lectures', () => {
     ).rejects.toMatchObject({ code: 'payload_too_large' })
     // Rejected before the quota is touched: the sample account can still add one.
     expect(await createLecture(ACTOR_S, imp(NEW, 19 * MIN), f.db)).toMatchObject({ id: NEW })
+  })
+})
+
+describe('POST /lectures, source youtube (F10.2–F10.4)', () => {
+  const yt = (over: Partial<CreateLectureInput> = {}): CreateLectureInput => ({
+    id: NEW,
+    courseId: ID.P,
+    source: 'youtube',
+    youtubeUrl: 'https://youtu.be/6Svu_ae5ebk?t=42',
+    ...over,
+  })
+  const spend = (gatewayKey: string, costUsd: number) =>
+    f.db.insert(llmCalls).values({
+      task: 'transcribeChunk',
+      role: 'transcriber',
+      model: 'gemini-3.8-flash',
+      promptVersion: 'transcribe-chunk@1',
+      gatewayKey,
+      costUsd,
+      outcome: 'ok',
+    })
+  const create = (actor = ACTOR_A, over: Partial<CreateLectureInput> = {}) =>
+    createLecture(actor, yt(over), f.db, new Date(), fakeYoutubeClient)
+
+  it('stores only the video id and duration; the title defaults to the video title', async () => {
+    const lecture = await create()
+    expect(lecture).toMatchObject({
+      source: 'youtube',
+      status: 'draft',
+      title: 'Test lecture 6Svu_ae5ebk',
+      media: { youtubeId: '6Svu_ae5ebk', durationMs: 15 * MIN, localFileName: null },
+    })
+    const [row] = await f.db.select().from(lectures).where(eq(lectures.id, NEW))
+    expect(row?.durationMs).toBe(15 * MIN)
+    expect(JSON.stringify(row?.media)).not.toContain('youtu.be')
+    expect(await lecturesUsed(ID.A)).toBe(1)
+  })
+
+  it('keeps a title the student typed', async () => {
+    expect(await create(ACTOR_A, { title: 'Week 3 · Algorithms' })).toMatchObject({
+      title: 'Week 3 · Algorithms',
+    })
+  })
+
+  it.each([
+    ['fakeMissing', 'not_found'],
+    ['fakePrivate', 'private'],
+    ['fakeLiveNow', 'live'],
+    ['fakeNoEmbed', 'embed_disabled'],
+    ['fakeAgeGate', 'age_restricted'],
+    ['fakeTooShrt', 'too_short'],
+    ['fakeFrench0', 'not_english'],
+  ])('re-checks the video on the server: %s → 422 %s, nothing created', async (id, reason) => {
+    await expect(create(ACTOR_A, { youtubeUrl: `https://youtu.be/${id}` })).rejects.toMatchObject({
+      code: 'unprocessable_input',
+      details: { reason },
+    })
+    expect(await f.db.select().from(lectures).where(eq(lectures.id, NEW))).toHaveLength(0)
+    expect(await lecturesUsed(ID.A)).toBe(0)
+  })
+
+  it('422 for a link that is not a YouTube video', async () => {
+    await expect(create(ACTOR_A, { youtubeUrl: 'https://vimeo.com/1' })).rejects.toMatchObject({
+      code: 'unprocessable_input',
+    })
+  })
+
+  it('sample accounts: up to 20 minutes (403 over), one lecture a day', async () => {
+    const sample = (id: string, videoId: string) =>
+      create(ACTOR_S, { id, courseId: SAMPLE_COURSE, youtubeUrl: `https://youtu.be/${videoId}` })
+    await expect(sample(NEW, 'fakeLong45m')).rejects.toMatchObject({
+      code: 'sample_account_restricted',
+      status: 403,
+    })
+    await expect(sample(NEW, 'fakeTooLong')).rejects.toMatchObject({ code: 'payload_too_large' })
+    expect(await sample(NEW, 'cs50Lectur3')).toMatchObject({ id: NEW })
+    await expect(sample(NEW2, 'cs50Lectur4')).rejects.toMatchObject({ code: 'quota_exceeded' })
+  })
+
+  it('refuses new YouTube lectures with intake_paused at 75 % of the Google budget', async () => {
+    // Default GOOGLE_AI_BUDGET_USD = 10. Prod gateway spend doesn't count toward it.
+    await spend('prod', 50)
+    await spend('google', 7.49)
+    expect(await create()).toMatchObject({ id: NEW })
+    await spend('google', 0.01)
+    await expect(create(ACTOR_A, { id: NEW2 })).rejects.toMatchObject({
+      code: 'intake_paused',
+      status: 503,
+    })
+    // Other sources are unaffected.
+    expect(await createLecture(ACTOR_A, input({ id: NEW2 }), f.db)).toMatchObject({ id: NEW2 })
   })
 })

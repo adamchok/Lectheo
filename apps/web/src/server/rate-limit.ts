@@ -17,6 +17,8 @@ export interface RateLimit {
 export const SAMPLE_SIGNIN_LIMIT: RateLimit = { limit: 5, windowMs: 10 * 60_000 }
 /** Transcript uploads per user (POST /lectures/{id}/transcript): each one parses up to 2 MB. */
 export const TRANSCRIPT_UPLOAD_LIMIT: RateLimit = { limit: 10, windowMs: 10 * 60_000 }
+/** YouTube link checks per user (GET /youtube/preview): each one is a Data API call. */
+export const YOUTUBE_PREVIEW_LIMIT: RateLimit = { limit: 30, windowMs: 10 * 60_000 }
 
 /** Counts one request for `key`; false once the window's count exceeds the limit. */
 export async function takeRateLimit(

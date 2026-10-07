@@ -14,6 +14,7 @@ import {
   parseTranscript,
   pollTranscription,
   submitTranscription,
+  transcribeVideo,
   validateGraph,
   verifyItems,
 } from './steps'
@@ -37,7 +38,11 @@ export async function processLecture(lectureId: string): Promise<'ready' | 'fail
   'use workflow'
   let current: PipelineStep = 'parseTranscript'
   try {
-    if ((await beginPipeline(lectureId)) === 'audio') {
+    const kind = await beginPipeline(lectureId)
+    if (kind === 'youtube') {
+      current = 'transcribeVideo'
+      await transcribeVideo(lectureId)
+    } else if (kind === 'audio') {
       current = 'submitTranscription'
       await submitTranscription(lectureId)
       current = 'pollTranscription'
