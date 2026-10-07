@@ -169,8 +169,11 @@ export function StudyConcept({ lecture, concept: c, onPage, open, onOpen }: Stud
           >
             {playable ? <Play aria-hidden /> : <FileText aria-hidden />}
             {playable ? 'Watch this part' : 'Read this part'}
-            {playable && c.clipMs > 0 && (
-              <span className="text-muted-foreground font-normal">· {clipLength(c.clipMs)}</span>
+            {playable && firstMoment !== undefined && (
+              <span className="text-muted-foreground font-normal">
+                · from {formatTimestamp(firstMoment)}
+                {c.clipMs > 0 && ` · ${clipLength(c.clipMs)}`}
+              </span>
             )}
           </Button>
         )}

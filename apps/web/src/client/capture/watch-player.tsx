@@ -5,7 +5,7 @@ import { ArrowUpRight, Headphones } from 'lucide-react'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import type { z } from 'zod'
 import { Button } from '@/components/ui/button'
-import { loadYouTubeApi, YT_STATE, type YTPlayer } from './watch-player-youtube'
+import { firstPlayCheck, loadYouTubeApi, YT_STATE, type YTPlayer } from './watch-player-youtube'
 
 /** What watch mode needs from whichever player is mounted. Times are lecture/player time in ms. */
 export interface WatchPlayerHandle {
@@ -28,8 +28,6 @@ export interface WatchPlayerProps extends WatchPlayerEvents {
 }
 
 const NOCOOKIE_HOST = 'https://www.youtube-nocookie.com'
-/** How far before startMs the first PLAYING position may be before we distrust the timeline. */
-const START_SLACK_MS = 30_000
 const frameClass = 'bg-muted relative aspect-video w-full overflow-hidden rounded-xl'
 
 /**
@@ -120,12 +118,12 @@ function YouTubePlayer({
     root.appendChild(target)
     let player: YTPlayer | null = null
     let cancelled = false
-    let checkedOnPlay = false
+    let firstPlay: 'pending' | 'reseeked' | 'done' = 'pending'
     const unready = () => events.current.onReady(null)
     /*
      * A video shorter than the lecture window is a different cut than the transcript: YouTube
      * would silently play from 0:00 and markers would land on the wrong time. getDuration() can
-     * be 0 at onReady, so this runs again on the first PLAYING state.
+     * be 0 at onReady, so firstPlayCheck runs it again on the first PLAYING state.
      */
     const offTimeline = (p: YTPlayer): boolean => {
       const durationMs = p.getDuration() * 1000
@@ -164,14 +162,22 @@ function YouTubePlayer({
               })
             },
             onStateChange: ({ data }) => {
-              if (data === YT_STATE.PLAYING && !checkedOnPlay) {
-                checkedOnPlay = true
-                // Also catches an ignored `start` (playing from far before the window).
-                const behindMs = startMs - created.getCurrentTime() * 1000
-                if (offTimeline(created) || behindMs > START_SLACK_MS) {
+              if (data === YT_STATE.PLAYING && firstPlay !== 'done') {
+                const verdict = firstPlayCheck({
+                  startMs,
+                  endMs,
+                  currentMs: created.getCurrentTime() * 1000,
+                  durationMs: created.getDuration() * 1000,
+                  reseeked: firstPlay === 'reseeked',
+                })
+                if (verdict === 'blocked') {
                   blocked.current()
                   return
                 }
+                if (verdict === 'reseek') {
+                  firstPlay = 'reseeked'
+                  created.seekTo(startMs / 1000, true)
+                } else firstPlay = 'done'
               }
               if (data === YT_STATE.PLAYING) events.current.onPlayingChange(true)
               if (data === YT_STATE.PAUSED) events.current.onPlayingChange(false)
