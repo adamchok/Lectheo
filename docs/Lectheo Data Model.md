@@ -182,6 +182,7 @@ Index: `(concept_id)`.
 | `canonical_key` | text | normalized name. `UNIQUE (course_id, canonical_key)` |
 | `summary` | text | one grounded sentence |
 | `key_points` | jsonb | 2–5 points with segment citations. The source for teach-back rubrics. **Not secret** since 7 Oct 2026: shown in the Study brief (`GET /lectures/{id}/brief` only; [[Lectheo Product Spec#F9. Study mode — Must|F9]], ADR-009 amended); still frozen into `rubric_snapshot` for teach-back |
+| `depth` | jsonb null | *(decided 7 Oct 2026, to be built)* ([[Lectheo Product Spec#F9. Study mode — Must|F9.13]]): `{ howItWorks: [{ text, cites: [idx] }], example: { text, code?, beyondLecture } \| null, mistakes: [{ mistake, why }] }`, citations are segment indexes of `first_lecture_id`. Written by the pipeline's `explainConcepts` step (in parallel with item drafting) for concepts this lecture introduces; never overwritten by a later lecture; replaced on re-process. `null` until written or if the step failed. Not secret; shown only in the Study brief. Never derived from `item_secrets` |
 | `first_lecture_id` | uuid FK ON DELETE SET NULL | |
 
 Index: `(course_id)`.
