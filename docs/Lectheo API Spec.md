@@ -200,7 +200,7 @@ Examples:
   "media": { "youtubeId": null, "localFileName": "week6.mp4", "durationMs": 3120000 }, "hasTimestamps": true,
   "markerCounts": { "lost": 4, "important": 3 }, "needsReprocess": false, "error": null }
 ```
-Library media also carries `startMs`/`endMs` (the core window) and `fallbackAudioUrl` (CS50's official MP3 on the same timeline, used when the YouTube embed is blocked). Polled every 2 s while `status ∈ {processing, map_ready}`. The map is usable from `map_ready` onwards; `ready` means questions are available too.
+Library media also carries `startMs`/`endMs` (the core window) and `fallbackAudioUrl` (CS50's official MP3 on the same timeline, used when the YouTube embed is blocked). *(decided 7 Oct 2026, to be built)*: the response adds `chapters: [{ id, title, summary, startMs, endMs, conceptIds }]` for lectures with timestamps ([[Lectheo Product Spec#F11. Chapters — Must|F11]]). Polled every 2 s while `status ∈ {processing, map_ready}`. The map is usable from `map_ready` onwards; `ready` means questions are available too.
 
 ### `PATCH /lectures/{id}`: `{ title }` → `200`
 ### `DELETE /lectures/{id}`: `204`. Cascades and removes Storage objects. Library lectures → `404`.
@@ -238,10 +238,10 @@ For **library and already-processed** lectures, markers are linked to concepts *
 ### `DELETE /lectures/{id}/markers/{markerId}`
 Undo (soft delete) → `204`.
 
-Study marks *(decided 7 Oct 2026, to be built)*: `{ id, kind, capture: "study", conceptId }`. The server sets `tMs` to the concept's first source moment in this lecture and links the marker to `conceptId` directly. `409 invalid_state` for lectures without timestamps.
+Study marks *(decided 7 Oct 2026, to be built)*: `{ id, kind, capture: "study", conceptId }` or, for a chapter ([[Lectheo Product Spec#F11. Chapters — Must|F11]]), `{ id, kind, capture: "study", chapterId }`, which links the marker to every concept the chapter covers and sets `tMs` to the chapter's start. The server sets `tMs` to the concept's first source moment in this lecture and links the marker to `conceptId` directly. `409 invalid_state` for lectures without timestamps.
 
 ### `GET /lectures/{id}/brief` *(decided 7 Oct 2026, to be built)*
-The Study brief ([[Lectheo Product Spec#F9. Study mode — Must|F9]]). `200 { lectureId, readMinutes, videoMinutes, concepts: [{ id, name, mastery: { state, confidentMistake }, prerequisites: [{ id, name }], summary, keyPoints: [{ id, text, sources: [SourceRef] }], clips: [{ startMs, endMs }], clipMs, marks: { lost, important } }] }`. Concepts in learning order (prerequisites first, then first appearance). Available from `map_ready`. `readMinutes` = words ÷ 200, rounded up. No AI calls.
+The Study brief ([[Lectheo Product Spec#F9. Study mode — Must|F9]]). `200 { lectureId, readMinutes, videoMinutes, concepts: [{ id, name, mastery: { state, confidentMistake }, prerequisites: [{ id, name }], summary, keyPoints: [{ id, text, sources: [SourceRef] }], clips: [{ startMs, endMs }], clipMs, chapter: { id, title, startMs }, marks: { lost, important } }] }`. Concepts in learning order (prerequisites first, then first appearance). Available from `map_ready`. `readMinutes` = words ÷ 200, rounded up. No AI calls.
 
 ### `GET /youtube/preview?url=` *(decided 7 Oct 2026, to be built)*
 ([[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]]) `200 { videoId, title, channel, durationMs, thumbnailUrl, ok, reason? }`. `reason`: `not_found` · `private` · `embed_disabled` · `live` · `too_short` · `too_long` (tier limit) · `not_english`. Uses the YouTube Data API (`videos.list`, server key); no AI spend.

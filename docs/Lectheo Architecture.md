@@ -210,7 +210,7 @@ flowchart TD
     poll --> fetch["fetchTranscript<br/>sentences → truncate to tier limit · delete audio + remote transcript"]
     pt --> seg["segment<br/>sentence groups ≤ 40 s · PK (lecture, idx)"]
     fetch --> seg
-    seg --> ex["extractConcepts<br/>reasoner · counts scaled to length · existing course concepts in prompt"]
+    seg --> ex["extractConcepts<br/>reasoner · counts scaled to length · existing course concepts in prompt · chapters by segment index (F11, to be built)"]
     ex --> vg["validateGraph<br/>citations exist · DAG · dedupe by canonical key"]
     vg --> lay["layoutMap<br/>ELK once · store positions + layout_hash"]
     lay --> al["alignMarkers"]
@@ -357,7 +357,7 @@ concept           = argmax overlap(markerSegments, concept.occurrence segments)
                     ties → concept with most occurrences in the window
                     none → "unlinked" (shown on the lecture timeline)
 ```
-Runs on write for processed lectures, and in the pipeline otherwise. Study marks ([[Lectheo Product Spec#F9. Study mode — Must|F9]], *(decided 7 Oct 2026, to be built)*) skip alignment: they name their concept. Window sizes are tuned on the CS50 lectures.
+Runs on write for processed lectures, and in the pipeline otherwise. Study marks ([[Lectheo Product Spec#F9. Study mode — Must|F9]], *(decided 7 Oct 2026, to be built)*) skip alignment: they name their concept. Chapter marks ([[Lectheo Product Spec#F11. Chapters — Must|F11]]) likewise link to the chapter's concepts directly. Window sizes are tuned on the CS50 lectures.
 
 ### 6.2 Mastery
 Input: the user's attempts for a concept (excluding `invalid`). *Independent* = diagnostic with confidence `sure`, or a practice attempt with `assisted = false`.
@@ -413,7 +413,7 @@ nothing at all left → add_lecture ("Add Lecture N+1" in an own course / "Add y
 | `/dashboard` | Course cards, lecture list and status, "Next step" card, account menu (sample label + Reset; *Delete account* for Google accounts). Google first run: an empty first-run screen with *Add your first lecture* |
 | `/courses/[id]` | Concept map (React Flow, stored ELK layout) + list view toggle + lecture timeline with unlinked markers |
 | `/lectures/new` | Add lecture: Import recording · Upload audio · Paste or upload transcript, with the consent checkbox (Record live is not built) |
-| `/lectures/[id]/watch` | Watch mode (YouTube or local file) with L/I marking, transcript side panel |
+| `/lectures/[id]/watch` | Watch mode (YouTube or local file) with L/I marking, transcript side panel. *(decided 7 Oct 2026, to be built)*: a **Chapters** tab with progress-bar ticks, *play this chapter only* and chapter-level marks ([[Lectheo Product Spec#F11. Chapters — Must|F11]]) |
 | `/lectures/[id]` | Processing progress (2 s polling) and transcript |
 | `/lectures/[id]/diagnostic` | Confidence-first questions, instant feedback, results |
 | `/activities/[id]` | Spot the flaw / Teach-back / Transfer / Stump (beta) |

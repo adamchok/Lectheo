@@ -242,6 +242,7 @@ Format: context → decision → consequences. All **Accepted, 4 Oct 2026** (v2 
 - **Consequences:**
   - \+ The judge path makes no generation calls.
   - − One-time seed cost: planned ≈ $10–12, actual $5.25.
+  - *(decided 7 Oct 2026, to be built)*: chapters ([[Lectheo Product Spec#F11. Chapters — Must|F11]]) are added to the library by a one-off script on the dev key; user lectures get them from the existing `extractConcepts` call at near-zero extra cost.
 
 ### ADR-011 · Capture modes share one timeline: media time
 - **Decision:**

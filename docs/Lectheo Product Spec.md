@@ -265,6 +265,19 @@ Activities are ordered by the recommender: confident mistakes → red → marked
 | F10.7 | Watch and Study use the YouTube embed (marks work as in the library). If the embed fails, show "Open on YouTube"; there is no audio fallback. The video is never downloaded. | Should |
 | F10.8 | Privacy page and README list Google (Gemini, transcription of YouTube links) and the YouTube Data API. | Should |
 
+### F11. Chapters — Must
+
+*Decided 7 Oct 2026, to be built in the same session as F9.* Students want to jump to the part they need and listen to just that, like a well-chaptered YouTube video.
+
+| ID | Requirement | Priority |
+|---|---|---|
+| F11.1 | Every lecture with timestamps gets **chapters**: about 8–15 per hour, each with a short title, a one-line description, its start and end, and the concepts it covers. Non-concept parts get chapters too ("Announcements", "Q&A", "Recap") so they can be skipped. Lectures without timestamps get none. | Must |
+| F11.2 | Chapters come from the **existing `extractConcepts` call** (no extra AI call). The model names the **transcript line** each chapter starts at (`[s42]`), never a time; the server reads the real time from that segment, so timestamps are exact. Validated: in order, no overlaps, covering the lecture from the first to the last segment, concept references existing. | Must |
+| F11.3 | **Watch page:** a **Chapters** tab beside Transcript lists time, title and description; the current chapter is highlighted as the media plays; clicking jumps there. Chapter ticks sit on the progress bar. **Play this chapter only** stops playback at the chapter's end. | Must |
+| F11.4 | Each chapter row with concepts has quiet **I'm lost** / **Important** buttons. The marker (capture `study`, at the chapter's start) links **directly to every concept the chapter covers**. Chapters without concepts show no buttons. L/I during playback keep working as before. | Must |
+| F11.5 | **Study page** (F9): each concept shows where it sits ("In chapter 4 · 23:10", a link). **Lecture header:** "12 chapters · 58 min". | Must |
+| F11.6 | The **CS50 library** gets chapters through a one-off script run on the dev key; it only adds data, so the item bank and stable ids don't change. | Must |
+
 ---
 
 ## 4. User journeys
@@ -303,7 +316,7 @@ Sign in with Google → **Record live** in the lecture hall and tap L / I → st
 
 ### 4.4 Student with a long lecture (Study mode, *(decided 7 Oct 2026, to be built)*)
 
-Sign in → add the lecture (recording + .vtt, audio, transcript, or a YouTube link once F10 ships) → **Study** the brief in ~15 minutes, tapping *I'm lost here* on two concepts → watch only those two clips → **Test me** → the diagnostic starts with the marked concepts and finds a confident mistake → Spot the flaw → Mastered over the following days. The full video is never watched end to end.
+Sign in → add the lecture (recording + .vtt, audio, transcript, or a YouTube link once F10 ships) → **Study** the brief in ~15 minutes, tapping *I'm lost here* on two concepts → watch only those two clips, or jump to the two chapters that sounded hard (F11) → **Test me** → the diagnostic starts with the marked concepts and finds a confident mistake → Spot the flaw → Mastered over the following days. The full video is never watched end to end.
 
 ## 5. Value proposition
 
@@ -341,7 +354,7 @@ Full analysis, profiles, feature matrix and sources: **[[Lectheo Competition]]**
 
 **In scope (Must):** sign-in page (Google + sample account); dashboard; CS50 library with watch mode; import recording + transcript; audio and transcript upload; markers; concept map + list view; adaptive diagnostic; spot the flaw; teach-back; Socratic feedback; mastery map; consent, deletion and limits.
 
-**Decided 7 Oct 2026, to be built:** Study mode ([[#F9. Study mode — Must|F9]], Must); YouTube lectures ([[#F10. YouTube lectures — Should (after a spike)|F10]], Should, only if the spike passes).
+**Decided 7 Oct 2026, to be built:** Study mode ([[#F9. Study mode — Must|F9]], Must); chapters ([[#F11. Chapters — Must|F11]], Must, with F9); YouTube lectures ([[#F10. YouTube lectures — Should (after a spike)|F10]], Should, only if the spike passes).
 
 **Should (in order):** record live (slim) → Stump the AI (beta) → transfer problems → slides as extra input → transcript correction → own-course dedupe → persona picker.
 
@@ -399,6 +412,8 @@ Full analysis, profiles, feature matrix and sources: **[[Lectheo Competition]]**
 - [ ] Final tagline.
 - [ ] Any evidence from 3–5 real students that they would tap "I'm lost" during a lecture? (Strengthens Real-World Impact.)
 
+*Decided on 7 Oct 2026:* **Chapters** (F11): AI chapters from the existing extraction call, anchored to transcript lines so times are exact; a Chapters tab with *play this chapter only*; chapter-level marks linked straight to the chapter's concepts; the library gets chapters by a one-off script; built in the same session as Study mode.
+
 *Decided on 7 Oct 2026:* **Study mode** (F9): a lecture brief from the existing summaries and key points, in prerequisite order, with inline clips, *I'm lost here* marks linked straight to concepts (capture `study`), no progress tracking, Study before Watch in the next step, and **key points shown to students** (ADR-009 amended). **YouTube lectures** (F10): spike first; if it passes, Gemini transcribes public YouTube links (direct Google key if the gateway can't), transcripts cached per video, English only, embed-disabled videos refused, sample accounts allowed 1 per day ≤ 20 min.
 
 *Decided on 7 Oct 2026:* Teams `.docx` import is dropped: real Teams exports carry one timestamp per speaker turn, which breaks marker alignment and the lecture links. Teams always offers `.vtt` from the same menu, so `.docx` adds no reach. A `.docx` upload is refused with a pointer to the `.vtt`.
@@ -429,6 +444,7 @@ Built on 6 Oct 2026: F0.4 (the dashboard follows the student's own course), F0.6
 | Req | Item |
 |---|---|
 | F9 | Study mode (lecture brief) |
+| F11 | Chapters (same session as F9) |
 | F10 | YouTube lectures, only if the F10.1 spike passes |
 
 ### Should items: built or cut
