@@ -36,6 +36,13 @@
       "when": 1791225237808,
       "tag": "0004_rate_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791362226190,
+      "tag": "0005_study_chapters",
+      "breakpoints": true
     }
   ]
 }

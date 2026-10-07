@@ -1,7 +1,7 @@
 import type { ExtractConceptsOutput } from '@lectheo/ai'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { validateGraphStep } from './graph'
-import { graphErrors, planGraph, type CourseEdge } from './graph-check'
+import { graphErrors, planChapters, planGraph, type CourseEdge } from './graph-check'
 import { createPipelineFixture, rows, type PipelineFixture } from './test-fixture'
 
 vi.mock('server-only', () => ({}))
@@ -16,6 +16,13 @@ const concept = (canonicalKey: string, segmentIdxs = [0]) => ({
 })
 
 type Edge = ExtractConceptsOutput['edges'][number]
+type ExtractedChapter = ExtractConceptsOutput['chapters'][number]
+const chapter = (startIdx: number, conceptKeys: string[] = []): ExtractedChapter => ({
+  title: `From s${startIdx}`,
+  summary: 'One line.',
+  startIdx,
+  conceptKeys,
+})
 const dependsOn = (fromKey: string, toKey: string): Edge => ({
   fromKey,
   toKey,
@@ -26,7 +33,8 @@ const dependsOn = (fromKey: string, toKey: string): Edge => ({
 const extraction = (
   concepts: ReturnType<typeof concept>[],
   edges: Edge[] = [],
-): ExtractConceptsOutput => ({ concepts, edges })
+  chapters: ExtractedChapter[] = [],
+): ExtractConceptsOutput => ({ concepts, edges, chapters })
 
 const SEGMENTS = new Set([0, 1, 2])
 
@@ -84,6 +92,48 @@ describe('graphErrors', () => {
   })
 })
 
+describe('planChapters (F11.2)', () => {
+  const IDXS = [0, 1, 2, 3, 4, 5]
+  const withChapters = (chapters: ExtractedChapter[]) =>
+    extraction([concept('pointer'), concept('malloc')], [], chapters)
+
+  it('turns valid starts into ranges whose concepts are plan nodes (existing ones reused)', () => {
+    const out = withChapters([chapter(0, ['pointer', 'arrays']), chapter(3, ['malloc'])])
+    const plan = planGraph(out, [{ id: 'X', canonicalKey: 'arrays', name: 'Arrays' }])
+    expect(planChapters(out, plan, IDXS, 4, true)).toEqual({
+      errors: [],
+      chapters: [
+        expect.objectContaining({
+          id: 'ch1',
+          startIdx: 0,
+          endIdx: 2,
+          concepts: ['new:pointer', 'X'],
+        }),
+        expect.objectContaining({ id: 'ch2', startIdx: 3, endIdx: 5, concepts: ['new:malloc'] }),
+      ],
+    })
+  })
+
+  it('drops invalid chapters (with the reasons) instead of failing the map', () => {
+    const out = withChapters([chapter(2, ['ghost']), chapter(1)])
+    const result = planChapters(out, planGraph(out, []), IDXS, 4, true)
+    expect(result.chapters).toBeNull()
+    expect(result.errors).toEqual([
+      'chapters: the first chapter must start at s0',
+      'chapter 1 "From s2": unknown concept "ghost"',
+      'chapter 2 "From s1": must start after chapter 1 (s2)',
+    ])
+  })
+
+  it('gives untimed lectures no chapters', () => {
+    const out = withChapters([chapter(0)])
+    expect(planChapters(out, planGraph(out, []), IDXS, 4, false)).toEqual({
+      chapters: null,
+      errors: [],
+    })
+  })
+})
+
 describe('validateGraph step', () => {
   let f: PipelineFixture
   beforeEach(async () => {
@@ -104,5 +154,63 @@ describe('validateGraph step', () => {
       `SELECT status, output FROM pipeline_steps WHERE step = 'validateGraph'`,
     )
     expect(step).toMatchObject({ status: 'failed', output: { error: { code: 'invalid_graph' } } })
+  })
+
+  const storeExtraction = (out: ExtractConceptsOutput) =>
+    f.exec(`INSERT INTO pipeline_steps (lecture_id, step, status, output)
+      VALUES ('${f.lectureId}', 'extractConcepts', 'done',
+        '${JSON.stringify({ extraction: out, model: 'fake' })}'::jsonb)`)
+  const storedChapters = async () =>
+    (
+      await rows<{ chapters: unknown }>(
+        f,
+        `SELECT chapters FROM lectures WHERE id = '${f.lectureId}'`,
+      )
+    )[0]?.chapters
+
+  it('stores chapters with concept ids, replacing them on a re-run', async () => {
+    await storeExtraction(
+      extraction(
+        [concept('pointer'), concept('malloc', [3])],
+        [],
+        [chapter(0, ['pointer']), chapter(3, ['malloc', 'pointer'])],
+      ),
+    )
+    await validateGraphStep(f.db, f.lectureId)
+    const ids = Object.fromEntries(
+      (
+        await rows<{ id: string; canonical_key: string }>(
+          f,
+          `SELECT id, canonical_key FROM concepts`,
+        )
+      ).map((r) => [r.canonical_key, r.id]),
+    )
+    expect(await storedChapters()).toEqual([
+      {
+        id: 'ch1',
+        title: 'From s0',
+        summary: 'One line.',
+        startIdx: 0,
+        endIdx: 2,
+        conceptIds: [ids.pointer],
+      },
+      {
+        id: 'ch2',
+        title: 'From s3',
+        summary: 'One line.',
+        startIdx: 3,
+        endIdx: 11,
+        conceptIds: [ids.malloc, ids.pointer],
+      },
+    ])
+  })
+
+  it('keeps the map but stores no chapters when they are invalid', async () => {
+    await storeExtraction(extraction([concept('pointer')], [], [chapter(5)]))
+    await expect(validateGraphStep(f.db, f.lectureId)).resolves.toMatchObject({
+      concepts: 1,
+      chapters: 0,
+    })
+    expect(await storedChapters()).toBeNull()
   })
 })

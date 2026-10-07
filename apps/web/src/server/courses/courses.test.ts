@@ -126,7 +126,7 @@ describe('GET /courses/{id}/map', () => {
     expect(sourcesOf(ID.C3)).toEqual([])
   })
 
-  it('never contains 🔒 key points', async () => {
+  it('leaves key points to the Study brief', async () => {
     const json = JSON.stringify(await getCourseMap(ACTOR_A, ID.LIB, f.db))
     expect(json).not.toContain('keyPoints')
     expect(json).not.toContain('key_points')

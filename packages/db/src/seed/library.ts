@@ -1,5 +1,6 @@
 import {
   AnswerKeyByKind,
+  Chapters,
   CourseAttributionJson,
   DistractorMeta,
   HintsSecret,
@@ -9,7 +10,9 @@ import {
   PublicPayloadByKind,
   RubricSecret,
 } from '@lectheo/contracts'
+import { chapterErrors, toChapterRanges } from '@lectheo/domain'
 import type * as s from '../schema'
+import { LIBRARY_CHAPTERS } from './fixtures/chapters'
 import { EDGES, EXTRA_OCCURRENCES } from './fixtures/edges'
 import { lecture3Items } from './fixtures/l3-items'
 import { lecture3 } from './fixtures/l3-lecture'
@@ -83,7 +86,33 @@ const assertCites = (lecture: LectureFx, segs: readonly number[], what: string):
   return [...segs]
 }
 
-const buildLecture = (lecture: LectureFx): Insert<typeof s.lectures> => {
+/** F11.6: the fixture's chapters, checked like the pipeline checks them (null when none). */
+const buildChapters = (lecture: LectureFx, owners: Map<string, LectureFx>): Chapters | null => {
+  const fx = LIBRARY_CHAPTERS[lecture.key]
+  if (!fx || fx.length === 0) return null
+  const idxs = lecture.segments.map((seg) => seg.idx)
+  const starts = fx.map((c) => ({ ...c, startIdx: c.start }))
+  const minutes = (clockToMs(lecture.end) - clockToMs(lecture.start)) / 60_000
+  const errors = chapterErrors(starts, idxs, minutes, (key) => owners.has(key))
+  if (errors.length > 0) throw new Error(`seed: ${lecture.key} chapters: ${errors.join('; ')}`)
+  return Chapters.parse(
+    toChapterRanges(starts, Math.max(...idxs)).map(
+      ({ id, title, summary, startIdx, endIdx, concepts }) => ({
+        id,
+        title,
+        summary,
+        startIdx,
+        endIdx,
+        conceptIds: concepts.map(conceptId),
+      }),
+    ),
+  )
+}
+
+const buildLecture = (
+  lecture: LectureFx,
+  owners: Map<string, LectureFx>,
+): Insert<typeof s.lectures> => {
   const media = LectureMediaJson.parse({
     youtubeId: lecture.youtubeId,
     startMs: clockToMs(lecture.start),
@@ -101,6 +130,7 @@ const buildLecture = (lecture: LectureFx): Insert<typeof s.lectures> => {
     media,
     hasTimestamps: true,
     durationMs: media.durationMs ?? null,
+    chapters: buildChapters(lecture, owners),
     createdAt: FIXTURE_CREATED_AT,
     updatedAt: FIXTURE_CREATED_AT,
   }
@@ -240,7 +270,7 @@ export function buildLibraryRows(): LibraryRows {
       attribution: CourseAttributionJson.parse(LIBRARY_ATTRIBUTION),
       createdAt: FIXTURE_CREATED_AT,
     },
-    lectures: LECTURES.map(buildLecture),
+    lectures: LECTURES.map((l) => buildLecture(l, owners)),
     segments: LECTURES.flatMap(buildSegments),
     ...buildGraph(owners),
     ...buildItems(owners),

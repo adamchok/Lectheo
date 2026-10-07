@@ -13,8 +13,10 @@ export {
 } from './ids'
 export { seedAll, seedLibrary, seedStudent, type SeedDb, type SeedCounts } from './load'
 export { buildLibraryRows, clockToMs, ITEMS, LECTURES, type LibraryRows } from './library'
+export { LIBRARY_CHAPTERS } from './fixtures/chapters'
 export { buildStudentRows, DEFAULT_SEED_BASE_DATE, type StudentRows } from './student'
 export type {
+  ChapterFx,
   ConceptFx,
   EdgeFx,
   ExtraOccurrenceFx,

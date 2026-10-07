@@ -6,6 +6,9 @@ import { z } from 'zod'
  * ADR-009 / Data Model invariant 1: no response schema may carry a 🔒 field.
  * Walks every exported *Response schema recursively (Zod 4 `_zod.def` introspection).
  * `correctOptionId` is allowed: AnswerResponse reveals it after the answer (API Spec §6).
+ * Key points stopped being secret when ADR-009 was amended (F9.8), but only the Study brief shows
+ * them: everywhere else they stay out, and answer keys, flaws, rubrics, hints and leak keywords
+ * stay hidden everywhere, the brief included.
  */
 const FORBIDDEN_KEYS = [
   'answerKey',
@@ -18,6 +21,11 @@ const FORBIDDEN_KEYS = [
   'flawSummary',
   'modelSolution',
 ]
+
+/** The one place each otherwise-forbidden path may appear. */
+const ALLOWED_PATHS: Readonly<Record<string, readonly string[]>> = {
+  BriefResponse: ['$.concepts[].keyPoints'],
+}
 
 interface Def {
   type: string
@@ -93,6 +101,7 @@ describe('response contracts never expose secret fields', () => {
         'SubmitResponse',
         'AnswerResponse',
         'CourseMapResponse',
+        'BriefResponse',
       ]),
     )
   })
@@ -106,8 +115,17 @@ describe('response contracts never expose secret fields', () => {
     expect(collectKeys(planted).map(leafKey)).toContain('answerKey')
   })
 
-  it.each(responseSchemas)('%s has no 🔒 keys', (_name, schema) => {
-    const leaks = collectKeys(schema).filter((p) => FORBIDDEN_KEYS.includes(leafKey(p)))
+  it.each(responseSchemas)('%s has no 🔒 keys', (name, schema) => {
+    const allowed = ALLOWED_PATHS[name] ?? []
+    const leaks = collectKeys(schema).filter(
+      (p) => FORBIDDEN_KEYS.includes(leafKey(p)) && !allowed.includes(p),
+    )
     expect(leaks).toEqual([])
+  })
+
+  it('the Study brief shows key points (F9.8)', () => {
+    expect(collectKeys(contracts.BriefResponse)).toEqual(
+      expect.arrayContaining(['$.concepts[].keyPoints']),
+    )
   })
 })

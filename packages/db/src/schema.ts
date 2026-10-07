@@ -40,6 +40,7 @@ import {
   STEP_STATUSES,
   USAGE_METRICS,
   type AttemptGrading,
+  type Chapters,
   type CourseAttributionJson,
   type DistractorMeta,
   type HintsSecret,
@@ -142,6 +143,8 @@ export const lectures = pgTable(
     workflowRunId: text('workflow_run_id'),
     needsReprocess: boolean('needs_reprocess').notNull().default(false),
     error: jsonb('error').$type<LectureError>(),
+    /** F11: segment-index chapters from extractConcepts; null without timestamps. */
+    chapters: jsonb('chapters').$type<Chapters>(),
     createdAt: createdAt(),
     updatedAt: tsz('updated_at')
       .notNull()
@@ -238,7 +241,7 @@ export const concepts = pgTable(
     name: text('name').notNull(),
     canonicalKey: text('canonical_key').notNull(),
     summary: text('summary').notNull(),
-    /** 🔒 source for teach-back rubrics; never serialized to clients. */
+    /** Shown in the Study brief (ADR-009 amended); frozen into rubric_snapshot for teach-back. */
     keyPoints: jsonb('key_points').$type<KeyPoints>().notNull(),
     firstLectureId: uuid('first_lecture_id').references(() => lectures.id, {
       onDelete: 'set null',
@@ -349,7 +352,10 @@ export const itemSecrets = pgTable('item_secrets', {
   distractorMeta: jsonb('distractor_meta').$type<DistractorMeta>(),
   rubric: jsonb('rubric').$type<RubricSecret>(),
   hints: jsonb('hints').$type<HintsSecret>(),
-  leakKeywords: text('leak_keywords').array().notNull().default(sql`'{}'::text[]`),
+  leakKeywords: text('leak_keywords')
+    .array()
+    .notNull()
+    .default(sql`'{}'::text[]`),
 })
 
 // ---------- learner activity ----------

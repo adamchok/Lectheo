@@ -1,6 +1,14 @@
 import type { ExtractConceptsOutput } from '@lectheo/ai'
 import type { Relation } from '@lectheo/contracts'
-import { canonicalKey, isDag, validateCitations, type GraphEdge } from '@lectheo/domain'
+import {
+  canonicalKey,
+  chapterErrors,
+  isDag,
+  toChapterRanges,
+  validateCitations,
+  type ChapterRange,
+  type GraphEdge,
+} from '@lectheo/domain'
 
 /*
  * validateGraph rules (Architecture §4.3, F2.7, ADR-006, ADR-012), pure: dedupe extracted concepts
@@ -43,6 +51,8 @@ export interface GraphPlan {
   edges: PlannedEdge[]
   /** Edge endpoints that matched neither an extracted nor an existing concept. */
   unknownKeys: string[]
+  /** A concept key (extracted or existing) → its node id, or null. */
+  resolve: (key: string) => string | null
 }
 
 /** "Linked Lists", "linked-list" and "linked_lists" are the same concept. */
@@ -87,7 +97,7 @@ export function planGraph(
       ? [{ from, to, relation: e.relation, segmentIdxs: e.segmentIdxs }]
       : []
   })
-  return { concepts: [...byNorm.values()], edges, unknownKeys }
+  return { concepts: [...byNorm.values()], edges, unknownKeys, resolve }
 }
 
 /** depends_on cycle across the whole course (existing edges + this lecture's). */
@@ -128,4 +138,37 @@ export function graphErrors(
     ...edgeErrors,
     ...cycleErrors(plan, courseEdges),
   ]
+}
+
+export interface ChapterPlan {
+  /** Ranges with concept node ids, or null (no timestamps, none given, or invalid). */
+  chapters: ChapterRange[] | null
+  errors: string[]
+}
+
+/**
+ * F11.2: chapters are checked here, not in the extraction call, so a bad chapter list never fails
+ * the map: it is dropped (and logged), and the lecture simply has no chapters.
+ */
+export function planChapters(
+  extraction: ExtractConceptsOutput,
+  plan: GraphPlan,
+  segmentIdxs: readonly number[],
+  minutes: number,
+  hasTimestamps: boolean,
+): ChapterPlan {
+  if (!hasTimestamps || extraction.chapters.length === 0) return { chapters: null, errors: [] }
+  const starts = extraction.chapters.map((c) => ({
+    title: c.title.trim(),
+    summary: c.summary.trim(),
+    startIdx: c.startIdx,
+    concepts: c.conceptKeys,
+  }))
+  const errors = chapterErrors(starts, segmentIdxs, minutes, (key) => plan.resolve(key) !== null)
+  if (errors.length > 0) return { chapters: null, errors }
+  const resolved = starts.map((c) => ({
+    ...c,
+    concepts: c.concepts.flatMap((key) => plan.resolve(key) ?? []),
+  }))
+  return { chapters: toChapterRanges(resolved, Math.max(...segmentIdxs)), errors: [] }
 }

@@ -26,7 +26,12 @@ export const PRIORITY_WEIGHTS = {
 export const RECENT_PRACTICE_WINDOW_MS = 10 * 60 * 1000
 
 /** Practice order (Architecture §6.3); transfer and stump only when enabled. */
-export const PRACTICE_ORDER: readonly ActivityType[] = ['spot_flaw', 'teach_back', 'transfer', 'stump']
+export const PRACTICE_ORDER: readonly ActivityType[] = [
+  'spot_flaw',
+  'teach_back',
+  'transfer',
+  'stump',
+]
 
 export interface EnabledActivities {
   readonly transfer?: boolean
@@ -105,9 +110,7 @@ export function prerequisitesOfRed(
   redConceptIds: ReadonlySet<string>,
 ): ReadonlySet<string> {
   return new Set(
-    edges
-      .filter((e) => e.relation === 'depends_on' && redConceptIds.has(e.from))
-      .map((e) => e.to),
+    edges.filter((e) => e.relation === 'depends_on' && redConceptIds.has(e.from)).map((e) => e.to),
   )
 }
 
@@ -136,6 +139,8 @@ export interface LectureRef {
   /** "Lecture 5" for library lectures, the student's own title otherwise. */
   readonly title: string
   readonly durationMs?: number | null
+  /** Study brief reading time (F9.5), when known. */
+  readonly readMinutes?: number | null
 }
 
 /** One of the student's own marks, as evidence. */
@@ -188,7 +193,7 @@ export const PAYOFFS = {
   confidentMistake: 'A correct answer here clears the confident mistake.',
   red: 'A correct answer moves it to Getting there.',
   oneMoreWin: 'One more independent win in a different activity → Mastered.',
-  watch: 'Your marks decide what the diagnostic asks.',
+  study: 'Your marks decide what the diagnostic asks.',
   diagnostic: "Finds the mistakes you're sure about.",
   stump: "The hardest test there is: write a question the AI can't answer.",
 } as const
@@ -216,16 +221,20 @@ export function dashboardNextStep(input: NextStepInput): NextStepResponse {
   if (processing) {
     return lectureStep('processing', processing, `${processing.title} is being processed.`, null)
   }
+  // F9.7: Study first (watching stays one click away on the card).
   const lecture = input.unwatchedLibraryLectures[0]
   if (lecture) {
     return {
       ...lectureStep(
-        'watch',
+        'study',
         lecture,
-        `${lecture.title} is ready. Watch it and tap when you're lost.`,
-        PAYOFFS.watch,
+        `${lecture.title} is ready. Study it in a few minutes and mark what's unclear.`,
+        PAYOFFS.study,
       ),
-      estimateMinutes: durationMinutes(lecture.durationMs),
+      estimateMinutes:
+        lecture.readMinutes != null && lecture.readMinutes > 0
+          ? lecture.readMinutes
+          : durationMinutes(lecture.durationMs),
     }
   }
   const pending = input.pendingDiagnostics[0]
@@ -292,16 +301,14 @@ function conceptStep(
     evidence: conceptEvidence(top, detail),
     estimateMinutes: ESTIMATE_MINUTES.practice,
     payoff: conceptPayoff(top, detail),
-    alsoWorthDoing: rest.slice(0, MAX_ALSO_WORTH_DOING).map(
-      (c): AlsoWorthDoing => ({
-        conceptId: c.conceptId,
-        conceptName: c.conceptName,
-        state: c.state,
-        confidentMistake: c.confidentMistake,
-        activityType: activityFor(input, c.conceptId),
-        reason: conceptReason(c),
-      }),
-    ),
+    alsoWorthDoing: rest.slice(0, MAX_ALSO_WORTH_DOING).map((c): AlsoWorthDoing => ({
+      conceptId: c.conceptId,
+      conceptName: c.conceptName,
+      state: c.state,
+      confidentMistake: c.confidentMistake,
+      activityType: activityFor(input, c.conceptId),
+      reason: conceptReason(c),
+    })),
   }
 }
 
@@ -346,7 +353,11 @@ const latestAt = (attempts: readonly MasteryAttempt[]): number =>
  */
 function masteredLongestAgo(input: NextStepInput) {
   return input.masteredConcepts
-    .map((c, order) => ({ c, at: latestAt(input.concepts.get(c.conceptId)?.attempts ?? []), order }))
+    .map((c, order) => ({
+      c,
+      at: latestAt(input.concepts.get(c.conceptId)?.attempts ?? []),
+      order,
+    }))
     .sort((a, b) => a.at - b.at || a.order - b.order)[0]?.c
 }
 

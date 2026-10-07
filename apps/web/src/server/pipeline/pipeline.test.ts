@@ -93,6 +93,15 @@ describe('processLecture with AI_FAKE', () => {
       `SELECT concept_id AS id FROM concept_occurrences WHERE lecture_id = '${f.lectureId}'`,
     )
     expect(concepts).toHaveLength(3)
+    // F11: 8 min → 1..3 chapters; the fake splits at s0 and s6, the last a concept-free recap.
+    const [stored] = await rows<{ chapters: { startIdx: number; conceptIds: string[] }[] }>(
+      f,
+      `SELECT chapters FROM lectures WHERE id = '${f.lectureId}'`,
+    )
+    expect(stored?.chapters.map((c) => [c.startIdx, c.conceptIds.length])).toEqual([
+      [0, 3],
+      [6, 0],
+    ])
     expect(await itemCounts()).toEqual({ verified: 12 })
     const [course] = await rows<{ layout: Record<string, unknown>; layout_hash: string }>(
       f,

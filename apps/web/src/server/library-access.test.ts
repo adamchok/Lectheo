@@ -73,7 +73,7 @@ describe('library access by account kind', () => {
   ])('lets a %s account read the library', async (_, actor) => {
     expect((await getCourseMap(actor, ID.LIB, f.db)).course.id).toBe(ID.LIB)
     expect((await getLecture(actor, ID.L1, f.db)).id).toBe(ID.L1)
-    expect((await getNextStep(actor, ID.LIB, f.db)).kind).toBe('watch')
+    expect((await getNextStep(actor, ID.LIB, f.db)).kind).toBe('study')
     expect((await listCourseSummaries(f.db, actor))[0]?.id).toBe(ID.LIB)
   })
 

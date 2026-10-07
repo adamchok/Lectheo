@@ -2,7 +2,7 @@ import { lectureContext, UNTRUSTED_RULE } from '../../prompt'
 import type { PromptSpec } from '../../run-task'
 import type { ExtractConceptsInput } from './schema'
 
-export const PROMPT_VERSION = 'extract-concepts@0.2'
+export const PROMPT_VERSION = 'extract-concepts@0.3'
 
 // TODO(feature-pipeline): first draft. Add CS50 few-shot examples and tune on Lectures 3–5.
 export const SYSTEM = [
@@ -21,6 +21,13 @@ export const SYSTEM = [
   '- Cite only segment indexes that appear in the transcript.',
   '- If the lecture teaches no real concepts (e.g. an admin or logistics session), return empty',
   '  concepts and edges instead of inventing any.',
+  '- chapters: only when asked; otherwise return an empty list. Split the whole lecture into',
+  '  consecutive chapters like a well-chaptered video. startIdx is the segment the chapter starts',
+  '  at (42 for [s42]); never give times. The first chapter starts at the first segment; each',
+  '  next chapter starts later than the one before; a chapter ends where the next one starts.',
+  '  title: 2–6 words. summary: one line on what happens in it. conceptKeys: the canonicalKeys',
+  '  (from your concepts or the course list) that the chapter teaches; empty for parts that teach',
+  '  no concept, which still get their own chapter ("Announcements", "Q&A", "Recap").',
   UNTRUSTED_RULE,
 ].join('\n')
 
@@ -38,4 +45,9 @@ export function buildPrompt(input: ExtractConceptsInput): PromptSpec {
       `Extract about ${input.targetCount} concepts (±2) and their edges.`,
     ].join('\n\n'),
   }
+}
+
+function chaptersAsk(count: ExtractConceptsInput['chapterCount']): string {
+  if (!count) return 'Chapters: not wanted for this lecture; return an empty list.'
+  return `Chapters: split the lecture into ${count.min} to ${count.max} chapters.`
 }

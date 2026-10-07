@@ -55,7 +55,9 @@ vi.mock('@lectheo/ai', async (orig) => {
     extractConceptsTask: {
       ...ai.extractConceptsTask,
       fake: (input: Parameters<typeof ai.extractConceptsTask.fake>[0]) =>
-        extraction.empty ? { concepts: [], edges: [] } : ai.extractConceptsTask.fake(input),
+        extraction.empty
+          ? { concepts: [], edges: [], chapters: [] }
+          : ai.extractConceptsTask.fake(input),
     },
   }
 })

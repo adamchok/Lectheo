@@ -3,6 +3,7 @@ import {
   and,
   asc,
   conceptEdges,
+  conceptOccurrences,
   concepts,
   desc,
   eq,
@@ -19,6 +20,7 @@ import {
   type LectureRef,
   type MasteryAttempt,
   type NextStepInput,
+  briefReadMinutes,
   dashboardNextStep,
   nextActivityType,
   prerequisitesOfRed,
@@ -112,6 +114,16 @@ function lectureSteps(rows: LectureFlags[]) {
       .filter((l) => !l.hasCompletedSession && (l.hasMarkers || l.source !== 'library'))
       .map(lectureRef),
   }
+}
+
+/** The Study brief's reading time for the lecture the card suggests (F9.7). One query. */
+async function withReadMinutes(db: DbLike, lecture: LectureRef): Promise<LectureRef> {
+  const rows = await db
+    .select({ name: concepts.name, summary: concepts.summary, keyPoints: concepts.keyPoints })
+    .from(conceptOccurrences)
+    .innerJoin(concepts, eq(concepts.id, conceptOccurrences.conceptId))
+    .where(eq(conceptOccurrences.lectureId, lecture.lectureId))
+  return { ...lecture, readMinutes: briefReadMinutes(rows) }
 }
 
 /** "Add Lecture N" in the student's own course; the library isn't theirs to extend. */
@@ -223,7 +235,12 @@ export async function getNextStep(
     concepts: new Map(),
     activityTypes: new Map(),
   }
-  if (steps.processing.length > 0 || steps.unwatched.length > 0) return dashboardNextStep(base)
+  if (steps.processing.length > 0) return dashboardNextStep(base)
+  const [unwatched, ...laterUnwatched] = steps.unwatched
+  if (unwatched) {
+    const study = await withReadMinutes(db, unwatched)
+    return dashboardNextStep({ ...base, unwatchedLibraryLectures: [study, ...laterUnwatched] })
+  }
   const pending = steps.pending[0]
   if (pending) {
     const marks = await loadMarks(db, course.id, actor.userId, pending.lectureId)

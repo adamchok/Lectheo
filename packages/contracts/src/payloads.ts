@@ -12,7 +12,10 @@ export const SegmentIdxs = z.array(z.number().int().nonnegative()).min(1)
 
 export const McqPublicPayload = z.object({
   stem: z.string(),
-  options: z.array(z.object({ id: z.string(), text: z.string() })).min(3).max(5),
+  options: z
+    .array(z.object({ id: z.string(), text: z.string() }))
+    .min(3)
+    .max(5),
 })
 export const SpotFlawPublicPayload = z.object({
   sentences: z.array(z.string()).min(3).max(5),
@@ -74,7 +77,7 @@ export type RubricSecret = z.infer<typeof RubricSecret>
 export const HintsSecret = z.tuple([z.string(), z.string()])
 export type HintsSecret = z.infer<typeof HintsSecret>
 
-// ---------- 🔒 concepts.key_points ----------
+// ---------- concepts.key_points (shown in the Study brief since ADR-009 was amended, F9.8) ----------
 
 export const KeyPoints = z
   .array(z.object({ id: z.string(), text: z.string(), segmentIdxs: SegmentIdxs }))
@@ -89,6 +92,24 @@ export const RubricSnapshot = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('key_points'), keyPoints: KeyPoints }),
 ])
 export type RubricSnapshot = z.infer<typeof RubricSnapshot>
+
+// ---------- lectures.chapters (F11) ----------
+
+/**
+ * One chapter, anchored to transcript segment indexes (never times: times are read from the
+ * segments, so they are exact). `endIdx` is inclusive. `conceptIds` may be empty ("Q&A").
+ */
+export const Chapter = z.object({
+  id: z.string().min(1).max(20),
+  title: z.string().min(1),
+  summary: z.string(),
+  startIdx: z.number().int().nonnegative(),
+  endIdx: z.number().int().nonnegative(),
+  conceptIds: z.array(z.uuid()),
+})
+export type Chapter = z.infer<typeof Chapter>
+export const Chapters = z.array(Chapter).min(1)
+export type Chapters = z.infer<typeof Chapters>
 
 // ---------- misc jsonb ----------
 

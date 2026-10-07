@@ -90,6 +90,7 @@ export type CourseMapResponse = z.infer<typeof CourseMapResponse>
 
 export const NEXT_STEP_KINDS = [
   'processing',
+  'study',
   'watch',
   'diagnostic',
   'activity',
@@ -137,7 +138,10 @@ export const NextStepResponse = z.object({
   activityType: ActivityType.optional(),
   reason: z.string(),
   evidence: z.array(NextStepEvidence).max(2),
-  /** Watch: the lecture's length. Diagnostic 3, practice 5. Null for processing and add_lecture. */
+  /**
+   * Study: the brief's reading time. Watch: the lecture's length. Diagnostic 3, practice 5. Null for
+   * processing and add_lecture.
+   */
   estimateMinutes: z.number().int().positive().nullable(),
   payoff: z.string().nullable(),
   alsoWorthDoing: z.array(AlsoWorthDoing).max(2),

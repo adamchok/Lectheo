@@ -34,12 +34,21 @@ function signal(overrides: Partial<ConceptSignal>): ConceptSignal {
 }
 
 function practice(activityType: MasteryAttempt['activityType'], assisted = false): MasteryAttempt {
-  return { activityType, outcome: 'correct', confidence: null, assisted, isFollowUp: false, createdAt: NOW }
+  return {
+    activityType,
+    outcome: 'correct',
+    confidence: null,
+    assisted,
+    isFollowUp: false,
+    createdAt: NOW,
+  }
 }
 
 describe('conceptPriority', () => {
   it('applies the §6.3 weights', () => {
-    expect(conceptPriority(signal({ state: 'red', confidentMistake: true, markedLost: true }), NOW)).toBe(200)
+    expect(
+      conceptPriority(signal({ state: 'red', confidentMistake: true, markedLost: true }), NOW),
+    ).toBe(200)
     expect(conceptPriority(signal({ state: 'amber', prerequisiteOfRed: true }), NOW)).toBe(35)
     expect(conceptPriority(signal({}), NOW)).toBe(0)
   })
@@ -103,7 +112,9 @@ describe('nextActivityType', () => {
     const done = [practice('spot_flaw'), practice('teach_back')]
     expect(nextActivityType(done)).toBe('spot_flaw')
     expect(nextActivityType(done, { transfer: true })).toBe('transfer')
-    expect(nextActivityType([...done, practice('transfer')], { transfer: true, stump: true })).toBe('stump')
+    expect(nextActivityType([...done, practice('transfer')], { transfer: true, stump: true })).toBe(
+      'stump',
+    )
   })
 })
 
@@ -113,15 +124,27 @@ describe('dashboardNextStep', () => {
   const C3 = '0192f0a0-0000-7000-8000-0000000000c3'
   const C4 = '0192f0a0-0000-7000-8000-0000000000c4'
   const at = (minutesAgo: number) => new Date(NOW.getTime() - minutesAgo * MIN)
-  const attempt = (a: Partial<MasteryAttempt> & Pick<MasteryAttempt, 'activityType' | 'outcome'>): MasteryAttempt => ({
+  const attempt = (
+    a: Partial<MasteryAttempt> & Pick<MasteryAttempt, 'activityType' | 'outcome'>,
+  ): MasteryAttempt => ({
     confidence: null,
     assisted: false,
     isFollowUp: false,
     createdAt: at(60),
     ...a,
   })
-  const lost: EvidenceMarker = { kind: 'lost', lectureId: L5, lectureTitle: 'Lecture 5', tMs: 761_000 }
-  const important: EvidenceMarker = { kind: 'important', lectureId: L5, lectureTitle: 'Lecture 5', tMs: 65_000 }
+  const lost: EvidenceMarker = {
+    kind: 'lost',
+    lectureId: L5,
+    lectureTitle: 'Lecture 5',
+    tMs: 761_000,
+  }
+  const important: EvidenceMarker = {
+    kind: 'important',
+    lectureId: L5,
+    lectureTitle: 'Lecture 5',
+    tMs: 65_000,
+  }
 
   const ranked = rankConcepts(
     [
@@ -167,24 +190,34 @@ describe('dashboardNextStep', () => {
     valid(step)
   })
 
-  it('then an unwatched library lecture, estimated at its length', () => {
+  it('then studying an unwatched library lecture, estimated at its reading time (F9.7)', () => {
     const step = dashboardNextStep({
       ...base,
-      unwatchedLibraryLectures: [{ lectureId: L5, title: 'Lecture 5', durationMs: 7_260_000 }],
+      unwatchedLibraryLectures: [
+        { lectureId: L5, title: 'Lecture 5', durationMs: 7_260_000, readMinutes: 5 },
+      ],
       pendingDiagnostics: [{ lectureId: L4, title: 'Lecture 4' }],
       rankedConcepts: ranked,
     })
     expect(step).toEqual({
-      kind: 'watch',
+      kind: 'study',
       lectureId: L5,
-      reason: "Lecture 5 is ready. Watch it and tap when you're lost.",
+      reason: "Lecture 5 is ready. Study it in a few minutes and mark what's unclear.",
       evidence: [],
-      estimateMinutes: 121,
+      estimateMinutes: 5,
       payoff: 'Your marks decide what the diagnostic asks.',
       alsoWorthDoing: [],
     })
     valid(step)
-    const unknownLength = dashboardNextStep({ ...base, unwatchedLibraryLectures: [{ lectureId: L5, title: 'L5' }] })
+    const noBrief = dashboardNextStep({
+      ...base,
+      unwatchedLibraryLectures: [{ lectureId: L5, title: 'L5', durationMs: 7_260_000 }],
+    })
+    expect(noBrief.estimateMinutes).toBe(121)
+    const unknownLength = dashboardNextStep({
+      ...base,
+      unwatchedLibraryLectures: [{ lectureId: L5, title: 'L5' }],
+    })
     expect(unknownLength.estimateMinutes).toBeNull()
   })
 
@@ -203,15 +236,28 @@ describe('dashboardNextStep', () => {
       alsoWorthDoing: [],
     })
     expect(step.evidence).toEqual([
-      { kind: 'marked_lost', text: "You marked I'm lost at 12:41 in Lecture 5", source: { lectureId: L5, tMs: 761_000 } },
-      { kind: 'marked_important', text: 'You marked Important at 1:05 in Lecture 5', source: { lectureId: L5, tMs: 65_000 } },
+      {
+        kind: 'marked_lost',
+        text: "You marked I'm lost at 12:41 in Lecture 5",
+        source: { lectureId: L5, tMs: 761_000 },
+      },
+      {
+        kind: 'marked_important',
+        text: 'You marked Important at 1:05 in Lecture 5',
+        source: { lectureId: L5, tMs: 65_000 },
+      },
     ])
     valid(step)
   })
 
   it('then the top concept with evidence, payoff and the next two concepts', () => {
     const sureWrong = (minutesAgo: number) =>
-      attempt({ activityType: 'diagnostic', outcome: 'incorrect', confidence: 'sure', createdAt: at(minutesAgo) })
+      attempt({
+        activityType: 'diagnostic',
+        outcome: 'incorrect',
+        confidence: 'sure',
+        createdAt: at(minutesAgo),
+      })
     const step = dashboardNextStep({
       ...base,
       rankedConcepts: ranked,
@@ -235,16 +281,32 @@ describe('dashboardNextStep', () => {
       "You marked I'm lost at 12:41 in Lecture 5",
     ])
     expect(step.alsoWorthDoing).toEqual([
-      { conceptId: C2, conceptName: 'Arrays', state: 'amber', confidentMistake: false, activityType: 'spot_flaw', reason: 'Arrays is getting there. One more independent win.' },
+      {
+        conceptId: C2,
+        conceptName: 'Arrays',
+        state: 'amber',
+        confidentMistake: false,
+        activityType: 'spot_flaw',
+        reason: 'Arrays is getting there. One more independent win.',
+      },
       // No precomputed type: falls back to nextActivityType on its attempts.
-      { conceptId: C3, conceptName: 'Loops', state: 'gray', confidentMistake: false, activityType: 'spot_flaw', reason: 'Practice Loops.' },
+      {
+        conceptId: C3,
+        conceptName: 'Loops',
+        state: 'gray',
+        confidentMistake: false,
+        activityType: 'spot_flaw',
+        reason: 'Practice Loops.',
+      },
     ])
     valid(step)
   })
 
   it('suggests Stump on the concept mastered longest ago when everything is green', () => {
     const win = (minutesAgo: number) => ({
-      attempts: [attempt({ activityType: 'spot_flaw', outcome: 'correct', createdAt: at(minutesAgo) })],
+      attempts: [
+        attempt({ activityType: 'spot_flaw', outcome: 'correct', createdAt: at(minutesAgo) }),
+      ],
       markers: [],
     })
     const concepts = new Map([
@@ -268,63 +330,131 @@ describe('dashboardNextStep', () => {
       alsoWorthDoing: [],
     })
     valid(step)
-    const noStump = dashboardNextStep({ ...base, masteredConcepts: mastered, concepts, stumpEnabled: false })
+    const noStump = dashboardNextStep({
+      ...base,
+      masteredConcepts: mastered,
+      concepts,
+      stumpEnabled: false,
+    })
     expect(noStump).toMatchObject({ activityType: 'spot_flaw', conceptId: C2, payoff: null })
   })
 
   it('then a failed lecture, then adding a lecture: never "all caught up"', () => {
-    const failed = dashboardNextStep({ ...base, failedLectures: [{ lectureId: L3, title: 'Week 3' }], nextLectureSeq: 4 })
-    expect(failed).toMatchObject({ kind: 'processing', lectureId: L3, reason: 'Processing Week 3 stopped. Open it to try again.' })
+    const failed = dashboardNextStep({
+      ...base,
+      failedLectures: [{ lectureId: L3, title: 'Week 3' }],
+      nextLectureSeq: 4,
+    })
+    expect(failed).toMatchObject({
+      kind: 'processing',
+      lectureId: L3,
+      reason: 'Processing Week 3 stopped. Open it to try again.',
+    })
 
-    const unfinished = dashboardNextStep({ ...base, unfinishedLectures: [{ lectureId: L3, title: 'Week 3' }], nextLectureSeq: 4 })
-    expect(unfinished).toMatchObject({ kind: 'processing', lectureId: L3, reason: 'Finish adding Week 3.' })
+    const unfinished = dashboardNextStep({
+      ...base,
+      unfinishedLectures: [{ lectureId: L3, title: 'Week 3' }],
+      nextLectureSeq: 4,
+    })
+    expect(unfinished).toMatchObject({
+      kind: 'processing',
+      lectureId: L3,
+      reason: 'Finish adding Week 3.',
+    })
 
     const next = dashboardNextStep({ ...base, nextLectureSeq: 4 })
-    expect(next).toEqual({ kind: 'add_lecture', reason: 'Add Lecture 4 to keep going.', evidence: [], estimateMinutes: null, payoff: null, alsoWorthDoing: [] })
+    expect(next).toEqual({
+      kind: 'add_lecture',
+      reason: 'Add Lecture 4 to keep going.',
+      evidence: [],
+      estimateMinutes: null,
+      payoff: null,
+      alsoWorthDoing: [],
+    })
     valid(next)
     expect(dashboardNextStep(base).reason).toBe('Add your next lecture to keep going.')
   })
 })
 
 describe('conceptEvidence', () => {
-  const attempt = (a: Partial<MasteryAttempt> & Pick<MasteryAttempt, 'activityType' | 'outcome'>): MasteryAttempt => ({
+  const attempt = (
+    a: Partial<MasteryAttempt> & Pick<MasteryAttempt, 'activityType' | 'outcome'>,
+  ): MasteryAttempt => ({
     confidence: null,
     assisted: false,
     isFollowUp: false,
     createdAt: NOW,
     ...a,
   })
-  const mark = (kind: EvidenceMarker['kind']): EvidenceMarker => ({ kind, lectureId: L4, lectureTitle: 'Lecture 4', tMs: 5000 })
+  const mark = (kind: EvidenceMarker['kind']): EvidenceMarker => ({
+    kind,
+    lectureId: L4,
+    lectureTitle: 'Lecture 4',
+    tMs: 5000,
+  })
 
   it('ranks confident mistake → latest wrong or partial → lost → important, max two', () => {
     const attempts = [
-      attempt({ activityType: 'diagnostic', outcome: 'incorrect', confidence: 'sure', createdAt: new Date(NOW.getTime() - 2 * MIN) }),
+      attempt({
+        activityType: 'diagnostic',
+        outcome: 'incorrect',
+        confidence: 'sure',
+        createdAt: new Date(NOW.getTime() - 2 * MIN),
+      }),
       attempt({ activityType: 'spot_flaw', outcome: 'partial' }),
     ]
-    const texts = conceptEvidence({ confidentMistake: true }, { attempts, markers: [mark('lost')] }).map((e) => e.text)
+    const texts = conceptEvidence(
+      { confidentMistake: true },
+      { attempts, markers: [mark('lost')] },
+    ).map((e) => e.text)
     expect(texts).toEqual(['Sure but wrong in the diagnostic', 'Partial in Spot the flaw'])
-    const marks = conceptEvidence({ confidentMistake: false }, { attempts: [], markers: [mark('important'), mark('lost')] })
+    const marks = conceptEvidence(
+      { confidentMistake: false },
+      { attempts: [], markers: [mark('important'), mark('lost')] },
+    )
     expect(marks.map((e) => e.kind)).toEqual(['marked_lost', 'marked_important'])
   })
 
   it('does not repeat a sure-and-wrong latest answer as "Wrong"', () => {
     const sure = [attempt({ activityType: 'diagnostic', outcome: 'incorrect', confidence: 'sure' })]
-    expect(conceptEvidence({ confidentMistake: true }, { attempts: sure, markers: [] }).map((e) => e.kind)).toEqual(['confident_mistake'])
-    const unsure = [attempt({ activityType: 'diagnostic', outcome: 'incorrect', confidence: 'unsure' })]
-    expect(conceptEvidence({ confidentMistake: false }, { attempts: unsure, markers: [] })[0]?.text).toBe('Wrong in the diagnostic')
+    expect(
+      conceptEvidence({ confidentMistake: true }, { attempts: sure, markers: [] }).map(
+        (e) => e.kind,
+      ),
+    ).toEqual(['confident_mistake'])
+    const unsure = [
+      attempt({ activityType: 'diagnostic', outcome: 'incorrect', confidence: 'unsure' }),
+    ]
+    expect(
+      conceptEvidence({ confidentMistake: false }, { attempts: unsure, markers: [] })[0]?.text,
+    ).toBe('Wrong in the diagnostic')
   })
 })
 
 describe('conceptPayoff', () => {
   const none = { attempts: [], markers: [] }
-  const sureWin: MasteryAttempt = { activityType: 'diagnostic', outcome: 'correct', confidence: 'sure', assisted: false, isFollowUp: false, createdAt: NOW }
+  const sureWin: MasteryAttempt = {
+    activityType: 'diagnostic',
+    outcome: 'correct',
+    confidence: 'sure',
+    assisted: false,
+    isFollowUp: false,
+    createdAt: NOW,
+  }
 
   it('uses the §6.3 lines and stays silent when none is honest', () => {
-    expect(conceptPayoff({ state: 'red', confidentMistake: true }, none)).toBe('A correct answer here clears the confident mistake.')
-    expect(conceptPayoff({ state: 'red', confidentMistake: false }, none)).toBe('A correct answer moves it to Getting there.')
-    expect(conceptPayoff({ state: 'amber', confidentMistake: false }, { attempts: [sureWin], markers: [] })).toBe(
-      'One more independent win in a different activity → Mastered.',
+    expect(conceptPayoff({ state: 'red', confidentMistake: true }, none)).toBe(
+      'A correct answer here clears the confident mistake.',
     )
+    expect(conceptPayoff({ state: 'red', confidentMistake: false }, none)).toBe(
+      'A correct answer moves it to Getting there.',
+    )
+    expect(
+      conceptPayoff(
+        { state: 'amber', confidentMistake: false },
+        { attempts: [sureWin], markers: [] },
+      ),
+    ).toBe('One more independent win in a different activity → Mastered.')
     expect(conceptPayoff({ state: 'amber', confidentMistake: false }, none)).toBeNull()
     expect(conceptPayoff({ state: 'gray', confidentMistake: false }, none)).toBeNull()
   })

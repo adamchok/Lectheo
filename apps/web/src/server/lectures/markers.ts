@@ -1,12 +1,19 @@
-import type { ListMarkersResponse, MarkerInput, PostMarkersResponse } from '@lectheo/contracts'
+import type {
+  ListMarkersResponse,
+  MarkerBody,
+  MarkerInput,
+  PostMarkersResponse,
+} from '@lectheo/contracts'
 import {
   and,
   asc,
   conceptOccurrences,
   eq,
+  inArray,
   isNull,
   markerConcepts,
   markers,
+  min,
   sql,
   transcriptSegments,
 } from '@lectheo/db'
@@ -29,26 +36,122 @@ type InsertedMarker = Pick<MarkerInput, 'id' | 'kind' | 'tMs'>
 /** Lectures whose concepts already exist, so markers are aligned on write (Arch §6.1). */
 const ALIGNED_STATUSES: readonly Lecture['status'][] = ['map_ready', 'ready']
 
+type StudyBody = Exclude<MarkerBody, MarkerInput>
+
+const isStudy = (m: MarkerBody): m is StudyBody => m.capture === 'study'
+
+interface PlacedMarker extends InsertedMarker {
+  capture: MarkerBody['capture']
+  /** Study marks name their concepts (linked directly, overlap 1); null = align by time. */
+  conceptIds: readonly string[] | null
+}
+
+/** Each concept's first source moment in this lecture (F9.4). One query. */
+async function firstMoments(
+  db: DbLike,
+  lectureId: string,
+  conceptIds: readonly string[],
+): Promise<Map<string, number>> {
+  if (conceptIds.length === 0) return new Map()
+  const rows = await db
+    .select({ conceptId: conceptOccurrences.conceptId, tMs: min(transcriptSegments.startMs) })
+    .from(conceptOccurrences)
+    .innerJoin(
+      transcriptSegments,
+      and(
+        eq(transcriptSegments.lectureId, conceptOccurrences.lectureId),
+        sql`${transcriptSegments.idx} = ANY(${conceptOccurrences.segmentIdxs})`,
+      ),
+    )
+    .where(
+      and(
+        eq(conceptOccurrences.lectureId, lectureId),
+        inArray(conceptOccurrences.conceptId, [...conceptIds]),
+      ),
+    )
+    .groupBy(conceptOccurrences.conceptId)
+  return new Map(rows.flatMap((r) => (r.tMs === null ? [] : [[r.conceptId, r.tMs] as const])))
+}
+
+/** Chapter id → its start time and concepts (F11.4). One query. */
+async function chapterStarts(
+  db: DbLike,
+  lecture: Lecture,
+): Promise<Map<string, { tMs: number; conceptIds: string[] }>> {
+  const chapters = lecture.chapters ?? []
+  if (chapters.length === 0) return new Map()
+  const rows = await db
+    .select({ idx: transcriptSegments.idx, startMs: transcriptSegments.startMs })
+    .from(transcriptSegments)
+    .where(
+      and(
+        eq(transcriptSegments.lectureId, lecture.id),
+        inArray(
+          transcriptSegments.idx,
+          chapters.map((c) => c.startIdx),
+        ),
+      ),
+    )
+  const startOf = new Map(rows.map((r) => [r.idx, r.startMs]))
+  return new Map(
+    chapters.flatMap((c) => {
+      const tMs = startOf.get(c.startIdx)
+      return tMs === undefined ? [] : [[c.id, { tMs, conceptIds: c.conceptIds }] as const]
+    }),
+  )
+}
+
+/**
+ * Study marks get their time and concepts from the server: a concept mark sits at the concept's
+ * first source moment, a chapter mark at the chapter's start (F9.4, F11.4). An unknown concept or
+ * chapter, or a chapter without concepts, is a 404.
+ */
+async function placeMarkers(
+  db: DbLike,
+  lecture: Lecture,
+  input: readonly MarkerBody[],
+): Promise<PlacedMarker[]> {
+  const study = input.filter(isStudy)
+  const conceptIds = study.flatMap((m) => ('conceptId' in m ? [m.conceptId] : []))
+  const [moments, chapters] = await Promise.all([
+    firstMoments(db, lecture.id, conceptIds),
+    study.some((m) => 'chapterId' in m) ? chapterStarts(db, lecture) : new Map<string, never>(),
+  ])
+  return input.map((m): PlacedMarker => {
+    if (!isStudy(m)) return { ...m, conceptIds: null }
+    if ('conceptId' in m) {
+      const tMs = moments.get(m.conceptId)
+      if (tMs === undefined) throw notFound()
+      return { id: m.id, kind: m.kind, capture: 'study', tMs, conceptIds: [m.conceptId] }
+    }
+    const chapter = chapters.get(m.chapterId)
+    if (!chapter || chapter.conceptIds.length === 0) throw notFound()
+    return { id: m.id, kind: m.kind, capture: 'study', ...chapter }
+  })
+}
+
 /**
  * POST /lectures/{id}/markers: batch insert, `ON CONFLICT (id) DO NOTHING` so a resent batch is
- * safe (ADR-007). Newly inserted markers on processed lectures are linked to concepts now.
+ * safe (ADR-007). Newly inserted watch markers on processed lectures are aligned to concepts now;
+ * study marks are linked straight to the concepts they name.
  */
 export async function postMarkers(
   actor: Actor,
   lectureId: string,
-  input: readonly MarkerInput[],
+  input: readonly MarkerBody[],
   db: DbLike = appDb(),
 ): Promise<PostMarkersDto> {
   const { lecture } = await loadLectureForRead(actor, lectureId, db)
   if (!lecture.hasTimestamps) {
     throw invalidState('This lecture has no timestamps, so markers can’t be placed.')
   }
+  const placed = await placeMarkers(db, lecture, input)
 
   return db.transaction(async (tx) => {
     const inserted = await tx
       .insert(markers)
       .values(
-        input.map((m) => ({
+        placed.map((m) => ({
           id: m.id,
           lectureId: lecture.id,
           userId: actor.userId,
@@ -60,8 +163,16 @@ export async function postMarkers(
       .onConflictDoNothing({ target: markers.id })
       .returning({ id: markers.id, kind: markers.kind, tMs: markers.tMs })
 
-    if (inserted.length > 0 && ALIGNED_STATUSES.includes(lecture.status)) {
-      await alignOnWrite(tx as unknown as DbLike, lecture.id, inserted)
+    const fresh = new Map(
+      placed.filter((m) => inserted.some((i) => i.id === m.id)).map((m) => [m.id, m]),
+    )
+    const links = [...fresh.values()].flatMap((m) =>
+      (m.conceptIds ?? []).map((conceptId) => ({ markerId: m.id, conceptId, overlapScore: 1 })),
+    )
+    if (links.length > 0) await tx.insert(markerConcepts).values(links).onConflictDoNothing()
+    const toAlign = inserted.filter((m) => fresh.get(m.id)?.conceptIds === null)
+    if (toAlign.length > 0 && ALIGNED_STATUSES.includes(lecture.status)) {
+      await alignOnWrite(tx as unknown as DbLike, lecture.id, toAlign)
     }
     return { accepted: inserted.length, duplicates: input.length - inserted.length }
   })
