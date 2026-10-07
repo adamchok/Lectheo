@@ -125,6 +125,18 @@ describe('planChapters (F11.2)', () => {
     ])
   })
 
+  it('reports no_chapters for a timed lecture, also from outputs stored before chapters', () => {
+    const empty = withChapters([])
+    expect(planChapters(empty, planGraph(empty, []), IDXS, 4, true)).toEqual({
+      chapters: null,
+      errors: ['no_chapters'],
+    })
+    // An extractConcepts output saved by prompt 0.2 (mid-pipeline at deploy) has no chapters key.
+    const { chapters: _omit, ...old } = empty
+    const legacy = old as ExtractConceptsOutput
+    expect(planChapters(legacy, planGraph(legacy, []), IDXS, 4, true).chapters).toBeNull()
+  })
+
   it('gives untimed lectures no chapters', () => {
     const out = withChapters([chapter(0)])
     expect(planChapters(out, planGraph(out, []), IDXS, 4, false)).toEqual({

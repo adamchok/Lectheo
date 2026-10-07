@@ -71,7 +71,7 @@ The words for the public landing page at `/`. Layout, tokens and section rules a
 1. **Read the brief or watch. Mark what's unclear.**
    Read a few-minute brief of the lecture, or watch it and press **L** when you're lost and **I** when something matters. No pausing, no notes. Your marks sit on the lecture's timeline.
 2. **See the lecture as a map.**
-   Lectheo builds a concept map of the lecture and shows how ideas depend on each other. Your marks land on the concepts they belong to, so confusion is traced back to where it started. Every lecture is split into chapters, so you can jump to the part you need.
+   Lectheo builds a concept map of the lecture and shows how ideas depend on each other. Your marks land on the concepts they belong to, so confusion is traced back to where it started. Every lecture with timestamps is split into chapters, so you can jump to the part you need.
 3. **Get a diagnosis, not a quiz.**
    A short diagnostic asks how sure you are *before* you see the options. Sure and wrong, twice, is a **confident mistake**: the gap you didn't feel. Each result links to the moment in the lecture that explains it.
 4. **Practice until it's proven.**

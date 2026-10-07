@@ -4,6 +4,7 @@ import type { LectureResponse } from '@lectheo/contracts'
 import { BookOpenText, FileText, Play, type LucideIcon } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
+import { useEffect } from 'react'
 import { cn } from '@/lib/utils'
 
 /* The lecture page's Study | Watch | Transcript switch (Design System §4 "Lecture: Study"). */
@@ -46,6 +47,37 @@ function modeLinks(lecture: ModeLecture): ModeLink[] {
   ]
 }
 
+const FOCUS_KEY = 'lectheo:mode-switched'
+
+/**
+ * Study and Transcript are the same route, so a switch remounts the view without the route-change
+ * focus move: after a switch, focus the new view's h1 (WCAG 2.4.3) instead of leaving <body>.
+ */
+function useFocusAfterSwitch(): void {
+  useEffect(() => {
+    let switched = false
+    try {
+      switched = sessionStorage.getItem(FOCUS_KEY) === '1'
+      sessionStorage.removeItem(FOCUS_KEY)
+    } catch {
+      return
+    }
+    if (!switched) return
+    const heading = document.querySelector<HTMLElement>('main h1')
+    if (!heading) return
+    heading.tabIndex = -1
+    heading.focus({ preventScroll: true })
+  }, [])
+}
+
+const markSwitch = (): void => {
+  try {
+    sessionStorage.setItem(FOCUS_KEY, '1')
+  } catch {
+    // Storage blocked: focus stays where the browser puts it.
+  }
+}
+
 /** A segmented control of links; nothing when the lecture has only one mode. */
 export function LectureModes({
   lecture,
@@ -57,6 +89,7 @@ export function LectureModes({
   className?: string
 }) {
   const links = modeLinks(lecture)
+  useFocusAfterSwitch()
   if (links.length < 2) return null
   return (
     <nav aria-label="Lecture view" className={className}>
@@ -68,10 +101,11 @@ export function LectureModes({
               <Link
                 href={href}
                 aria-current={active ? 'page' : undefined}
+                onClick={active ? undefined : markSwitch}
                 className={cn(
                   'text-body-sm inline-flex h-7 items-center gap-1.5 rounded-sm px-2.5 font-medium transition-colors duration-fast',
                   active
-                    ? 'bg-accent text-accent-foreground'
+                    ? 'bg-accent text-accent-foreground inset-shadow-[0_-2px_0_0_var(--primary)]'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                 )}
               >

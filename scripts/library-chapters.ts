@@ -9,7 +9,7 @@
  * each model output is cached under .cache/seed-library/, so a rerun never pays twice.
  */
 import { execSync } from 'node:child_process'
-import { writeFileSync } from 'node:fs'
+import { rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { extractConceptsTask, runTask, type ExtractConceptsOutput } from '@lectheo/ai'
@@ -25,6 +25,7 @@ import {
 import { chapterCountRange, chapterErrors } from '@lectheo/domain'
 import {
   assertDevGateway,
+  cachePath,
   cached,
   ledgerCost,
   readLedger,
@@ -67,9 +68,12 @@ function chaptersTask(lecture: LectureFx, minutes: number) {
   }
 }
 
-async function chaptersFor(lecture: LectureFx): Promise<ChapterFx[]> {
+async function chaptersFor(lecture: LectureFx, force: boolean): Promise<ChapterFx[]> {
   const minutes = (clockToMs(lecture.end) - clockToMs(lecture.start)) / 60_000
-  const output = await cached<ExtractConceptsOutput>(`chapters-${lecture.key}.json`, async () => {
+  const cacheName = `chapters-${lecture.key}.json`
+  // --force regenerates: drop the cached model output too, or `cached` would return it.
+  if (force) rmSync(cachePath(cacheName), { force: true })
+  const output = await cached<ExtractConceptsOutput>(cacheName, async () => {
     const { output } = await runTask(
       chaptersTask(lecture, minutes),
       {
@@ -116,7 +120,7 @@ async function main(): Promise<void> {
       out(`${lecture.key}: has ${chapters[lecture.key]?.length} chapters, skipped`)
       continue
     }
-    const made = await chaptersFor(lecture)
+    const made = await chaptersFor(lecture, values.force)
     chapters[lecture.key] = made
     out(`${lecture.key}: ${made.length} chapters`)
   }

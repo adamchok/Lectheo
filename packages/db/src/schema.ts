@@ -52,6 +52,7 @@ import {
   type MessageGuard,
   type RubricSecret,
   type RubricSnapshot,
+  type StudyTarget,
 } from '@lectheo/contracts'
 import { uuidv7 } from './ids'
 
@@ -223,6 +224,8 @@ export const markers = pgTable(
     kind: markerKind('kind').notNull(),
     tMs: integer('t_ms').notNull(),
     capture: markerCapture('capture').notNull(),
+    /** Study marks: `{ conceptId }` or `{ chapterId }`, so a re-run re-links them by rule. */
+    target: jsonb('target').$type<StudyTarget>(),
     deletedAt: tsz('deleted_at'),
     createdAt: createdAt(),
   },

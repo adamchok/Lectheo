@@ -415,6 +415,14 @@ describe('conceptEvidence', () => {
     expect(marks.map((e) => e.kind)).toEqual(['marked_lost', 'marked_important'])
   })
 
+  it('words a study mark by what was marked, not by a moment (F9.4)', () => {
+    const [study] = conceptEvidence(
+      { confidentMistake: false },
+      { attempts: [], markers: [{ ...mark('lost'), on: 'Hash tables' }] },
+    )
+    expect(study?.text).toBe("You marked I'm lost on Hash tables in Lecture 4")
+  })
+
   it('does not repeat a sure-and-wrong latest answer as "Wrong"', () => {
     const sure = [attempt({ activityType: 'diagnostic', outcome: 'incorrect', confidence: 'sure' })]
     expect(

@@ -1,3 +1,4 @@
+import { CHAPTER_SUMMARY_MAX, CHAPTER_TITLE_MAX } from '@lectheo/contracts'
 import type { TimedSegment } from './study'
 
 /*
@@ -64,6 +65,12 @@ export function chapterErrors<C>(
       errors.push(`${where}: must start after chapter ${i} (s${prev.startIdx})`)
     }
     if (c.title.trim().length === 0) errors.push(`${where}: empty title`)
+    if (c.title.length > CHAPTER_TITLE_MAX) {
+      errors.push(`${where}: title longer than ${CHAPTER_TITLE_MAX} characters`)
+    }
+    if (c.summary.length > CHAPTER_SUMMARY_MAX) {
+      errors.push(`${where}: summary longer than ${CHAPTER_SUMMARY_MAX} characters`)
+    }
     for (const concept of c.concepts) {
       if (!isKnownConcept(concept)) errors.push(`${where}: unknown concept "${String(concept)}"`)
     }

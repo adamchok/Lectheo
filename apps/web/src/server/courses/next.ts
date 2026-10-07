@@ -135,7 +135,9 @@ const loadMarks = (db: DbLike, courseId: string, userId: string, lectureId?: str
   db
     .select({
       conceptId: markerConcepts.conceptId,
+      conceptName: concepts.name,
       kind: markers.kind,
+      capture: markers.capture,
       lectureId: markers.lectureId,
       tMs: markers.tMs,
       title: lectures.title,
@@ -145,6 +147,7 @@ const loadMarks = (db: DbLike, courseId: string, userId: string, lectureId?: str
     .from(markers)
     .innerJoin(lectures, eq(lectures.id, markers.lectureId))
     .leftJoin(markerConcepts, eq(markerConcepts.markerId, markers.id))
+    .leftJoin(concepts, eq(concepts.id, markerConcepts.conceptId))
     .where(
       and(
         eq(lectures.courseId, courseId),
@@ -162,6 +165,8 @@ const toEvidenceMarker = (m: MarkRow): EvidenceMarker => ({
   lectureId: m.lectureId,
   lectureTitle: lectureTitle(m),
   tMs: m.tMs,
+  // A study mark was pressed on a concept or chapter, not at a moment (F9.4).
+  ...(m.capture === 'study' && m.conceptName ? { on: m.conceptName } : {}),
 })
 
 /** Concepts in map order with the latest practice time (epoch ms) for the user. */

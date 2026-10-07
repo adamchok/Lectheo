@@ -80,7 +80,7 @@ const STEPS = [
   },
   {
     title: 'See the lecture as a map.',
-    body: 'Lectheo builds a concept map of the lecture and shows how ideas depend on each other. Your marks land on the concepts they belong to, so confusion is traced back to where it started. Every lecture is split into chapters, so you can jump to the part you need.',
+    body: 'Lectheo builds a concept map of the lecture and shows how ideas depend on each other. Your marks land on the concepts they belong to, so confusion is traced back to where it started. Every lecture with timestamps is split into chapters, so you can jump to the part you need.',
   },
   {
     title: 'Get a diagnosis, not a quiz.',

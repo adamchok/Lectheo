@@ -14,11 +14,12 @@ import {
   sql,
   uuidv7,
 } from '@lectheo/db'
+import { Chapters } from '@lectheo/contracts'
 import { chapterCountRange, scaleForMinutes, type ChapterRange } from '@lectheo/domain'
 import { computeLayout, layoutHash } from '@lectheo/domain/layout'
 import { aiContext } from '../ai-hooks'
 import type { DbLike } from '../db'
-import { alignOnWrite } from '../lectures/markers'
+import { alignOnWrite, relinkStudyMarks } from '../lectures/markers'
 import {
   cycleErrors,
   graphErrors,
@@ -210,15 +211,18 @@ async function storeGraph(
     await tx
       .update(lectures)
       .set({
-        chapters:
-          chapters?.map(({ id, title, summary, startIdx, endIdx, concepts }) => ({
-            id,
-            title,
-            summary,
-            startIdx,
-            endIdx,
-            conceptIds: [...new Set(concepts.map(conceptId))],
-          })) ?? null,
+        chapters: chapters
+          ? Chapters.parse(
+              chapters.map(({ id, title, summary, startIdx, endIdx, concepts }) => ({
+                id,
+                title,
+                summary,
+                startIdx,
+                endIdx,
+                conceptIds: [...new Set(concepts.map(conceptId))],
+              })),
+            )
+          : null,
       })
       .where(eq(lectures.id, lecture.id))
     return { concepts: plan.concepts.length, reused: plan.concepts.length - fresh.length }
@@ -257,7 +261,9 @@ export async function validateGraphStep(
       spokenMinutes(segments),
       lecture.hasTimestamps,
     )
-    if (chapterErrors.length > 0) {
+    if (chapterErrors.includes('no_chapters')) {
+      console.warn(JSON.stringify({ event: 'no_chapters', lectureId }))
+    } else if (chapterErrors.length > 0) {
       console.warn(JSON.stringify({ event: 'invalid_chapters', lectureId, errors: chapterErrors }))
     }
     const stored = await storeGraph(db, lecture, plan, chapters)
@@ -303,13 +309,29 @@ export async function alignMarkersStep(
     // No timestamps → markers are disabled for this lecture (F1.7).
     if (!lecture.hasTimestamps) return { markers: 0 }
     const live = await db
-      .select({ id: markers.id, kind: markers.kind, tMs: markers.tMs })
+      .select({
+        id: markers.id,
+        kind: markers.kind,
+        tMs: markers.tMs,
+        capture: markers.capture,
+        target: markers.target,
+      })
       .from(markers)
       .where(and(eq(markers.lectureId, lectureId), isNull(markers.deletedAt)))
     if (live.length > 0) {
       const ids = live.map((m) => m.id)
       await db.delete(markerConcepts).where(inArray(markerConcepts.markerId, ids))
-      await alignOnWrite(db, lectureId, live)
+      // F9.4 / F11.4: study marks name what they are on, so they are re-linked, not re-aligned.
+      await alignOnWrite(
+        db,
+        lectureId,
+        live.filter((m) => m.capture !== 'study'),
+      )
+      await relinkStudyMarks(
+        db,
+        lecture,
+        live.filter((m) => m.capture === 'study'),
+      )
     }
     return { markers: live.length }
   })

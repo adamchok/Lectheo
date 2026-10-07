@@ -9,7 +9,7 @@ import {
   PipelineStep,
   ReprocessFromStep,
 } from '../enums'
-import { Chapter } from '../payloads'
+import { Chapter, StudyTarget } from '../payloads'
 
 /** `library` can't be created at runtime. */
 export const CreateLectureRequest = z.object({
@@ -148,6 +148,8 @@ export const MarkerDto = z.object({
   kind: MarkerKind,
   tMs: Ms,
   capture: MarkerCapture,
+  /** Study marks only: the concept or chapter that was marked. */
+  target: StudyTarget.nullable(),
   conceptIds: z.array(Id),
 })
 export const ListMarkersResponse = z.object({ data: z.array(MarkerDto) })

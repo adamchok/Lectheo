@@ -12,10 +12,7 @@ export const SegmentIdxs = z.array(z.number().int().nonnegative()).min(1)
 
 export const McqPublicPayload = z.object({
   stem: z.string(),
-  options: z
-    .array(z.object({ id: z.string(), text: z.string() }))
-    .min(3)
-    .max(5),
+  options: z.array(z.object({ id: z.string(), text: z.string() })).min(3).max(5),
 })
 export const SpotFlawPublicPayload = z.object({
   sentences: z.array(z.string()).min(3).max(5),
@@ -77,7 +74,7 @@ export type RubricSecret = z.infer<typeof RubricSecret>
 export const HintsSecret = z.tuple([z.string(), z.string()])
 export type HintsSecret = z.infer<typeof HintsSecret>
 
-// ---------- concepts.key_points (shown in the Study brief since ADR-009 was amended, F9.8) ----------
+// ---------- concepts.key_points (shown in the Study brief, ADR-009 amended) ----------
 
 export const KeyPoints = z
   .array(z.object({ id: z.string(), text: z.string(), segmentIdxs: SegmentIdxs }))
@@ -99,10 +96,14 @@ export type RubricSnapshot = z.infer<typeof RubricSnapshot>
  * One chapter, anchored to transcript segment indexes (never times: times are read from the
  * segments, so they are exact). `endIdx` is inclusive. `conceptIds` may be empty ("Q&A").
  */
+/** Model-written text is capped (F11.1: a short title and one line). */
+export const CHAPTER_TITLE_MAX = 80
+export const CHAPTER_SUMMARY_MAX = 300
+
 export const Chapter = z.object({
   id: z.string().min(1).max(20),
-  title: z.string().min(1),
-  summary: z.string(),
+  title: z.string().min(1).max(CHAPTER_TITLE_MAX),
+  summary: z.string().max(CHAPTER_SUMMARY_MAX),
   startIdx: z.number().int().nonnegative(),
   endIdx: z.number().int().nonnegative(),
   conceptIds: z.array(z.uuid()),
@@ -110,6 +111,15 @@ export const Chapter = z.object({
 export type Chapter = z.infer<typeof Chapter>
 export const Chapters = z.array(Chapter).min(1)
 export type Chapters = z.infer<typeof Chapters>
+
+// ---------- markers.target (F9.4, F11.4) ----------
+
+/** What a study mark is on. Watch and live markers have none (they are aligned by time). */
+export const StudyTarget = z.union([
+  z.object({ conceptId: z.uuid() }),
+  z.object({ chapterId: Chapter.shape.id }),
+])
+export type StudyTarget = z.infer<typeof StudyTarget>
 
 // ---------- misc jsonb ----------
 

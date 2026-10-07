@@ -1,6 +1,7 @@
 import { uuidv7 } from '@lectheo/db'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ACTOR_A, addAttempt, ID } from '../courses/test-fixtures'
+import { postMarkers } from '../lectures/markers'
 import type { DbLike } from '../db'
 import { claimLecture, refundReprocess, STALE_MINUTES } from './claim'
 import { validateGraphStep } from './graph'
@@ -218,6 +219,45 @@ describe('claims', () => {
 })
 
 describe('re-run edge cases', () => {
+  it('a re-run re-links study marks by what they name, not by time (F9.4, F11.4)', async () => {
+    await runFull()
+    const [lecture] = await rows<{ chapters: { id: string; conceptIds: string[] }[] }>(
+      f,
+      `SELECT chapters FROM lectures WHERE id = '${f.lectureId}'`,
+    )
+    const chapter = lecture?.chapters.find((c) => c.conceptIds.length > 1)
+    const concept = chapter?.conceptIds.at(-1) ?? ''
+    expect(chapter).toBeDefined()
+    const conceptMark = {
+      id: uuidv7(),
+      kind: 'lost' as const,
+      capture: 'study' as const,
+      conceptId: concept,
+    }
+    const chapterMark = {
+      id: uuidv7(),
+      kind: 'important' as const,
+      capture: 'study' as const,
+      chapterId: chapter?.id ?? '',
+    }
+    await postMarkers(ACTOR_A, f.lectureId, [conceptMark, chapterMark], f.db)
+
+    await claimLecture(ACTOR_A, f.lectureId, 'extractConcepts', f.db)
+    expect(await processLecture(f.lectureId)).toBe('ready')
+
+    const linked = async (markerId: string) =>
+      (
+        await rows<{ concept_id: string }>(
+          f,
+          `SELECT concept_id FROM marker_concepts WHERE marker_id = '${markerId}'`,
+        )
+      )
+        .map((r) => r.concept_id)
+        .sort()
+    expect(await linked(conceptMark.id)).toEqual([concept])
+    expect(await linked(chapterMark.id)).toEqual([...(chapter?.conceptIds ?? [])].sort())
+  })
+
   it('an edge reversed by a re-run is not a cycle with its own old edge', async () => {
     await runFull()
     const [edge] = await rows<{ from_key: string; to_key: string }>(

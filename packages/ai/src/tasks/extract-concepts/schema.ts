@@ -51,7 +51,10 @@ export const ExtractedChapter = z.object({
 export const ExtractConceptsOutput = z.object({
   concepts: z.array(ExtractedConcept),
   edges: z.array(ExtractedEdge),
-  /** Empty when no chapters were asked for. Validated in the pipeline's validateGraph. */
-  chapters: z.array(ExtractedChapter),
+  /**
+   * Empty when no chapters were asked for. Validated in the pipeline's validateGraph. A malformed
+   * chapter list becomes [] instead of failing the whole extraction (chapters are optional).
+   */
+  chapters: z.array(ExtractedChapter).catch([]),
 })
 export type ExtractConceptsOutput = z.infer<typeof ExtractConceptsOutput>

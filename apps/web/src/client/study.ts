@@ -55,26 +55,22 @@ export type MarkTarget =
 const targetConcepts = (t: MarkTarget): readonly string[] =>
   'conceptId' in t ? [t.conceptId] : t.conceptIds
 
-const sameSet = (a: readonly string[], b: readonly string[]): boolean =>
-  a.length === b.length && a.every((id) => b.includes(id))
+/** The study mark target the server stores (`markers.target`). */
+const storedTarget = (t: MarkTarget): Marker['target'] =>
+  'conceptId' in t ? { conceptId: t.conceptId } : { chapterId: t.chapterId }
 
-/**
- * The student's study mark of `kind` on the target, if any. ponytail: marks carry no target id,
- * so a mark is matched by time and concepts; a chapter that starts at its only concept's first
- * moment shares its mark with that concept, which is the same mark anyway.
- */
+/** The student's study mark of `kind` on the target (matched by its stored target), if any. */
 export function findMark(
   markers: readonly Marker[] | undefined,
   kind: MarkerKind,
   target: MarkTarget,
 ): Marker | undefined {
-  return markers?.find(
-    (m) =>
-      m.capture === 'study' &&
-      m.kind === kind &&
-      m.tMs === target.tMs &&
-      sameSet(m.conceptIds, targetConcepts(target)),
-  )
+  return markers?.find((m) => {
+    if (m.capture !== 'study' || m.kind !== kind || !m.target) return false
+    return 'conceptId' in target
+      ? 'conceptId' in m.target && m.target.conceptId === target.conceptId
+      : 'chapterId' in m.target && m.target.chapterId === target.chapterId
+  })
 }
 
 interface ToggleVars {
@@ -118,6 +114,7 @@ export function useToggleMark(lectureId: string, courseId: string) {
               kind,
               tMs: target.tMs,
               capture: 'study' as const,
+              target: storedTarget(target),
               conceptIds: [...targetConcepts(target)],
             },
           ]

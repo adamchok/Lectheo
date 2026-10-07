@@ -3,6 +3,7 @@ import type {
   MarkerBody,
   MarkerInput,
   PostMarkersResponse,
+  StudyTarget,
 } from '@lectheo/contracts'
 import {
   and,
@@ -44,6 +45,7 @@ interface PlacedMarker extends InsertedMarker {
   capture: MarkerBody['capture']
   /** Study marks name their concepts (linked directly, overlap 1); null = align by time. */
   conceptIds: readonly string[] | null
+  target: StudyTarget | null
 }
 
 /** Each concept's first source moment in this lecture (F9.4). One query. */
@@ -118,15 +120,17 @@ async function placeMarkers(
     study.some((m) => 'chapterId' in m) ? chapterStarts(db, lecture) : new Map<string, never>(),
   ])
   return input.map((m): PlacedMarker => {
-    if (!isStudy(m)) return { ...m, conceptIds: null }
+    if (!isStudy(m)) return { ...m, conceptIds: null, target: null }
     if ('conceptId' in m) {
       const tMs = moments.get(m.conceptId)
       if (tMs === undefined) throw notFound()
-      return { id: m.id, kind: m.kind, capture: 'study', tMs, conceptIds: [m.conceptId] }
+      const target = { conceptId: m.conceptId }
+      return { id: m.id, kind: m.kind, capture: 'study', tMs, conceptIds: [m.conceptId], target }
     }
     const chapter = chapters.get(m.chapterId)
     if (!chapter || chapter.conceptIds.length === 0) throw notFound()
-    return { id: m.id, kind: m.kind, capture: 'study', ...chapter }
+    const target = { chapterId: m.chapterId }
+    return { id: m.id, kind: m.kind, capture: 'study', ...chapter, target }
   })
 }
 
@@ -158,6 +162,7 @@ export async function postMarkers(
           kind: m.kind,
           tMs: m.tMs,
           capture: m.capture,
+          target: m.target,
         })),
       )
       .onConflictDoNothing({ target: markers.id })
@@ -211,6 +216,55 @@ export async function alignOnWrite(
   if (links.length > 0) await db.insert(markerConcepts).values(links).onConflictDoNothing()
 }
 
+export interface StudyMark {
+  id: string
+  tMs: number
+  target: StudyTarget | null
+}
+
+/**
+ * Re-links study marks after a re-run (the pipeline's alignMarkers): they are never aligned by
+ * time. A concept mark keeps its concept while the lecture still teaches it; a chapter mark goes
+ * to the chapter that now starts at its time (else the one with its old id), and its target
+ * follows that chapter. Callers delete the marks' old links first.
+ */
+export async function relinkStudyMarks(
+  db: DbLike,
+  lecture: Lecture,
+  marks: readonly StudyMark[],
+): Promise<void> {
+  if (marks.length === 0) return
+  const [occurring, chapters] = await Promise.all([
+    db
+      .select({ conceptId: conceptOccurrences.conceptId })
+      .from(conceptOccurrences)
+      .where(eq(conceptOccurrences.lectureId, lecture.id)),
+    chapterStarts(db, lecture),
+  ])
+  const taught = new Set(occurring.map((o) => o.conceptId))
+  const links: { markerId: string; conceptId: string; overlapScore: number }[] = []
+  for (const m of marks) {
+    if (m.target && 'conceptId' in m.target) {
+      if (taught.has(m.target.conceptId)) {
+        links.push({ markerId: m.id, conceptId: m.target.conceptId, overlapScore: 1 })
+      }
+      continue
+    }
+    const oldId = m.target && 'chapterId' in m.target ? m.target.chapterId : null
+    const match =
+      [...chapters].find(([, c]) => c.tMs === m.tMs) ?? [...chapters].find(([id]) => id === oldId)
+    if (!match) continue
+    const [chapterId, chapter] = match
+    links.push(
+      ...chapter.conceptIds.map((conceptId) => ({ markerId: m.id, conceptId, overlapScore: 1 })),
+    )
+    if (chapterId !== oldId) {
+      await db.update(markers).set({ target: { chapterId } }).where(eq(markers.id, m.id))
+    }
+  }
+  if (links.length > 0) await db.insert(markerConcepts).values(links).onConflictDoNothing()
+}
+
 /** GET /lectures/{id}/markers: the caller's live markers in time order, with linked concepts. */
 export async function listMarkers(
   actor: Actor,
@@ -224,6 +278,7 @@ export async function listMarkers(
       kind: markers.kind,
       tMs: markers.tMs,
       capture: markers.capture,
+      target: markers.target,
       conceptId: markerConcepts.conceptId,
     })
     .from(markers)

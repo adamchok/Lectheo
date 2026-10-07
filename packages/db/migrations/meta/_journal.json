@@ -43,6 +43,13 @@
       "when": 1791362226190,
       "tag": "0005_study_chapters",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791365457989,
+      "tag": "0006_study_mark_target",
+      "breakpoints": true
     }
   ]
 }

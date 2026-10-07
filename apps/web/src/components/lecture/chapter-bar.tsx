@@ -30,6 +30,7 @@ export function ChapterBar({ lecture, playing, currentMs, pause }: ChapterBarPro
   const chapters = lecture.chapters
   const [nowMs, setNowMs] = useState(lecture.media?.startMs ?? chapters[0]?.startMs ?? 0)
   const [only, setOnly] = useState(false)
+  const [status, setStatus] = useState('')
   /** The chapter "only" holds to; null re-locks to wherever playback is next. */
   const locked = useRef<LectureChapter | null>(null)
 
@@ -44,6 +45,7 @@ export function ChapterBar({ lecture, playing, currentMs, pause }: ChapterBarPro
         locked.current = chapterAt(chapters, ms) ?? null
       } else if (ms >= lock.endMs) {
         pause()
+        setStatus(`Paused at the end of chapter ${chapters.indexOf(lock) + 1}, ${lock.title}.`)
         locked.current = null
       }
     }
@@ -85,6 +87,7 @@ export function ChapterBar({ lecture, playing, currentMs, pause }: ChapterBarPro
           pressed={only}
           onPressedChange={(on) => {
             locked.current = null
+            setStatus('')
             setOnly(on)
           }}
           className="px-2.5"
@@ -92,6 +95,9 @@ export function ChapterBar({ lecture, playing, currentMs, pause }: ChapterBarPro
           Play this chapter only
         </Toggle>
       </div>
+      <p role="status" className="sr-only">
+        {status}
+      </p>
     </div>
   )
 }

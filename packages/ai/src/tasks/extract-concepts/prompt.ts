@@ -43,11 +43,12 @@ export function buildPrompt(input: ExtractConceptsInput): PromptSpec {
       `Lecture: ${input.lectureTitle}`,
       `Existing course concepts:\n${existing}`,
       `Extract about ${input.targetCount} concepts (±2) and their edges.`,
+      chaptersAsk(input.chapterCount),
     ].join('\n\n'),
   }
 }
 
-function chaptersAsk(count: ExtractConceptsInput['chapterCount']): string {
+export function chaptersAsk(count: ExtractConceptsInput['chapterCount']): string {
   if (!count) return 'Chapters: not wanted for this lecture; return an empty list.'
   return `Chapters: split the lecture into ${count.min} to ${count.max} chapters.`
 }

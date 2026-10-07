@@ -38,6 +38,14 @@ describe('chapterErrors (F11.2)', () => {
     ])
   })
 
+  it('rejects over-long titles and summaries', () => {
+    const long = { ...start(5), title: 'x'.repeat(81), summary: 'y'.repeat(301) }
+    expect(chapterErrors([long], segs, 5, known)).toEqual([
+      'chapter 1 "' + 'x'.repeat(81) + '": title longer than 80 characters',
+      'chapter 1 "' + 'x'.repeat(81) + '": summary longer than 300 characters',
+    ])
+  })
+
   it('rejects counts far from 8–15 per hour, and none at all', () => {
     expect(chapterErrors([start(5)], segs, 60, known)).toEqual([
       'chapters: expected 7..16 for 60 min, got 1',

@@ -154,6 +154,7 @@ Edits never re-segment, so citations stay stable.
 | `kind` | enum `lost`, `important` | |
 | `t_ms` | int | media time |
 | `capture` | enum `watch`, `live`, `study` | `study` ([[Lectheo Product Spec#F9. Study mode — Must|F9]]), a mark made on a concept in the brief; linked to that concept directly (`marker_concepts.overlap_score = 1`), `t_ms` = the concept's first source moment. Chapter marks ([[Lectheo Product Spec#F11. Chapters — Must|F11]]) use the same capture: `t_ms` = the chapter's start, linked to every concept the chapter covers |
+| `target` | jsonb null | Study marks only: `{ conceptId }` or `{ chapterId }` (contracts `StudyTarget`), what was marked. A pipeline re-run re-links study marks by it instead of by time (the chapter id follows the chapter that now starts at `t_ms`). `null` for watch and live markers |
 | `deleted_at` | timestamptz null | undo within 5 s (soft delete) |
 | `created_at` | timestamptz | |
 

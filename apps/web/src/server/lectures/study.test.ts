@@ -11,7 +11,7 @@ import {
   SECRET_KEY_POINT,
 } from '../courses/test-fixtures'
 import { getBrief } from './brief'
-import { listMarkers, postMarkers } from './markers'
+import { deleteMarker, listMarkers, postMarkers } from './markers'
 import { getLecture } from './read'
 
 vi.mock('server-only', () => ({}))
@@ -145,11 +145,24 @@ describe('study marks (F9.4, F11.4)', () => {
     expect(await postMarkers(ACTOR_A, ID.L1, [mark], f.db)).toEqual({ accepted: 1, duplicates: 0 })
     expect(await postMarkers(ACTOR_A, ID.L1, [mark], f.db)).toEqual({ accepted: 0, duplicates: 1 })
     expect((await listMarkers(ACTOR_A, ID.L1, f.db)).data).toEqual([
-      { id: mark.id, kind: 'lost', tMs: 40_000, capture: 'study', conceptIds: [ID.C2] },
+      {
+        id: mark.id,
+        kind: 'lost',
+        tMs: 40_000,
+        capture: 'study',
+        target: { conceptId: ID.C2 },
+        conceptIds: [ID.C2],
+      },
     ])
     expect(await links(mark.id)).toEqual([{ concept_id: ID.C2, overlap_score: 1 }])
     const brief = await getBrief(ACTOR_A, ID.L1, f.db)
     expect(brief.concepts.find((c) => c.id === ID.C2)?.marks).toEqual({ lost: 1, important: 0 })
+
+    // Undo (the pressed toggle): gone from the list and the brief's counts.
+    await deleteMarker(ACTOR_A, ID.L1, mark.id, f.db)
+    expect((await listMarkers(ACTOR_A, ID.L1, f.db)).data).toEqual([])
+    const after = await getBrief(ACTOR_A, ID.L1, f.db)
+    expect(after.concepts.find((c) => c.id === ID.C2)?.marks).toEqual({ lost: 0, important: 0 })
   })
 
   it('a chapter mark sits at the chapter start, linked to every concept it covers', async () => {
@@ -159,7 +172,12 @@ describe('study marks (F9.4, F11.4)', () => {
     await postMarkers(ACTOR_A, ID.L1, [mark], f.db)
     await postMarkers(ACTOR_A, ID.L1, [mark], f.db)
     expect((await listMarkers(ACTOR_A, ID.L1, f.db)).data).toEqual([
-      expect.objectContaining({ id: mark.id, tMs: 40_000, capture: 'study' }),
+      expect.objectContaining({
+        id: mark.id,
+        tMs: 40_000,
+        capture: 'study',
+        target: { chapterId: 'ch2' },
+      }),
     ])
     expect(await links(mark.id)).toEqual(
       [ID.C1, ID.C2].sort().map((concept_id) => ({ concept_id, overlap_score: 1 })),

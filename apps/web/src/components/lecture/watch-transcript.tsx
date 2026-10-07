@@ -121,6 +121,7 @@ export function TranscriptPanel({
     >
       {hasChapters ? (
         <Tabs defaultValue="transcript" className="min-h-0 flex-1 gap-0">
+          <h2 className="sr-only">Transcript and chapters</h2>
           <div className="border-b px-3 py-2">
             <TabsList>
               <TabsTrigger value="transcript" className="px-3">

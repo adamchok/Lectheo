@@ -227,7 +227,7 @@ Format: context → decision → consequences. All **Accepted, 4 Oct 2026** (v2 
   - Spot-flaw verdict and location are checked in code. Only the correction goes to the judge.
   - Rubrics are frozen into `activities.rubric_snapshot`.
   - Author replies are capped at 150 tokens and leak-checked before display ([[#ADR-013 · TypeSafe Jev as the leak check, with an LLM escalation|ADR-013]]).
-  - **Amended 7 Oct 2026 (built):** `concepts.key_points` stop being secret, because the Study brief ([[Lectheo Product Spec#F9. Study mode — Must|F9]]) shows them. Teach-back still grades against them via `rubric_snapshot`. Everything else above stays hidden.
+  - **Amended 7 Oct 2026 (built):** `concepts.key_points` stop being secret, because the Study brief ([[Lectheo Product Spec#F9. Study mode — Must|F9]]) shows them. Teach-back still grades against them via `rubric_snapshot`. Everything else above stays hidden. **Cost, accepted on purpose:** the key points are teach-back's rubric criteria (and items are drafted from them), so a student can read them in Study and paraphrase them into a teach-back for full marks. No answer key, flaw or hint leaks, and Mastered still needs a second, different activity type. If this is abused, the follow-up is a copy-overlap penalty in `judge-teach-back` (high verbatim overlap with the key points caps the criterion score), not hiding the key points again.
 - **Consequences:**
   - \+ Leak risk reduced structurally.
   - − Author replies aren't streamed (~2.5–3.5 s).

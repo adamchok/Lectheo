@@ -4,7 +4,7 @@ import type { BriefResponse, LectureResponse } from '@lectheo/contracts'
 import { ClipboardCheck, FileText } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
-import { useEffect, useId } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { pluralize } from '@/client/format'
 import { useBrief } from '@/client/study'
 import { DeleteLectureButton } from '@/components/capture/delete-lecture-button'
@@ -16,7 +16,7 @@ import { PageChrome } from '@/components/shell/page-chrome'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { LectureModes } from './lecture-modes'
-import { StudyConcept } from './study-concept'
+import { StudyConcept, type OpenPart } from './study-concept'
 
 /*
  * /lectures/[id] in Study mode (Product Spec F9, Design System §4 "Lecture: Study"): one reading
@@ -96,6 +96,8 @@ export interface StudyViewProps {
 export function StudyView({ lecture, courseTitle }: StudyViewProps) {
   const brief = useBrief(lecture.id)
   useConceptAnchor(Boolean(brief.data))
+  // One player at a time: opening a part in one block closes the one before.
+  const [open, setOpen] = useState<{ conceptId: string; part: OpenPart } | null>(null)
   const userLecture = lecture.source !== 'library'
   const onPage = new Set(brief.data?.concepts.map((c) => c.id))
 
@@ -149,7 +151,14 @@ export function StudyView({ lecture, courseTitle }: StudyViewProps) {
         <>
           <div className="divide-border divide-y">
             {brief.data.concepts.map((c) => (
-              <StudyConcept key={c.id} lecture={lecture} concept={c} onPage={onPage} />
+              <StudyConcept
+                key={c.id}
+                lecture={lecture}
+                concept={c}
+                onPage={onPage}
+                open={open?.conceptId === c.id ? open.part : null}
+                onOpen={(part) => setOpen(part === null ? null : { conceptId: c.id, part })}
+              />
             ))}
           </div>
           <section

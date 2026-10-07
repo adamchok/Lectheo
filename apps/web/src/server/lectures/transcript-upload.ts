@@ -94,11 +94,11 @@ export async function uploadTranscript(
   await db.transaction(async (tx) => {
     const claimed = await tx
       .update(lectures)
-      .set({ status: 'draft', hasTimestamps, durationMs, error: null })
+      .set({ status: 'draft', hasTimestamps, durationMs, error: null, chapters: null })
       .where(and(eq(lectures.id, lecture.id), inArray(lectures.status, [...UPLOADABLE_STATUSES])))
       .returning({ id: lectures.id })
     if (claimed.length === 0) throw invalidState('This lecture is already being processed.')
-    // A re-upload replaces the previous transcript.
+    // A re-upload replaces the previous transcript (and the chapters citing its segments).
     await tx.delete(transcriptSegments).where(eq(transcriptSegments.lectureId, lecture.id))
     await tx
       .insert(transcriptSegments)

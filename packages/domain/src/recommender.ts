@@ -26,12 +26,7 @@ export const PRIORITY_WEIGHTS = {
 export const RECENT_PRACTICE_WINDOW_MS = 10 * 60 * 1000
 
 /** Practice order (Architecture §6.3); transfer and stump only when enabled. */
-export const PRACTICE_ORDER: readonly ActivityType[] = [
-  'spot_flaw',
-  'teach_back',
-  'transfer',
-  'stump',
-]
+export const PRACTICE_ORDER: readonly ActivityType[] = ['spot_flaw', 'teach_back', 'transfer', 'stump']
 
 export interface EnabledActivities {
   readonly transfer?: boolean
@@ -110,7 +105,9 @@ export function prerequisitesOfRed(
   redConceptIds: ReadonlySet<string>,
 ): ReadonlySet<string> {
   return new Set(
-    edges.filter((e) => e.relation === 'depends_on' && redConceptIds.has(e.from)).map((e) => e.to),
+    edges
+      .filter((e) => e.relation === 'depends_on' && redConceptIds.has(e.from))
+      .map((e) => e.to),
   )
 }
 
@@ -150,6 +147,8 @@ export interface EvidenceMarker {
   /** Same convention as `LectureRef.title`. */
   readonly lectureTitle: string
   readonly tMs: number
+  /** Study marks: what was marked (a concept), worded "on …" instead of "at 12:41". */
+  readonly on?: string
 }
 
 export interface ConceptDetail {
@@ -380,11 +379,16 @@ function sureWrongText(count: number): string {
 const isSureWrong = (a: MasteryAttempt): boolean =>
   a.activityType === 'diagnostic' && a.confidence === 'sure' && a.outcome === 'incorrect'
 
-/** "You marked I'm lost at 12:41 in Lecture 5", with its lecture moment. */
+/**
+ * "You marked I'm lost at 12:41 in Lecture 5" (a study mark: "… on Hash tables in Lecture 5"),
+ * with its lecture moment.
+ */
 function markEvidence(m: EvidenceMarker): NextStepEvidence {
   return {
     kind: m.kind === 'lost' ? 'marked_lost' : 'marked_important',
-    text: `You marked ${MARKER_WORDS[m.kind]} at ${formatTimestamp(m.tMs)} in ${m.lectureTitle}`,
+    text: m.on
+      ? `You marked ${MARKER_WORDS[m.kind]} on ${m.on} in ${m.lectureTitle}`
+      : `You marked ${MARKER_WORDS[m.kind]} at ${formatTimestamp(m.tMs)} in ${m.lectureTitle}`,
     source: { lectureId: m.lectureId, tMs: m.tMs },
   }
 }

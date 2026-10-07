@@ -157,8 +157,11 @@ export function planChapters(
   minutes: number,
   hasTimestamps: boolean,
 ): ChapterPlan {
-  if (!hasTimestamps || extraction.chapters.length === 0) return { chapters: null, errors: [] }
-  const starts = extraction.chapters.map((c) => ({
+  // `?? []`: extractConcepts outputs stored before chapters existed (prompt 0.2) have none.
+  const extracted = extraction.chapters ?? []
+  if (!hasTimestamps) return { chapters: null, errors: [] }
+  if (extracted.length === 0) return { chapters: null, errors: ['no_chapters'] }
+  const starts = extracted.map((c) => ({
     title: c.title.trim(),
     summary: c.summary.trim(),
     startIdx: c.startIdx,

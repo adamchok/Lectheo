@@ -2,6 +2,7 @@
 
 import type { MarkerKind } from '@lectheo/contracts'
 import { Flag, Star } from 'lucide-react'
+import { useId } from 'react'
 import { findMark, useMarkers, useToggleMark, type MarkTarget } from '@/client/study'
 import { errorMessage } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
@@ -39,6 +40,7 @@ export function MarkButtons({
   iconOnly = false,
 }: MarkButtonsProps) {
   const markers = useMarkers(lectureId)
+  const errorId = useId()
   const toggle = useToggleMark(lectureId, courseId)
   return (
     <div className="flex flex-wrap items-center gap-1">
@@ -52,11 +54,17 @@ export function MarkButtons({
             aria-pressed={pressed}
             aria-label={iconOnly ? `${short}: ${name}` : undefined}
             disabled={!markers.data}
+            aria-describedby={markers.isError ? errorId : undefined}
             onClick={() => toggle.toggle(kind, target, mark)}
             className={cn(iconOnly && 'size-8', pressed && PRESSED[kind])}
           >
             <Icon aria-hidden className={cn(pressed && 'fill-current')} />
-            {!iconOnly && label}
+            {!iconOnly && (
+              <>
+                {label}
+                <span className="sr-only">: {name}</span>
+              </>
+            )}
           </Button>
         )
         return iconOnly ? (
@@ -68,6 +76,14 @@ export function MarkButtons({
           <span key={kind}>{button}</span>
         )
       })}
+      {markers.isError && (
+        <p id={errorId} role="alert" className="text-caption text-destructive basis-full">
+          Couldn&apos;t load your marks.{' '}
+          <button type="button" className="underline" onClick={() => markers.refetch()}>
+            Retry
+          </button>
+        </p>
+      )}
       {toggle.isError && (
         <p role="alert" className="text-caption text-destructive basis-full">
           Couldn&apos;t save that mark. {errorMessage(toggle.error)}
