@@ -56,6 +56,32 @@ test('node opens a sheet over the full-width map; Esc closes it; markers sit bel
   await panel.getByRole('button', { name: 'Close details' }).click()
   await expect(panel).toBeHidden()
   await expect(node).toBeFocused()
+
+  // Esc on the open (selected) node itself: React Flow's own Esc must not blur it afterwards.
+  await node.click()
+  await expect(panel).toBeVisible()
+  await node.focus()
+  await page.keyboard.press('Escape')
+  await expect(panel).toBeHidden()
+  await page.waitForTimeout(100)
+  await expect(node).toBeFocused()
+
+  // Esc from elsewhere (a timeline dot) closes the sheet without pulling focus back to the map.
+  await node.click()
+  await expect(panel).toBeVisible()
+  const dot = markers.getByRole('link').first()
+  await dot.focus()
+  await page.keyboard.press('Escape')
+  await expect(panel).toBeHidden()
+  await expect(dot).toBeFocused()
+
+  // Switching to the list and back doesn't reopen the sheet.
+  await node.click()
+  await expect(panel).toBeVisible()
+  await page.getByRole('radio', { name: 'List' }).click()
+  await page.getByRole('radio', { name: 'Map' }).click()
+  await expect(page.locator('.react-flow__node').first()).toBeVisible()
+  await expect(panel).toBeHidden()
 })
 
 /** Light and dark at 1440px and 375px, with the sheet open, then scrolled to Your markers. */

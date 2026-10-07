@@ -30,6 +30,7 @@ import { pickUnseenItem } from '../activities/items'
 import type { Actor } from '../auth'
 import { appDb, type DbLike } from '../db'
 import { FEATURES } from '../features'
+import { type LectureLengthInput, playableWindow } from '../lectures/length'
 import { loadAttemptsByConcept, masteryFromAttempts } from '../mastery'
 import { type Course, loadCourseForRead } from '../ownership'
 
@@ -74,16 +75,8 @@ type LectureFlags = Awaited<ReturnType<typeof loadLectureFlags>>[number]
 const lectureTitle = (l: Pick<LectureFlags, 'source' | 'seq' | 'title'>): string =>
   l.source === 'library' ? `Lecture ${l.seq}` : l.title
 
-/**
- * What the student will actually watch: library lectures play only the media window
- * (`startMs..endMs`, e.g. 45 min of a 2 h video); otherwise the whole recording.
- */
-export function watchMs(l: Pick<LectureFlags, 'durationMs' | 'media'>): number | null {
-  const start = l.media?.startMs
-  const end = l.media?.endMs
-  if (typeof start === 'number' && typeof end === 'number' && end > start) return end - start
-  return l.durationMs
-}
+/** What the student will actually watch (`playableWindow`: the library window, else the media). */
+export const watchMs = (l: LectureLengthInput): number | null => playableWindow(l).durationMs
 
 const lectureRef = (l: LectureFlags): LectureRef => ({
   lectureId: l.id,

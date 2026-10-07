@@ -1,4 +1,4 @@
-import type { CourseMapResponse, LectureMediaJson, MapNode, SourceRef } from '@lectheo/contracts'
+import type { CourseMapResponse, MapNode, SourceRef } from '@lectheo/contracts'
 import {
   and,
   asc,
@@ -22,6 +22,7 @@ import { excerpt } from '../activities/sources'
 import type { Actor } from '../auth'
 import { appDb, type DbLike } from '../db'
 import { FEATURES } from '../features'
+import { type LectureLengthInput, playableWindow } from '../lectures/length'
 import { loadMasteryForUser } from '../mastery'
 import { loadCourseForRead, type Course } from '../ownership'
 import { toAttribution } from './summary'
@@ -155,29 +156,14 @@ const loadSegmentTimes = (db: DbLike, courseId: string) =>
 
 type SegmentTimes = Awaited<ReturnType<typeof loadSegmentTimes>>[number]
 
-type LectureTimesInput = {
-  hasTimestamps: boolean
-  media: LectureMediaJson | null
-  durationMs: number | null
-}
-
-/**
- * The timeline's axis for one lecture (F2.11), in media time: a library window plays
- * `media.startMs..endMs`; otherwise the recording or YouTube length, else the last segment's end.
- */
+/** The timeline's axis for one lecture (F2.11), in media time; none without timestamps. */
 export function lectureTimes(
-  lecture: LectureTimesInput,
+  lecture: LectureLengthInput & { hasTimestamps: boolean },
   segments: Pick<SegmentTimes, 'lastEndMs' | 'chapterStartsMs'> | undefined,
 ): { startMs: number; durationMs: number | null; chapterStartsMs: number[] } {
   if (!lecture.hasTimestamps) return { startMs: 0, durationMs: null, chapterStartsMs: [] }
-  const start = lecture.media?.startMs
-  const end = lecture.media?.endMs
-  const chapterStartsMs = segments?.chapterStartsMs ?? []
-  if (typeof start === 'number' && typeof end === 'number' && end > start) {
-    return { startMs: start, durationMs: end - start, chapterStartsMs }
-  }
-  const durationMs = lecture.media?.durationMs ?? lecture.durationMs ?? segments?.lastEndMs ?? null
-  return { startMs: 0, durationMs, chapterStartsMs }
+  const window = playableWindow(lecture, segments?.lastEndMs ?? null)
+  return { ...window, chapterStartsMs: segments?.chapterStartsMs ?? [] }
 }
 
 type SourceRow = Awaited<ReturnType<typeof loadSources>>[number]

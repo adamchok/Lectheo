@@ -96,6 +96,10 @@ describe('LectureTimeline', () => {
     // The first chapter starts the lecture: one tick, at 5:00.
     const ticks = [...container.querySelectorAll<HTMLElement>('[data-testid="chapter-tick"]')]
     expect(ticks.map((t) => t.style.left)).toEqual(['50%'])
+    // Screen readers get the range in the list's name, not as bare times.
+    expect(
+      container.querySelector('ul[aria-label^="Markers in"]')?.getAttribute('aria-label'),
+    ).toMatch(/^Markers in Lecture 1, .+ to .+$/)
     expect(container.textContent).toContain('0:00')
     expect(container.textContent).toContain('10:00')
   })

@@ -71,7 +71,11 @@ export function NodePanel({ concept, map, onClose }: NodePanelProps) {
   // Esc closes the sheet wherever focus is, on the map or in the panel (F2.10).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !e.defaultPrevented) onClose()
+      if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing) return
+      // Esc in a text field (a native search input) clears it; it doesn't close the sheet.
+      if ((e.target as Element | null)?.closest?.('input, textarea, select, [contenteditable]'))
+        return
+      onClose()
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)

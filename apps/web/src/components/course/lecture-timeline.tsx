@@ -4,7 +4,7 @@ import type { CourseMapResponse, MarkerKind } from '@lectheo/contracts'
 import { Flag, Star } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
-import { useEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { formatTimestamp, formatTimestampLong, pluralize } from '@/client/format'
 import { cn } from '@/lib/utils'
 
@@ -88,7 +88,8 @@ export function clusterMarkers(
 function useWidth<T extends HTMLElement>() {
   const ref = useRef<T>(null)
   const [width, setWidth] = useState(0)
-  useEffect(() => {
+  // Before paint, so the first frame already clusters at the real width.
+  useLayoutEffect(() => {
     const el = ref.current
     if (!el || typeof ResizeObserver === 'undefined') return
     const observer = new ResizeObserver(([entry]) => setWidth(entry?.contentRect.width ?? 0))
@@ -177,21 +178,30 @@ function MarkerTrack({ lecture, markers }: MarkerTrackProps) {
   const axis = lectureAxis(lecture, markers)
   const clusters = clusterMarkers(markers, axis, width)
   // The first chapter starts the lecture: no tick there (like the Watch bar).
-  const ticks = lecture.chapterStartsMs.filter((ms) => ms > axis.startMs && ms < axis.endMs)
+  // A chapter within one dot of the start (a library window opening a few seconds into it) also
+  // gets no tick: it would read as part of the track's end.
+  const minTickPct = width > 0 ? (DOT_PX / width) * 100 : 0
+  const ticks = lecture.chapterStartsMs.filter((ms) => {
+    const pct = axisPct(ms, axis)
+    return ms > axis.startMs && ms < axis.endMs && pct > minTickPct
+  })
+  const range = lecture.durationMs
+    ? `, ${formatTimestampLong(axis.startMs)} to ${formatTimestampLong(axis.endMs)}`
+    : ''
   return (
     <div className="space-y-1">
       <div ref={track} className="relative h-8">
         <span aria-hidden className="bg-border absolute inset-x-0 top-1/2 h-px" />
-        {ticks.map((ms) => (
+        {ticks.map((ms, i) => (
           <span
-            key={ms}
+            key={`${i}-${ms}`}
             aria-hidden
             data-testid="chapter-tick"
             className="bg-muted-foreground absolute top-1/2 h-3 w-0.5 -translate-x-1/2 -translate-y-1/2"
             style={{ left: `${axisPct(ms, axis)}%` }}
           />
         ))}
-        <ul aria-label={`Markers in ${lecture.title}`}>
+        <ul aria-label={`Markers in ${lecture.title}${range}`}>
           {clusters.map((cluster) => (
             <li
               key={cluster.markers[0]!.id}
@@ -207,8 +217,12 @@ function MarkerTrack({ lecture, markers }: MarkerTrackProps) {
           ))}
         </ul>
       </div>
-      {lecture.durationMs !== null && (
-        <p className="text-mono-sm text-muted-foreground flex justify-between tabular-nums">
+      {/* The range is in the list's name; screen readers skip the bare times. */}
+      {range && (
+        <p
+          aria-hidden
+          className="text-mono-sm text-muted-foreground flex justify-between tabular-nums"
+        >
           <span>{formatTimestamp(axis.startMs)}</span>
           <span>{formatTimestamp(axis.endMs)}</span>
         </p>
@@ -234,18 +248,18 @@ export function LectureTimeline({ map }: { map: CourseMapResponse }) {
   return (
     <section
       aria-labelledby="timeline-heading"
-      className="bg-card border-border rounded-xl border p-5"
+      className="bg-card border-border rounded-lg border p-5"
     >
-      <h2 id="timeline-heading" className="font-medium">
+      <h2 id="timeline-heading" className="text-title-md">
         Your markers
       </h2>
-      <p className="text-muted-foreground mb-4 text-sm">
+      <p className="text-muted-foreground text-body-sm mb-4">
         Where you flagged or starred each lecture. Select one to jump to that moment.
       </p>
       <ul className="space-y-4">
         {lectures.map(({ lecture, markers: own }) => (
           <li key={lecture.id} className="space-y-1">
-            <p className="text-sm break-words">
+            <p className="text-body-sm break-words">
               <span className="font-medium">{lecture.title}</span>{' '}
               <span className="text-muted-foreground">· {pluralize(own.length, 'marker')}</span>
             </p>
@@ -254,7 +268,7 @@ export function LectureTimeline({ map }: { map: CourseMapResponse }) {
         ))}
       </ul>
       {hasUnlinked && (
-        <p className="text-muted-foreground mt-4 text-xs">
+        <p className="text-muted-foreground text-caption mt-4">
           Dashed markers are unlinked: moments that didn&apos;t match a concept, like an anecdote or
           admin talk. They aren&apos;t used to pick questions.
         </p>
