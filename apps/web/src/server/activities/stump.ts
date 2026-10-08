@@ -113,7 +113,9 @@ export const stumpHandler: ActivityTypeHandler<'stump'> = {
 
   async submit(ctx, body) {
     const { lectureId, segments } = await conceptSegments(ctx.db, ctx.concept)
+    const titles = await ctx.titles()
     const base = {
+      ...titles,
       conceptName: ctx.concept.name,
       segments,
       question: body.question,
@@ -141,7 +143,7 @@ export const stumpHandler: ActivityTypeHandler<'stump'> = {
     // ADR-009: the answerer input type has no key field; only the question goes over.
     const answer = await runTask(
       stumpAnswerTask,
-      { conceptName: ctx.concept.name, segments, question: body.question },
+      { ...titles, conceptName: ctx.concept.name, segments, question: body.question },
       ctx.ai,
     )
     const aiAnswer = answer.output.answer

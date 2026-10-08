@@ -16,7 +16,7 @@ import {
   type StumpRefereeOutput,
   type TaskContext,
 } from '@lectheo/ai'
-import { buildLibraryRows } from '@lectheo/db/seed'
+import { buildLibraryRows, LIBRARY_COURSE_TITLE } from '@lectheo/db/seed'
 import { assertDevGateway, cached, ledgerCost, readLedger, scriptContext } from './lib/cache'
 import { writeEvalCsv } from './lib/csv'
 
@@ -136,7 +136,14 @@ function segmentsFor(key: string) {
 
 async function runCase(c: StumpCase, ctx: TaskContext): Promise<CaseRun> {
   const { name, segments } = segmentsFor(c.concept)
-  const base = { conceptName: name, segments, question: c.question, answerKey: c.answerKey }
+  const courseTitle = LIBRARY_COURSE_TITLE
+  const base = {
+    courseTitle,
+    conceptName: name,
+    segments,
+    question: c.question,
+    answerKey: c.answerKey,
+  }
   const check = await runTask(stumpRefereeTask, { ...base, mode: 'validate', aiAnswer: null }, ctx)
   if (!isAccepted(check.output)) {
     const run = { validate: check.output, aiAnswer: null, compare: null }
@@ -145,7 +152,7 @@ async function runCase(c: StumpCase, ctx: TaskContext): Promise<CaseRun> {
   // The answerer gets the question only, never the key.
   const answer = await runTask(
     stumpAnswerTask,
-    { conceptName: name, segments, question: c.question },
+    { courseTitle, conceptName: name, segments, question: c.question },
     ctx,
   )
   const aiAnswer = answer.output.answer

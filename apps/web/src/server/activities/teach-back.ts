@@ -6,6 +6,7 @@ import {
   runTask,
   streamPersona,
   type ChatTurn,
+  type CourseTitles,
   type FriendReplyInput,
 } from '@lectheo/ai'
 import { RubricSnapshot, type KeyPoints } from '@lectheo/contracts'
@@ -88,11 +89,13 @@ function explanationText(ctx: ActivityContext, keyPoints: KeyPoints): string {
 
 /** Friend input: public concept name + summary only, never the 🔒 key points (ADR-009). */
 export function friendReplyInput(
+  titles: CourseTitles,
   concept: Pick<ActivityContext['concept'], 'name' | 'summary'>,
   activity: Pick<ActivityContext['activity'], 'turnsUsed' | 'turnBudget'>,
   history: readonly ChatTurn[],
 ): FriendReplyInput {
   return {
+    ...titles,
     conceptName: concept.name,
     conceptSummary: concept.summary,
     history,
@@ -128,7 +131,7 @@ export const teachBackHandler: ActivityTypeHandler<'teach_back'> = {
     const history = toTurns(await ctx.visibleMessages())
     const result = await streamPersona(
       friendReplyTask,
-      friendReplyInput(ctx.concept, ctx.activity, history),
+      friendReplyInput(await ctx.titles(), ctx.concept, ctx.activity, history),
       ctx.ai,
     )
     // Keep generating (and persist) even if the client disconnects mid-stream.
@@ -152,7 +155,7 @@ export const teachBackHandler: ActivityTypeHandler<'teach_back'> = {
     if (exchanges.length === 0) throw invalidState('Explain the concept to Sam before submitting.')
     const judge = await runTask(
       judgeTeachBackTask,
-      { conceptName: ctx.concept.name, keyPoints, exchanges },
+      { ...(await ctx.titles()), conceptName: ctx.concept.name, keyPoints, exchanges },
       ctx.ai,
     )
     // Labels stay generic: the key-point text is the answer, revealed only by finalReveal (F5.3).

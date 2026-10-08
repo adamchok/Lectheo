@@ -7,6 +7,8 @@ export * from './types'
 export {
   UNTRUSTED_RULE,
   UNTRUSTED_TAGS,
+  courseContext,
+  type CourseTitles,
   untrusted,
   lectureContext,
   estimateTokens,

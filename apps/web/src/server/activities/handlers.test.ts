@@ -226,7 +226,12 @@ describe('teach_back helpers', () => {
     const history = [{ role: 'student', text: 'It puts keys in buckets.' }] as const
     const json = JSON.stringify(
       friendReplyTask.buildPrompt(
-        friendReplyInput(concept, { turnsUsed: 6, turnBudget: 6 }, history),
+        friendReplyInput(
+          { courseTitle: 'CS50x' },
+          concept,
+          { turnsUsed: 6, turnBudget: 6 },
+          history,
+        ),
       ),
     )
     for (const k of concept.keyPoints) expect(json).not.toContain(k.text)

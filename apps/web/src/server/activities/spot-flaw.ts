@@ -161,6 +161,7 @@ async function draftReply(ctx: ActivityContext, text: string, stricter: boolean)
   // The newest visible message is the student's current one (stored by the core).
   const history: ChatTurn[] = visible.slice(0, -1).map((m) => ({ role: m.role, text: m.content }))
   const input = {
+    ...(await ctx.titles()),
     conceptName: ctx.concept.name,
     scenarioSentences: sentencesOf(ctx),
     history,
@@ -303,6 +304,7 @@ export const spotFlawHandler: ActivityTypeHandler<'spot_flaw'> = {
         ? await runTask(
             judgeCorrectionTask,
             {
+              ...(await ctx.titles()),
               scenarioSentences: sentencesOf(ctx),
               flawSentenceIdx: key.flawSentenceIdx,
               flawSummary: key.flawSummary ?? '',

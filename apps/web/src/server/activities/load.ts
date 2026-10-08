@@ -7,8 +7,10 @@ import {
   eq,
   items,
   itemSecrets,
+  lectures,
   messages,
 } from '@lectheo/db'
+import type { CourseTitles } from '@lectheo/ai'
 import { z } from 'zod'
 import { aiContext } from '../ai-hooks'
 import type { Actor } from '../auth'
@@ -75,6 +77,20 @@ async function loadSecrets(db: DbLike, item: ItemRow | null): Promise<ItemSecret
   return row
 }
 
+async function loadTitles(db: DbLike, concept: ConceptRow): Promise<CourseTitles> {
+  const [[course], [lecture]] = await Promise.all([
+    db.select({ title: courses.title }).from(courses).where(eq(courses.id, concept.courseId)),
+    concept.firstLectureId
+      ? db
+          .select({ title: lectures.title })
+          .from(lectures)
+          .where(eq(lectures.id, concept.firstLectureId))
+      : [],
+  ])
+  if (!course) throw new Error(`course missing for concept ${concept.id}`)
+  return { courseTitle: course.title, lectureTitle: lecture?.title ?? null }
+}
+
 export const visibleMessages = (db: DbLike, activityId: string) =>
   db
     .select()
@@ -95,6 +111,7 @@ export async function buildContext(
     loadItem(db, activity.itemId),
   ])
   let secrets: Promise<ItemSecretsRow> | undefined
+  let titles: Promise<CourseTitles> | undefined
   return {
     db,
     actor,
@@ -103,6 +120,7 @@ export async function buildContext(
     activity,
     item,
     secrets: () => (secrets ??= loadSecrets(db, item)),
+    titles: () => (titles ??= loadTitles(db, conceptRow)),
     visibleMessages: () => visibleMessages(db, activity.id),
   }
 }

@@ -133,7 +133,7 @@ const FAQ: ReadonlyArray<{ question: string; answer: ReactNode }> = [
   {
     question: 'Who is it for?',
     answer:
-      'Computer science students who learn from lectures, live or recorded. The sample uses CS50x, and the activities are written for CS concepts.',
+      "Students in concept-heavy courses (computer science, engineering, the sciences, economics) who learn from lectures, live or recorded. It's built and tested on computer science first: the sample uses CS50x.",
   },
   {
     question: 'Do I need an account to try it?',

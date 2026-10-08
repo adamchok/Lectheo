@@ -21,7 +21,7 @@ export function Hero() {
       <div className={`${CONTAINER} space-y-12 lg:space-y-16`}>
         <div className="max-w-3xl space-y-8">
           <div className="space-y-5">
-            <p className="text-overline text-primary">For CS students who learn from lectures</p>
+            <p className="text-overline text-primary">For students who learn from lectures</p>
             <h1 id="hero-title" className="text-display-xl text-balance">
               Find what you missed. <em className="text-primary">Prove</em> what you know.
             </h1>

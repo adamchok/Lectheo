@@ -8,7 +8,7 @@ import type {
   SubmitBodyByType,
 } from '@lectheo/contracts'
 import type { activities, concepts, items, itemSecrets, messages } from '@lectheo/db'
-import type { TaskContext } from '@lectheo/ai'
+import type { CourseTitles, TaskContext } from '@lectheo/ai'
 import type { z } from 'zod'
 import type { Actor } from '../auth'
 import type { DbLike } from '../db'
@@ -56,6 +56,8 @@ export interface ActivityContext extends BaseContext {
   readonly item: ItemRow | null
   /** 🔒 item_secrets for `item`. Throws if the activity has no item or the row is missing. */
   readonly secrets: () => Promise<ItemSecretsRow>
+  /** Course + first-lecture titles, for subject-neutral AI prompts. */
+  readonly titles: () => Promise<CourseTitles>
   /** Visible messages, oldest first. */
   readonly visibleMessages: () => Promise<MessageRow[]>
 }

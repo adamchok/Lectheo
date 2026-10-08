@@ -1,7 +1,8 @@
+import type { CourseTitles } from '../../prompt'
 import type { ChatTurn } from '../common'
 
 /** Streamed plain text — no output schema. */
-export interface FriendReplyInput {
+export interface FriendReplyInput extends CourseTitles {
   readonly conceptName: string
   /** Public concept summary, so the friend stays on topic (never the 🔒 key points). */
   readonly conceptSummary?: string

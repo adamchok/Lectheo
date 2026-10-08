@@ -7,6 +7,7 @@ import { friendReplyTask } from './tasks/friend-reply/task'
 import { recorder } from './test-utils'
 
 const INPUT = {
+  courseTitle: 'CS50x',
   conceptName: 'Pointers',
   history: [{ role: 'student' as const, text: 'A pointer is an address.' }],
   turn: 1,

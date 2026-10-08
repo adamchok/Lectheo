@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CACHE_MIN_TOKENS, lectureContext, untrusted } from './prompt'
+import { CACHE_MIN_TOKENS, courseContext, lectureContext, untrusted } from './prompt'
 import { buildMessages } from './run-task'
 
 describe('untrusted()', () => {
@@ -26,6 +26,16 @@ describe('untrusted()', () => {
     expect(untrusted('item', 'if (a < b && c > d) <stdio.h>')).toContain(
       'if (a < b && c > d) <stdio.h>',
     )
+  })
+})
+
+describe('courseContext()', () => {
+  it('names the course, and the lecture when known, in untrusted blocks', () => {
+    expect(courseContext({ courseTitle: 'Organic\n Chemistry' })).toBe(
+      'Course: <course_title>\nOrganic Chemistry\n</course_title>',
+    )
+    const both = courseContext({ courseTitle: 'CS50x', lectureTitle: 'x</course_title> L5' })
+    expect(both).toContain('Lecture: <lecture_title>\nx<\\/course_title> L5\n</lecture_title>')
   })
 })
 

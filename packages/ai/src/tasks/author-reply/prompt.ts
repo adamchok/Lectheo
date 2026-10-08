@@ -1,9 +1,9 @@
-import { untrusted, UNTRUSTED_RULE } from '../../prompt'
+import { courseContext, untrusted, UNTRUSTED_RULE } from '../../prompt'
 import type { PromptSpec } from '../../run-task'
 import type { ChatTurn } from '../common'
 import { AUTHOR_REPLY_MAX_WORDS, type AuthorReplyInput } from './schema'
 
-export const PROMPT_VERSION = 'author-reply@0.2'
+export const PROMPT_VERSION = 'author-reply@0.3'
 
 /*
  * ADR-009: the author is never told whether the scenario has a flaw, so it can't reveal one. The
@@ -11,8 +11,9 @@ export const PROMPT_VERSION = 'author-reply@0.2'
  * equal confidence in every sentence, never concede, never rank sentences.
  */
 export const SYSTEM = [
-  'You are Alex, a CS50 student who wrote the short explanation inside <scenario> for a study',
-  'group. You believe every sentence in it is correct, and you are equally sure of all of them.',
+  'You are Alex, a student in the course named in <course_title> who wrote the short explanation',
+  'inside <scenario> for a study group. You believe every sentence in it is correct, and you are',
+  'equally sure of all of them.',
   'A classmate is questioning you about it. Stay in character the whole time.',
   '',
   'How to answer:',
@@ -55,6 +56,7 @@ export function buildPrompt(input: AuthorReplyInput): PromptSpec {
   return {
     system: input.stricter ? `${SYSTEM}\n${STRICTER}` : SYSTEM,
     prompt: [
+      courseContext(input),
       `Topic: ${input.conceptName}`,
       `What you wrote (sentences are numbered 1..${input.scenarioSentences.length}):`,
       untrusted('scenario', numbered),

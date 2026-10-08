@@ -95,6 +95,7 @@ describe('task fakes are schema-valid and pass their own semantic validation', (
 
   it('author-reply', async () => {
     const out = await fakeRun(authorReplyTask, {
+      courseTitle: 'CS50x',
       conceptName: 'malloc',
       scenarioSentences: ['a', 'b', 'c'],
       history: [],
@@ -106,6 +107,7 @@ describe('task fakes are schema-valid and pass their own semantic validation', (
 
   it('judges map to attempt criteria', async () => {
     const correction = await fakeRun(judgeCorrectionTask, {
+      courseTitle: 'CS50x',
       scenarioSentences: ['a', 'b', 'c'],
       flawSentenceIdx: 1,
       flawSummary: 'heap not stack',
@@ -118,12 +120,14 @@ describe('task fakes are schema-valid and pass their own semantic validation', (
       { id: 'c2', label: 'Correct fix', score: 2, max: 2 },
     ])
     const teach = await fakeRun(judgeTeachBackTask, {
+      courseTitle: 'CS50x',
       conceptName: 'malloc',
       keyPoints: KEY_POINTS,
       exchanges: [{ question: 'What is malloc?', answer: 'It gives heap memory.' }],
     })
     expect(teach.criteria.map((c) => c.id)).toEqual(['k1', 'k2'])
     const transfer = await fakeRun(judgeTransferTask, {
+      courseTitle: 'CS50x',
       prompt: 'Write swap',
       modelSolution: 'tmp',
       rubric: RUBRIC,
@@ -144,6 +148,7 @@ describe('task fakes are schema-valid and pass their own semantic validation', (
 
   it('stump-referee (both passes) and leak-escalation', async () => {
     const base = {
+      courseTitle: 'CS50x',
       conceptName: 'Pointers',
       segments: SEGMENTS,
       question: 'What does *p evaluate to?',
@@ -207,6 +212,7 @@ describe('stump prompts keep student text in its block (Architecture §5.4)', ()
 
   it('referee: a closing tag in the question cannot break out', () => {
     const { prompt } = stumpRefereePrompt({
+      courseTitle: 'CS50x',
       mode: 'validate',
       conceptName: 'Pointers',
       segments: SEGMENTS,
@@ -219,7 +225,12 @@ describe('stump prompts keep student text in its block (Architecture §5.4)', ()
   })
 
   it('answerer: the input has no key, so the prompt never contains it', () => {
-    const spec = stumpAnswerPrompt({ conceptName: 'Pointers', segments: SEGMENTS, question: 'Q?' })
+    const spec = stumpAnswerPrompt({
+      courseTitle: 'CS50x',
+      conceptName: 'Pointers',
+      segments: SEGMENTS,
+      question: 'Q?',
+    })
     expect(JSON.stringify(spec)).not.toContain(key)
     expect(spec.prompt).toContain('<student_question>')
   })
