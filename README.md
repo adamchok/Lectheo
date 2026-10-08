@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="apps/web/src/app/icon.svg" alt="Lectheo logo: a lens, an open circle with an off-centre focal point" width="80" height="80">
+
 # Lectheo
 
 **Find what you missed. Prove what you know.**
