@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { buildPrompt } from './prompt'
 
 const INPUT = {
+  courseTitle: 'CS50x',
   conceptName: 'hash tables',
   conceptSummary: 'Maps keys to buckets.',
   history: [

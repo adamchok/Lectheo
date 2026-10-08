@@ -1,9 +1,9 @@
-import { untrusted, UNTRUSTED_RULE } from '../../prompt'
+import { courseContext, untrusted, UNTRUSTED_RULE } from '../../prompt'
 import type { PromptSpec } from '../../run-task'
 import { JUDGE_RULES } from '../common'
 import type { JudgeCorrectionInput } from './schema'
 
-export const PROMPT_VERSION = 'judge-correction@0.2'
+export const PROMPT_VERSION = 'judge-correction@0.3'
 
 /*
  * Architecture §5.4: verdict + location are checked in code before this runs; the judge grades
@@ -11,8 +11,9 @@ export const PROMPT_VERSION = 'judge-correction@0.2'
  * Anchors are factual so the same correction gets the same score (F4c.7, ≥ 95%).
  */
 export const SYSTEM = [
-  "You grade one thing: a student's correction of the flawed sentence in a short CS",
-  'explanation. Whether the student found the flaw was already checked; do not grade that.',
+  "You grade one thing: a student's correction of the flawed sentence in a short explanation",
+  'from the course named in <course_title>. Whether the student found the flaw was already',
+  'checked; do not grade that.',
   JUDGE_RULES,
   '',
   'Score every rubric criterion on its own 0..max scale (max is usually 2):',
@@ -45,6 +46,7 @@ export function buildPrompt(input: JudgeCorrectionInput): PromptSpec {
   return {
     system: SYSTEM,
     prompt: [
+      courseContext(input),
       untrusted('scenario', input.scenarioSentences.map((s, i) => `${i}. ${s}`).join('\n')),
       `Flawed sentence (index ${input.flawSentenceIdx}): ${flawed}`,
       `What is wrong with it: ${input.flawSummary}`,

@@ -17,7 +17,7 @@ import {
   type TaskContext,
 } from '@lectheo/ai'
 import { leakEscalationTask } from '@lectheo/ai/tasks/leak-escalation'
-import { ITEMS, LECTURES, type ItemFx } from '@lectheo/db/seed'
+import { ITEMS, LECTURES, LIBRARY_COURSE_TITLE, type ItemFx } from '@lectheo/db/seed'
 import { assertDevGateway, cached, ledgerCost, readLedger, scriptContext } from './lib/cache'
 import { writeEvalCsv } from './lib/csv'
 
@@ -64,6 +64,7 @@ const conceptName = (key: string): string =>
 
 async function authorReply(item: FlawItem, prompt: string, stricter: boolean, ctx: TaskContext) {
   const input = {
+    courseTitle: LIBRARY_COURSE_TITLE,
     conceptName: conceptName(item.concept),
     scenarioSentences: item.publicPayload.sentences,
     history: [],

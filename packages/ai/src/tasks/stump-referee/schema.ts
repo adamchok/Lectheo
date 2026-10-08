@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { CourseTitles } from '../../prompt'
 import { LlmSegmentIdxs } from '../common'
 
 export const STUMP_MODES = ['validate', 'compare'] as const
@@ -7,7 +8,7 @@ export const STUMP_MODES = ['validate', 'compare'] as const
  * Architecture §4.7. Pass 1 `validate`: is the student's question + key valid?
  * Pass 2 `compare`: is the answerer's (Sonnet) answer correct against the key?
  */
-export interface StumpRefereeInput {
+export interface StumpRefereeInput extends CourseTitles {
   readonly mode: (typeof STUMP_MODES)[number]
   readonly conceptName: string
   readonly segments: readonly { readonly idx: number; readonly text: string }[]

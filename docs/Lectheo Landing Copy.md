@@ -23,7 +23,7 @@ The words for the public landing page at `/`. Layout, tokens and section rules a
 ## Metadata
 
 - **Title:** Lectheo · Find what you missed. Prove what you know.
-- **Description (155 chars max):** Lectheo finds what you personally don't understand in a lecture, then makes you reason with it. Confidence-rated diagnosis and practice for concept-heavy courses.
+- **Description (155 chars max):** Lectheo finds what you don't understand in a lecture, then makes you reason with it. Confidence-rated diagnosis and practice for concept-heavy courses.
 - **OG image text:** Find what you missed. Prove what you know. + wordmark.
 
 ---

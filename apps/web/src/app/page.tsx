@@ -8,7 +8,7 @@ import { SkipLink } from '@/components/skip-link'
 
 const TITLE = 'Lectheo · Find what you missed. Prove what you know.'
 const DESCRIPTION =
-  "Lectheo finds what you personally don't understand in a lecture, then makes you reason with it. Confidence-rated diagnosis and practice for CS students."
+  "Lectheo finds what you don't understand in a lecture, then makes you reason with it. Confidence-rated diagnosis and practice for concept-heavy courses."
 
 export const metadata: Metadata = {
   title: { absolute: TITLE },

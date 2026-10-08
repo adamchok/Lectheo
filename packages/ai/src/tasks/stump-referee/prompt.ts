@@ -1,13 +1,13 @@
-import { lectureContext, untrusted, UNTRUSTED_RULE } from '../../prompt'
+import { courseContext, lectureContext, untrusted, UNTRUSTED_RULE } from '../../prompt'
 import type { PromptSpec } from '../../run-task'
 import type { StumpRefereeInput } from './schema'
 
-export const PROMPT_VERSION = 'stump-referee@0.3'
+export const PROMPT_VERSION = 'stump-referee@0.4'
 
 export const SYSTEM = [
-  'You referee "Stump the AI": a student writes a hard question about one CS lecture concept and',
-  'their own answer key. Judge only facts, using the lecture transcript and standard course',
-  'knowledge for this concept.',
+  'You referee "Stump the AI": a student writes a hard question about one lecture concept from',
+  'the course named in <course_title> and their own answer key. Judge only facts, using the',
+  'lecture transcript and standard course knowledge for this concept.',
   '',
   'validate mode — set each check:',
   '- onConcept: the question is about the named concept (or applies it directly).',
@@ -39,6 +39,7 @@ export function buildPrompt(input: StumpRefereeInput): PromptSpec {
     system: SYSTEM,
     cacheKeyBlocks: [lectureContext(input.segments)],
     prompt: [
+      courseContext(input),
       `Mode: ${input.mode}. Concept: ${input.conceptName}`,
       untrusted('student_question', input.question),
       `Answer key (written by the student):\n${untrusted('student_answer', input.answerKey)}`,

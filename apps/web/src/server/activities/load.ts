@@ -2,13 +2,17 @@ import {
   activities,
   and,
   asc,
+  conceptOccurrences,
   concepts,
   courses,
+  desc,
   eq,
   items,
   itemSecrets,
+  lectures,
   messages,
 } from '@lectheo/db'
+import type { CourseTitles } from '@lectheo/ai'
 import { z } from 'zod'
 import { aiContext } from '../ai-hooks'
 import type { Actor } from '../auth'
@@ -75,6 +79,40 @@ async function loadSecrets(db: DbLike, item: ItemRow | null): Promise<ItemSecret
   return row
 }
 
+/** Prompt label when the course row is gone (FK makes this unreachable); never fail a judge on it. */
+const FALLBACK_COURSE_TITLE = 'Untitled course'
+
+/** The concept's lecture: its first lecture, else its most salient occurrence's (stump too). */
+export const primaryLectureId = (
+  concept: Pick<ConceptRow, 'firstLectureId'>,
+  bySalience: readonly { lectureId: string }[],
+): string | null => concept.firstLectureId ?? bySalience[0]?.lectureId ?? null
+
+async function loadTitles(db: DbLike, concept: ConceptRow): Promise<CourseTitles> {
+  const [[course], top] = await Promise.all([
+    db.select({ title: courses.title }).from(courses).where(eq(courses.id, concept.courseId)),
+    concept.firstLectureId
+      ? []
+      : db
+          .select({ lectureId: conceptOccurrences.lectureId })
+          .from(conceptOccurrences)
+          .where(eq(conceptOccurrences.conceptId, concept.id))
+          .orderBy(desc(conceptOccurrences.salience))
+          .limit(1),
+  ])
+  const lectureId = primaryLectureId(concept, top)
+  const [lecture] = lectureId
+    ? await db.select({ title: lectures.title }).from(lectures).where(eq(lectures.id, lectureId))
+    : []
+  if (!course) {
+    console.log(JSON.stringify({ event: 'titles_course_missing', conceptId: concept.id }))
+  }
+  return {
+    courseTitle: course?.title ?? FALLBACK_COURSE_TITLE,
+    lectureTitle: lecture?.title ?? null,
+  }
+}
+
 export const visibleMessages = (db: DbLike, activityId: string) =>
   db
     .select()
@@ -95,6 +133,7 @@ export async function buildContext(
     loadItem(db, activity.itemId),
   ])
   let secrets: Promise<ItemSecretsRow> | undefined
+  let titles: Promise<CourseTitles> | undefined
   return {
     db,
     actor,
@@ -103,6 +142,7 @@ export async function buildContext(
     activity,
     item,
     secrets: () => (secrets ??= loadSecrets(db, item)),
+    titles: () => (titles ??= loadTitles(db, conceptRow)),
     visibleMessages: () => visibleMessages(db, activity.id),
   }
 }

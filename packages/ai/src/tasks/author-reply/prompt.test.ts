@@ -7,6 +7,7 @@ const SENTENCES = ['A is true.', 'B is true.', 'C is true.']
 describe('spot-the-flaw prompts', () => {
   it('author: every student turn is untrusted, and stricter mode adds the extra rule', () => {
     const spec = authorPrompt({
+      courseTitle: 'CS50x',
       conceptName: 'hash tables',
       scenarioSentences: SENTENCES,
       history: [
@@ -24,6 +25,7 @@ describe('spot-the-flaw prompts', () => {
 
   it('judge: the student correction sits in an untrusted block after the rubric', () => {
     const spec = judgePrompt({
+      courseTitle: 'CS50x',
       scenarioSentences: SENTENCES,
       flawSentenceIdx: 1,
       flawSummary: 'B is false',

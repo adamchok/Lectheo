@@ -9,7 +9,7 @@
  * Every run is cached (.cache/seed-library/evals/judge-*), so a rerun only pays for missing runs.
  */
 import { judgeCorrectionTask, runTask, type TaskResult } from '@lectheo/ai'
-import { ITEMS, type ItemFx } from '@lectheo/db/seed'
+import { ITEMS, LIBRARY_COURSE_TITLE, type ItemFx } from '@lectheo/db/seed'
 import { assertDevGateway, cached, ledgerCost, readLedger, scriptContext } from './lib/cache'
 import { writeEvalCsv } from './lib/csv'
 import { JUDGE_CASES, type JudgeCase } from './evals/judge-cases'
@@ -50,6 +50,7 @@ async function grade(c: JudgeCase, item: FlawItem, run: number, index: number): 
     const { output, model } = await runTask(
       judgeCorrectionTask,
       {
+        courseTitle: LIBRARY_COURSE_TITLE,
         scenarioSentences: item.publicPayload.sentences,
         flawSentenceIdx: key.flawSentenceIdx ?? 0,
         flawSummary: key.flawSummary ?? '',

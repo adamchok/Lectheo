@@ -2,10 +2,10 @@ import { lectureContext, UNTRUSTED_RULE } from '../../prompt'
 import type { PromptSpec } from '../../run-task'
 import type { ExplainConceptsInput } from './schema'
 
-export const PROMPT_VERSION = 'explain-concepts@0.1'
+export const PROMPT_VERSION = 'explain-concepts@0.2'
 
 export const SYSTEM = [
-  'You explain the concepts of a computer-science lecture in depth, for a student preparing to',
+  'You explain the concepts of a university lecture in depth, for a student preparing to',
   'be tested on them. Write from the transcript segments given; cite them by index ([s42] is',
   'cited as 42). For each concept:',
   '- howItWorks: 2 to 4 short paragraphs (2–4 sentences each) on how it works and why. Every',

@@ -142,6 +142,7 @@ export const transferHandler: ActivityTypeHandler<'transfer'> = {
     const judge = await runTask(
       judgeTransferTask,
       {
+        ...(await ctx.titles()),
         prompt: promptOf(ctx),
         modelSolution: key.modelSolution,
         rubric,
