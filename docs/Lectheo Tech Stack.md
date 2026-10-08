@@ -67,7 +67,7 @@ All slugs live in `packages/ai/src/models.ts` and were checked against the live 
 
 | Role | Used for | Primary | Settings | Fallback |
 |---|---|---|---|---|
-| `reasoner` | Concept extraction, item drafting for user lectures, on-demand items | `anthropic/claude-sonnet-5.5` | medium effort (pipeline), low (on demand), structured output | `google/gemini-3.8-flash` |
+| `reasoner` | Concept extraction, item drafting for user lectures, on-demand items, in-depth explanations (`explainConcepts`, F9.13) | `anthropic/claude-sonnet-5.5` | medium effort (pipeline), low (on demand), structured output | `google/gemini-3.8-flash` |
 | `reasoner-premium` | **Library seed only** (`scripts/seed-library.ts`, dev key) | `anthropic/claude-opus-5.5` | medium effort | `anthropic/claude-sonnet-5.5` (high) |
 | `verifier` | Blind-solve and check every generated item | `openai/gpt-6.1-sol` | medium effort | `openai/gpt-6-sol` (never Claude, to keep independence) |
 | `judge` | Spot-flaw correction, teach-back coverage, transfer, Stump referee | `openai/gpt-6.1-sol` | medium effort, criterion-level 0–2 output, single run | `google/gemini-3.8-flash` (outage only, recorded in `attempts.judge_model`) |
@@ -118,7 +118,7 @@ Benchmarks used (checked 4 Oct 2026):
 | Teach-back (~4 turns + 1 judge call) | Sonnet + Sol | ≈ $0.05 |
 | Transfer / Stump (beta) | Sol / Sonnet + Sol ×2 | ≈ $0.03 / $0.07 |
 | On-demand item (if the bank runs out) | Sonnet + Sol | ≈ $0.05 |
-| In-depth explanations per lecture ([[Lectheo Product Spec#F9. Study mode — Must|F9.13]]) | Sonnet 5.5 (`reasoner`) | ≈ $0.08–0.12 (about 12 concepts; library once, by script) |
+| In-depth explanations per lecture ([[Lectheo Product Spec#F9. Study mode — Must|F9.13]]) | Sonnet 5.5 (`reasoner`) | ≈ $0.08–0.12 (about 12 concepts; the library's explanations ship in the seed fixtures) |
 | YouTube lecture transcript [[Lectheo Product Spec#F10. YouTube lectures — Should (after a spike)|F10]] | Gemini 3.8 Flash, direct key | ≈ $0.42 per hour of video (2-hour max ≈ $0.85; $0.35/h measured on MIT 6.006); cached per video; capped by `GOOGLE_AI_BUDGET_USD` (default $10) |
 | **Judge path** (diagnostic + spot the flaw + teach-back) | | **≈ $0.10–0.15** |
 

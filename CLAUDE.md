@@ -5,7 +5,7 @@ concept map → confidence-rated adaptive diagnostic → spot the flaw + teach-b
 Hackathon build (ForgeHacks 2026). **The judge path must work every time** (Architecture §1).
 
 ## Read first
-- `docs/Lectheo Product Spec.md` — requirements (F0–F8, IDs referenced in code comments)
+- `docs/Lectheo Product Spec.md` — requirements (F0–F11, IDs referenced in code comments)
 - `docs/Lectheo Architecture.md` — flows, domain rules (§6), failure modes
 - `docs/Lectheo API Spec.md` — every endpoint; `packages/contracts` is its executable form
 - `docs/Lectheo Data Model.md` — tables, invariants (§6)
@@ -27,7 +27,7 @@ Hackathon build (ForgeHacks 2026). **The judge path must work every time** (Arch
 ## Rules that protect correctness
 - **Information hiding (ADR-009, amended 7 Oct 2026):** never select 🔒 data (`item_secrets.*`:
   answer keys, flaws, rubrics, hints, leak keywords; `activities.rubric_snapshot`) into a response.
-  `concepts.key_points` are no longer secret but appear only in the Study brief
+  `concepts.key_points` and `concepts.depth` are not secret but appear only in the Study brief
   (`GET /lectures/{id}/brief`). Responses always pass an explicit contracts schema (unknown keys
   stripped). `server/contracts.test.ts` guards this.
 - **Ownership:** load resources via `server/ownership.ts`. Another user's id → 404, never 403.

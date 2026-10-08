@@ -1,5 +1,7 @@
 # Lectheo workstreams (parallel worktrees)
 
+> **Historical:** the foundation-era split (waves 1–4, early Oct 2026). Counts and ownership below are as of then (the schema now has 24 tables). The current product is described in the `docs/Lectheo *.md` specs.
+
 The foundation is on `main`. Each workstream below runs in its own git worktree / branch
 (`feat/<name>`), owns a disjoint set of files, and merges back via PR with `pnpm check` green.
 
