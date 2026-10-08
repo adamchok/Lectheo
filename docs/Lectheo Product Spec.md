@@ -48,7 +48,7 @@ Students also miss gaps they don't notice. A topic they marked as "lost" may com
 
 ### Target user
 
-- **Primary:** undergraduates in concept-heavy computer science courses (intro CS, algorithms, systems).
+- **Primary:** university students in concept-heavy courses (computer science, engineering, the sciences, economics and the like), where ideas build on each other and can be quietly misunderstood. *Broadened 8 Oct 2026 from CS only: the method isn't CS-specific; CS stays the reference content and the evaluated subject.*
 - **Reference content:** **Harvard CS50x 2026, Lectures 3 (Algorithms), 4 (Memory) and 5 (Data Structures).** These are high-quality, widely recognized, and full of classic misconceptions (Big-O, pointers, swap-by-value, hash-table cost). Generated questions can be checked for correctness. Used under CC BY-NC-SA 4.0 (see [[#F7. CS50 lecture library — Must|F7.4]]).
 - **Device:** laptop running Chrome, in the lecture hall or watching a recorded lecture. Tablets and phones are out of scope.
 
@@ -340,7 +340,7 @@ Sign in → add the lecture (recording + .vtt, audio, transcript, or a YouTube l
 - **Trustworthy.** Questions are checked by an independent AI before you see them. Feedback always cites the lecture. Grading uses fixed rubrics.
 
 **Positioning statement:**
-*For CS undergraduates who leave lectures unsure what they really understand, Lectheo is an AI study partner that finds each student's specific gaps from their own lecture and trains them to reason with those ideas. Lecture recorders and AI note tools turn lectures into summaries and recall quizzes. Lectheo diagnoses misunderstanding and trains application.*
+*For students in concept-heavy courses who leave lectures unsure what they really understand, Lectheo is an AI study partner that finds each student's specific gaps from their own lecture and trains them to reason with those ideas. Lecture recorders and AI note tools turn lectures into summaries and recall quizzes. Lectheo diagnoses misunderstanding and trains application.*
 
 ---
 
@@ -425,6 +425,8 @@ Full analysis, profiles, feature matrix and sources: **[[Lectheo Competition]]**
 - [x] **Product name: Lectheo** (decided 4 Oct 2026). When checked, lectheo.com was unregistered and github.com/lectheo was free; register both. Search engines may correct it to near-misses (Lecto, LectO, Lectio), so always write "Lectheo (LEK-thee-oh)" in the README and demo video.
 - [ ] Final tagline.
 - [ ] Any evidence from 3–5 real students that they would tap "I'm lost" during a lecture? (Strengthens Real-World Impact.)
+
+*Decided on 8 Oct 2026:* **Audience broadened** from CS students to students in concept-heavy courses. The method (marks, map, confidence-first diagnosis, reasoning practice) isn't CS-specific; CS50 stays the sample and the only evaluated subject, which the README states as a limit. The AI prompts that still say "CS" (personas, judges) become subject-neutral, and the landing page copy follows the Landing Copy doc, in one small PR.
 
 *Decided on 7 Oct 2026:* **Diagnostic coverage** (F3.9–F3.11): a 3–6 question first round can leave most of a long lecture untested, and without marks it only asked about the start. Baseline questions are now spread one per chapter, the results show how many concepts were tested (overall and per chapter), and **Test the other N** runs further rounds on untested concepts only. Rejected: testing every concept every time (long, and marks would stop mattering). No extra cost: user lectures already get two diagnostic questions per concept.
 

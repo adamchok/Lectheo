@@ -70,9 +70,9 @@ What students are missing:
 
 ## Who it's for
 
-**Primary users:** undergraduates in concept-heavy computer science courses (intro CS, algorithms, data structures, systems) who learn from lectures, live or recorded. They're short on time, have recordings or transcripts from Teams, Zoom, Panopto or YouTube, and study on a laptop.
+**Primary users:** university students in concept-heavy courses (computer science, engineering, the sciences, economics and the like) who learn from lectures, live or recorded. They're short on time, have recordings or transcripts from Teams, Zoom, Panopto or YouTube, and study on a laptop.
 
-The sample uses **Harvard CS50x 2026, Lectures 3–5** (algorithms, memory, data structures). These are well known and full of classic misconceptions: Big-O, pointers, swap-by-value, hash-table cost.
+Computer science is the first proving ground: the sample uses **Harvard CS50x 2026, Lectures 3–5** (algorithms, memory, data structures), which are well known and full of classic misconceptions (Big-O, pointers, swap-by-value, hash-table cost). Nothing in the method is specific to CS: any lecture whose ideas build on each other and can be misunderstood works the same way.
 
 ## How it works
 
@@ -216,7 +216,7 @@ Everything below is live at [lectheo.vercel.app](https://lectheo.vercel.app) unl
 **Known limits:**
 - English lectures only.
 - Designed for a laptop: phones are usable, but the map and watch mode are desktop-first.
-- Activities are written for CS concepts.
+- Built and tested on computer science lectures; other concept-heavy subjects go through the same pipeline but haven't been evaluated yet.
 - Sample accounts get one lecture a day, up to 20 minutes; Google accounts get three a day, up to 2 hours.
 - The evals below use small samples.
 

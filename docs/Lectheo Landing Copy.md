@@ -23,7 +23,7 @@ The words for the public landing page at `/`. Layout, tokens and section rules a
 ## Metadata
 
 - **Title:** Lectheo · Find what you missed. Prove what you know.
-- **Description (155 chars max):** Lectheo finds what you personally don't understand in a lecture, then makes you reason with it. Confidence-rated diagnosis and practice for CS students.
+- **Description (155 chars max):** Lectheo finds what you personally don't understand in a lecture, then makes you reason with it. Confidence-rated diagnosis and practice for concept-heavy courses.
 - **OG image text:** Find what you missed. Prove what you know. + wordmark.
 
 ---
@@ -38,7 +38,7 @@ The words for the public landing page at `/`. Layout, tokens and section rules a
 
 ## 1. Hero
 
-**Eyebrow:** For CS students who learn from lectures
+**Eyebrow:** For students who learn from lectures
 
 **Headline:** Find what you missed. *Prove* what you know.
 
@@ -191,7 +191,7 @@ Text alternatives: ✓ = "Yes", — = "No", other cells read as written.
 An AI study partner for lectures. It finds what you personally don't understand, using your "I'm lost" marks and a confidence-rated diagnostic, then gives you practice that makes you reason with those ideas.
 
 **Who is it for?**
-Computer science students who learn from lectures, live or recorded. The sample uses CS50x, and the activities are written for CS concepts.
+Students in concept-heavy courses (computer science, engineering, the sciences, economics) who learn from lectures, live or recorded. It's built and tested on computer science first: the sample uses CS50x.
 
 **Do I need an account to try it?**
 No. **Try the sample account** gives you your own copy of a student partway through CS50x, with Lecture 5 ready to study. It's deleted after 24 hours. To add your own lectures, continue with Google. Your account starts empty: just your courses, nothing preloaded.
