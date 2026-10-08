@@ -12,7 +12,7 @@ An AI study partner that finds what _you_ misunderstood in a lecture, then makes
 ![Next.js 16](https://img.shields.io/badge/Next.js-16-1c1d22)
 ![Tests](https://img.shields.io/badge/tests-677%20unit%20%C2%B7%2013%20e2e-1d6b3a)
 
-[**Try it**](https://lectheo.vercel.app) · [Demo video](#demo) · [How it works](#how-it-works) · [Technical approach](#technical-approach) · [What works](#what-works-and-what-doesnt)
+[**Try it**](https://lectheo.vercel.app) · [**Demo video**](https://www.youtube.com/watch?v=t8TmaOyAQa4) · [How it works](#how-it-works) · [Technical approach](#technical-approach) · [What works](#what-works-and-what-doesnt)
 
 <img src="docs/audit/screenshots/study-v2/desktop-light-top.png" alt="Lectheo's Study page: a CS50 lecture split into chapters, with an outline on the left and each concept's summary, key points and lecture links" width="900">
 
@@ -48,7 +48,10 @@ Lectheo answers each part of that prompt:
 ## Demo
 
 - **Live app:** [lectheo.vercel.app](https://lectheo.vercel.app). Choose **Try the sample account**. There's no sign-up: you get your own copy of a student partway through Harvard's CS50x, with Lectures 3–5 ready, some marks made and a diagnostic taken. It is deleted after 24 hours. To add your own lectures, continue with Google: a Google account starts empty.
-- **Demo video (3–4 min):** _link to be added_
+- **Demo video:** [watch on YouTube](https://www.youtube.com/watch?v=t8TmaOyAQa4)
+
+  [![Lectheo demo video](https://img.youtube.com/vi/t8TmaOyAQa4/maxresdefault.jpg)](https://www.youtube.com/watch?v=t8TmaOyAQa4)
+
 - **Two-minute judge path:**
   1. Sample account → **Lecture 5 · Study**: chapters, then **Explain in depth** on a concept.
   2. Press **I'm lost** on a concept → **Test me**.
