@@ -111,15 +111,22 @@ const TASKS: readonly { name: string; system: string; build: () => PromptSpec }[
 ]
 
 describe('course-aware prompts', () => {
-  it.each(TASKS)('$name names the course and lecture in untrusted blocks', ({ system, build }) => {
+  it.each(TASKS)('$name names the course and lecture in user text', ({ system, build }) => {
     const spec = build()
-    const text = `${String(spec.system ?? '')}\n${String(spec.prompt ?? '')}`
+    const userText = (spec.messages ?? [])
+      .filter((m) => m.role === 'user')
+      .map((m) => String(m.content))
+      .join('\n')
+    const text = `${String(spec.prompt ?? '')}\n${userText}`
     expect(text).toContain('Course: <course_title>\nEcon 101\n</course_title>')
     expect(text).toContain('Lecture: <lecture_title>\nLecture 3: Elasticity\n</lecture_title>')
     // The static system prompt refers to the tag but never carries the title itself.
     expect(system).toContain('<course_title>')
     expect(system).not.toContain('Econ 101')
     expect(String(spec.system ?? '').startsWith(system)).toBe(true)
+    // Student-typed titles never reach the high-trust system slot, not even as a suffix.
+    expect(String(spec.system ?? '')).not.toContain('Econ 101')
+    expect(String(spec.system ?? '')).not.toContain('Elasticity')
   })
 })
 

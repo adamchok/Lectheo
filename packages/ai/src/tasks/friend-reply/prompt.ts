@@ -3,7 +3,7 @@ import { courseContext, untrusted, UNTRUSTED_RULE } from '../../prompt'
 import type { PromptSpec } from '../../run-task'
 import type { FriendReplyInput } from './schema'
 
-export const PROMPT_VERSION = 'friend-reply@1.1'
+export const PROMPT_VERSION = 'friend-reply@1.2'
 
 // ponytail: one persona (F4a.2); the picker adds variants of the "Who you are" block.
 export const SYSTEM = [
@@ -31,13 +31,17 @@ const CLOSING =
   'own words what you now understand (only what they actually told you).'
 
 export function buildPrompt(input: FriendReplyInput): PromptSpec {
-  const messages: ModelMessage[] = input.history.map((t) =>
-    t.role === 'student'
-      ? { role: 'user', content: untrusted('student_message', t.text) }
-      : { role: 'assistant', content: t.text },
-  )
+  // Titles are user/uploader text, so they ride in the first student turn, never in `system`.
+  const firstStudent = input.history.findIndex((t) => t.role === 'student')
+  const messages: ModelMessage[] = input.history.map((t, i) => {
+    if (t.role !== 'student') return { role: 'assistant', content: t.text }
+    const turn = untrusted('student_message', t.text)
+    return {
+      role: 'user',
+      content: i === firstStudent ? `${courseContext(input)}\n\n${turn}` : turn,
+    }
+  })
   const context = [
-    courseContext(input),
     `Concept being taught: ${input.conceptName}.`,
     input.conceptSummary
       ? `What the lecture covered (to stay on topic; never repeat it): ${input.conceptSummary}`

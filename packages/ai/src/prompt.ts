@@ -51,7 +51,7 @@ export function untrusted(tag: UntrustedTag, text: string): string {
     .replace(FORMAT_CHARS, '')
     .replace(
       TAG_BREAKOUT,
-      (_m, mid: string, name: string) => `<\\${mid.replace(/\s+/g, '').replace('／', '/')}${name}`,
+      (_m, mid: string, name: string) => `<\\${mid.replace(/\s+/g, '').replace(/／/g, '/')}${name}`,
     )
   return `<${tag}>\n${safe}\n</${tag}>`
 }
