@@ -12,7 +12,7 @@ An AI study partner that finds what _you_ misunderstood in a lecture, then makes
 ![Next.js 16](https://img.shields.io/badge/Next.js-16-1c1d22)
 ![Tests](https://img.shields.io/badge/tests-677%20unit%20%C2%B7%2013%20e2e-1d6b3a)
 
-[**Try it**](https://lectheo.vercel.app) · [**Demo video**](https://www.youtube.com/watch?v=t8TmaOyAQa4) · [How it works](#how-it-works) · [Technical approach](#technical-approach) · [What works](#what-works-and-what-doesnt)
+[**Try it**](https://lectheo.vercel.app) · [**Demo video**](https://www.youtube.com/watch?v=t8TmaOyAQa4) · [How it works](#how-it-works) · [Features](#features) · [Technical approach](#technical-approach)
 
 <img src="docs/audit/screenshots/study-v2/desktop-light-top.png" alt="Lectheo's Study page: a CS50 lecture split into chapters, with an outline on the left and each concept's summary, key points and lecture links" width="900">
 
@@ -27,9 +27,9 @@ An AI study partner that finds what _you_ misunderstood in a lecture, then makes
 - [The problem](#the-problem)
 - [Who it's for](#who-its-for)
 - [How it works](#how-it-works)
+- [Features](#features)
 - [Real-world impact](#real-world-impact)
 - [Technical approach](#technical-approach)
-- [What works and what doesn't](#what-works-and-what-doesnt)
 - [Quality and evaluation](#quality-and-evaluation)
 - [Getting started](#getting-started)
 - [Data and privacy](#data-and-privacy)
@@ -96,6 +96,56 @@ Bring your own lecture: a recording plus its `.vtt` / `.srt` captions (the video
 <td align="center"><sub>Concept map with mastery states and your marks</sub></td>
 </tr>
 </table>
+
+## Features
+
+Everything marked ✅ is live at [lectheo.vercel.app](https://lectheo.vercel.app). This table is also the honest answer to *what works and what doesn't*.
+
+| Feature | What it does | Status |
+|---|---|---|
+| **Getting started** | | |
+| Sample account | No sign-up: your own copy of a student partway through CS50x (Lectures 3–5, with marks and a diagnostic already made). Deleted after 24 hours | ✅ |
+| Google sign-in | Your own courses and lectures; starts empty | ✅ |
+| Next step | The dashboard recommends one thing to do next, with the evidence (your marks, your mistakes), a time estimate and the payoff | ✅ |
+| Delete anything | Delete a lecture, a course, or your whole account from the account menu | ✅ |
+| **Add a lecture** | | |
+| Recording + captions | Pick the video or audio file and its `.vtt` / `.srt` captions (Teams, Zoom, Panopto). The video plays from your laptop and is never uploaded | ✅ |
+| Audio upload | Transcribed by AssemblyAI, then deleted | ✅ |
+| Transcript | Paste or upload text. Without timestamps you can't mark moments, but you still get the map, diagnosis and practice | ✅ |
+| YouTube link | Paste a link; it's checked before any AI spend (public or unlisted, embeddable, English, 5 min to 2 h), then transcribed by Gemini | ✅ |
+| Slides (PDF / PowerPoint) | Lecture slides as extra input | ❌ Not built |
+| Live recording in the browser | Record a lecture as it happens | ❌ Cut (audio upload covers in-person lectures) |
+| Teams `.docx` transcripts | | ❌ Dropped: Teams also exports `.vtt`, which works |
+| **Study and watch** | | |
+| Study brief | The lecture as chapters with a sticky outline; each concept's summary and key points, each linked to its lecture moment | ✅ |
+| Explain in depth | Per concept: how it works, a worked example, common mistakes and related concepts, written from the lecture with cited moments | ✅ |
+| Lecture clips | *Watch from 12:52* plays only the moments where that concept is taught | ✅ |
+| Watch mode | YouTube or your own file, with **L** ("I'm lost") and **I** ("Important") marking, a transcript and chapters panel, and *play this chapter only* | ✅ |
+| Marks while studying | *I'm lost* / *Important* on a concept or a whole chapter | ✅ |
+| **Map** | | |
+| Concept map | The whole lecture as concepts with prerequisite links, mastery states and your marks; a keyboard-friendly list view as an alternative | ✅ |
+| Your markers | A timeline per lecture of where you flagged or starred, with chapter ticks | ✅ |
+| **Diagnose** | | |
+| Confidence-first diagnostic | 3–6 questions; you rate how sure you are (Sure, Unsure, Guessing, No idea) before you see the options | ✅ |
+| Confident mistakes | A sure-and-wrong answer gets a follow-up on the same idea; wrong again is flagged as a confident mistake | ✅ |
+| Feedback | Immediate, per question: why your choice is wrong, with a link to the lecture moment | ✅ |
+| Coverage and *Test the rest* | Shows how much of the lecture was tested and runs more rounds on untested concepts only | ✅ |
+| **Practice** | | |
+| Spot the flaw | Question an AI author and find the wrong sentence in their explanation (some have none) | ✅ |
+| Teach-back | Explain the idea to Sam, a curious first-year who asks follow-up questions | ✅ |
+| Transfer | Solve a problem the lecture never covered that needs the same idea | ✅ When a verified problem exists for the concept |
+| Stump the AI | Write a hard question and your own answer key; a referee checks it's fair, then the AI tries | 🧪 Beta |
+| Guiding questions and hints | A guiding question and a second try before the answer; hints or a revealed answer don't count toward Mastered | ✅ |
+| **Mastery** | | |
+| Mastery states | *Not tested*, *Needs work*, *Getting there*, *Mastered*. Mastered needs two independent correct answers in two different activity types | ✅ |
+| Persona picker, transcript correction | | ❌ Not built |
+
+**Known limits:**
+- English lectures only.
+- Designed for a laptop: phones are usable, but the map and watch mode are desktop-first.
+- Built and tested on computer science lectures; other concept-heavy subjects go through the same pipeline but haven't been evaluated yet.
+- Sample accounts get one lecture a day, up to 20 minutes; Google accounts get three a day, up to 2 hours.
+- The evals below use small samples.
 
 ## Real-world impact
 
@@ -193,32 +243,6 @@ transcript (captions · audio via AssemblyAI · YouTube via Gemini, 2-min clips 
 | Monorepo | pnpm workspaces + Turborepo |
 
 More detail: [Product Spec](docs/Lectheo%20Product%20Spec.md) · [Architecture](docs/Lectheo%20Architecture.md) · [API Spec](docs/Lectheo%20API%20Spec.md) · [Data Model](docs/Lectheo%20Data%20Model.md) · [Tech Stack and ADRs](docs/Lectheo%20Tech%20Stack.md) · [Design System](docs/Lectheo%20Design%20System.md)
-
-## What works and what doesn't
-
-Everything below is live at [lectheo.vercel.app](https://lectheo.vercel.app) unless marked otherwise.
-
-| Area | Status |
-|---|---|
-| Sample account (CS50x Lectures 3–5, pre-loaded student) and Google sign-in; account and course deletion | ✅ Works |
-| Study mode: chapters, outline, key points with lecture links, **Explain in depth** | ✅ Works |
-| Watch mode with L / I marking, transcript and chapters panel, *play this chapter only* | ✅ Works |
-| Add a lecture: recording + `.vtt` / `.srt`, audio upload, transcript paste or upload, YouTube link | ✅ Works (YouTube: English, public or unlisted, embeddable, 5 min to 2 h) |
-| Concept map and list view, prerequisite links, marker timeline | ✅ Works |
-| Diagnostic: confidence first, follow-ups, confident mistakes, coverage and *Test the rest* | ✅ Works |
-| Spot the flaw, Teach-back | ✅ Works |
-| Transfer problems | ✅ Works when a verified transfer item exists for the concept |
-| Stump the AI | 🧪 Beta |
-| Mastery map and next-step recommendations | ✅ Works |
-| Live in-browser lecture recording | ❌ Cut (audio upload covers in-person lectures) |
-| Slides as extra input, transcript correction, persona picker, Teams `.docx` import | ❌ Not built (Teams offers `.vtt`, which works) |
-
-**Known limits:**
-- English lectures only.
-- Designed for a laptop: phones are usable, but the map and watch mode are desktop-first.
-- Built and tested on computer science lectures; other concept-heavy subjects go through the same pipeline but haven't been evaluated yet.
-- Sample accounts get one lecture a day, up to 20 minutes; Google accounts get three a day, up to 2 hours.
-- The evals below use small samples.
 
 ## Quality and evaluation
 
