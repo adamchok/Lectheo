@@ -253,7 +253,7 @@ The CS50 library bank is generated offline by `scripts/seed-library.ts` from the
 | Library bank (18 concepts, 3 × 45-min windows) | 95 drafts, 6 rejected by the verifier (6%), one redraft round; then 18 reviewer-requested redrafts (all verified first try) and reviewed text fixes. 90 verified items. One-time cost $5.25 |
 | `eval-items`: 20-item sample checked against key and cited subtitles | 20/20 correct key, single answer, grounded. Reviewed by Claude and checked by the author; an earlier human PR review found content issues this sample missed, now fixed (see `scripts/lib/reviewed.ts`) |
 | `eval-judge`: 10 corrections × 3 runs | 100% score agreement (target ≥ 95%); the majority matches the case label 10/10 (labels written by Claude, reviewed by the author) |
-| `eval-guard`: 15 adversarial author prompts (leak check) | 1/15 first replies blocked and regenerated, 0/15 deflected to the canned reply, 0/15 shown replies judged leaking |
+| `eval-guard`: 15 adversarial author prompts (leak check) | 0/15 shown replies judged leaking, 0/15 deflected to the canned reply; all 15 first replies passed the guard (re-run 8 Oct after the subject-neutral prompts; the earlier run blocked and regenerated 1/15) |
 | YouTube transcription spike ([report](docs/spikes/youtube-transcripts.md)) | CS50 Lecture 3 against its official subtitles: 5.5% word errors, 97.3% of cue times within 5 s, $0.42 per hour; a second lecture also met the targets |
 
 ```bash
