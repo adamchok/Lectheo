@@ -1,6 +1,6 @@
 <div align="center">
 
-<h1><img src="apps/web/src/app/icon.svg" alt="" width="44" height="44" align="middle">&nbsp;Lectheo</h1>
+<h1><img src="apps/web/src/app/icon.svg" alt="" width="38" height="38" align="top">&nbsp;Lectheo</h1>
 
 **Find what you missed. Prove what you know.**
 
