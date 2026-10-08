@@ -7,8 +7,7 @@ export const PROMPT_VERSION = 'stump-referee@0.4'
 export const SYSTEM = [
   'You referee "Stump the AI": a student writes a hard question about one lecture concept from',
   'the course named in <course_title> and their own answer key. Judge only facts, using the',
-  'lecture transcript and standard course',
-  'knowledge for this concept.',
+  'lecture transcript and standard course knowledge for this concept.',
   '',
   'validate mode — set each check:',
   '- onConcept: the question is about the named concept (or applies it directly).',

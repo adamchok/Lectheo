@@ -3,6 +3,7 @@ import type { SourceRef, StumpResult } from '@lectheo/contracts'
 import { and, asc, conceptOccurrences, desc, eq, inArray, transcriptSegments } from '@lectheo/db'
 import { STUMP_MAX_TRIES, stumpOutcome } from '@lectheo/domain'
 import type { DbLike } from '../db'
+import { primaryLectureId } from './load'
 import { buildSources, conceptSources } from './sources'
 import type { ActivityContext, ActivityTypeHandler, ConceptRow, GradingResult } from './types'
 
@@ -37,7 +38,7 @@ export async function conceptSegments(db: DbLike, concept: ConceptRow): Promise<
     .from(conceptOccurrences)
     .where(eq(conceptOccurrences.conceptId, concept.id))
     .orderBy(desc(conceptOccurrences.salience))
-  const lectureId = concept.firstLectureId ?? occurrences[0]?.lectureId ?? null
+  const lectureId = primaryLectureId(concept, occurrences)
   if (!lectureId) return { lectureId: null, segments: [] }
   const idxs = new Set([
     ...concept.keyPoints.flatMap((k) => k.segmentIdxs),

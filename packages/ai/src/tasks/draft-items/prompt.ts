@@ -2,12 +2,12 @@ import { lectureContext, UNTRUSTED_RULE } from '../../prompt'
 import type { PromptSpec } from '../../run-task'
 import type { DraftItemsInput } from './schema'
 
-export const PROMPT_VERSION = 'draft-items@0.1'
+export const PROMPT_VERSION = 'draft-items@0.2'
 
 // TODO(feature-items): first draft. Add CS50 few-shots incl. correct "no flaw" scenarios (~30%).
 export const SYSTEM = [
-  'You write practice items for a computer-science lecture. Every item must be answerable from',
-  'the cited transcript segments and have exactly one defensible answer.',
+  'You write practice items for a university lecture. Every item must be answerable from the',
+  'cited transcript segments and have exactly one defensible answer.',
   'MCQ: 3–5 options with ids "a", "b", …; exactly one correct; each wrong option has a',
   'distractor entry naming the misconception it targets and why it is wrong.',
   'Spot the flaw: a 3–5 sentence explanation written as if by a confident student. About 30% of',

@@ -216,7 +216,7 @@ Everything below is live at [lectheo.vercel.app](https://lectheo.vercel.app) unl
 **Known limits:**
 - English lectures only.
 - Designed for a laptop: phones are usable, but the map and watch mode are desktop-first.
-- Built and tested on computer science lectures; other concept-heavy subjects go through the same pipeline but haven't been evaluated yet.
+- Built and tested on computer science lectures; other concept-heavy subjects go through the same subject-neutral prompts but haven't been evaluated yet (every eval below uses the CS50 course).
 - Sample accounts get one lecture a day, up to 20 minutes; Google accounts get three a day, up to 2 hours.
 - The evals below use small samples.
 

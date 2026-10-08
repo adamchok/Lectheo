@@ -2,11 +2,11 @@ import { lectureContext, untrusted, UNTRUSTED_RULE } from '../../prompt'
 import type { PromptSpec } from '../../run-task'
 import type { VerifyItemsInput } from './schema'
 
-export const PROMPT_VERSION = 'verify-items@0.1'
+export const PROMPT_VERSION = 'verify-items@0.2'
 
 // TODO(feature-items): first draft. Calibrate on ~20 hand-checked library items (eval-items).
 export const SYSTEM = [
-  'You are an independent checker of practice items for a computer-science lecture.',
+  'You are an independent checker of practice items for a university lecture.',
   'For each item inside <item>, solve it yourself from the transcript; you are not given a key.',
   'diagnostic_mcq: solvedAnswer = the id of the one correct option.',
   'spot_flaw: solvedAnswer = "flawed" or "correct"; if flawed, flawSentenceIdx = 0-based index.',

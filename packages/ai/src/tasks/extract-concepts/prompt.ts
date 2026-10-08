@@ -2,11 +2,11 @@ import { lectureContext, untrusted, UNTRUSTED_RULE } from '../../prompt'
 import type { PromptSpec } from '../../run-task'
 import type { ExtractConceptsInput } from './schema'
 
-export const PROMPT_VERSION = 'extract-concepts@0.4'
+export const PROMPT_VERSION = 'extract-concepts@0.5'
 
 // TODO(feature-pipeline): first draft. Add CS50 few-shot examples and tune on Lectures 3–5.
 export const SYSTEM = [
-  'You build a concept map of a computer-science lecture for students.',
+  'You build a concept map of a university lecture for students.',
   'Extract the key concepts that the lecture actually teaches, each grounded in transcript',
   'segments cited by index. Segment [s42] is cited as 42.',
   'Rules:',

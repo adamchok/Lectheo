@@ -22,7 +22,13 @@ export const UNTRUSTED_TAGS = [
 ] as const
 export type UntrustedTag = (typeof UNTRUSTED_TAGS)[number]
 
-const TAG_BREAKOUT = new RegExp(`<(\\s*/?\\s*)(${UNTRUSTED_TAGS.join('|')})\\b`, 'gi')
+// `<` also matches fullwidth ＜ and small ﹤, `/` also matches fullwidth ／ (look-alike tags).
+const TAG_BREAKOUT = new RegExp(
+  `[<\\uFF1C\\uFE64](\\s*[/\\uFF0F]?\\s*)(${UNTRUSTED_TAGS.join('|')})\\b`,
+  'gi',
+)
+/** Zero-width and other format characters (Unicode Cf), which could split a tag name. */
+const FORMAT_CHARS = /\p{Cf}/gu
 
 /** Standard rule every system prompt that embeds untrusted material must include. */
 export const UNTRUSTED_RULE =
@@ -39,10 +45,14 @@ export const UNTRUSTED_RULE =
 export function untrusted(tag: UntrustedTag, text: string): string {
   // Any `<tag`, `</tag`, `< / tag` (any case) of ANY untrusted tag gets a backslash after `<`,
   // so material can neither close its own block nor fake another one.
-  const safe = text.replace(
-    TAG_BREAKOUT,
-    (_m, mid: string, name: string) => `<\\${mid.replace(/\s+/g, '')}${name}`,
-  )
+  // ponytail: fullwidth letters inside a tag name aren't caught. NFKC would catch them but it
+  // rewrites transcripts (x² → x2); add it for title-like fields only if that ever matters.
+  const safe = text
+    .replace(FORMAT_CHARS, '')
+    .replace(
+      TAG_BREAKOUT,
+      (_m, mid: string, name: string) => `<\\${mid.replace(/\s+/g, '').replace('／', '/')}${name}`,
+    )
   return `<${tag}>\n${safe}\n</${tag}>`
 }
 
@@ -58,9 +68,8 @@ const oneLine = (text: string): string => text.replace(/\s+/g, ' ').trim()
 /** Both titles are user or uploader text, so each goes in an untrusted block. */
 export function courseContext(titles: CourseTitles): string {
   const course = `Course: ${untrusted('course_title', oneLine(titles.courseTitle))}`
-  return titles.lectureTitle
-    ? `${course}\nLecture: ${untrusted('lecture_title', oneLine(titles.lectureTitle))}`
-    : course
+  const lecture = titles.lectureTitle && oneLine(titles.lectureTitle)
+  return lecture ? `${course}\nLecture: ${untrusted('lecture_title', lecture)}` : course
 }
 
 export interface PromptSegment {
