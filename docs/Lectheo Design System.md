@@ -67,7 +67,7 @@ Lectheo is a calm, precise study workspace for CS students. It should feel like 
 ### Layout and spacing
 
 - 4px grid (`space-*`). Group with flex or grid `gap`; avoid margins between siblings.
-- App: sidebar (`sidebar-width`, collapsible to `sidebar-rail`) beside the content column. Content is centred up to `content-max` with a gutter of `space-4` below 640px and `space-6` above; vertical page padding `space-6`, `space-8` from 1024px. Detail panels take `panel-width` on the right instead of floating over content.
+- App: sidebar (`sidebar-width`, collapsible to `sidebar-rail`) beside the content column. Content is centred up to `content-max` with a gutter of `space-4` below 640px and `space-6` above; vertical page padding `space-6`, `space-8` from 1024px. Detail panels take `panel-width` on the right: a column beside the player in watch mode, a sheet over the map on the course page (so the map keeps the full width).
 - Rhythm in the app: PageHeader, then `space-8`, then sections separated by `space-8`; inside cards `space-4` or `space-5`. Landing sections: `space-16` padding, `space-24` from 1024px.
 - Sticky elements sit below the top bar: `html { scroll-padding-top: calc(var(--topbar-height) + 16px) }` (72px), and sticky panels offset by `topbar-height` plus `space-4`.
 - Works from 320px wide and at 400 % zoom with no horizontal page scroll. Wide tables and the comparison grid scroll inside their own container.
