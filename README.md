@@ -50,7 +50,7 @@ Lectheo answers each part of that prompt:
 - **Live app:** [lectheo.vercel.app](https://lectheo.vercel.app). Choose **Try the sample account**. There's no sign-up: you get your own copy of a student partway through Harvard's CS50x, with Lectures 3–5 ready, some marks made and a diagnostic taken. It is deleted after 24 hours. To add your own lectures, continue with Google: a Google account starts empty.
 - **Demo video (4 min):** [watch on YouTube](https://youtu.be/LjAHsxWZteY)
 
-  [![Lectheo demo video](https://img.youtube.com/vi/LjAHsxWZteY/hqdefault.jpg)](https://youtu.be/LjAHsxWZteY)
+  [![Lectheo demo video](https://i.ytimg.com/vi/LjAHsxWZteY/hqdefault.jpg)](https://youtu.be/LjAHsxWZteY)
 
 - **Two-minute judge path:**
   1. Sample account → **Lecture 5 · Study**: chapters, then **Explain in depth** on a concept.
